@@ -1,0 +1,50 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{9F2D7FB8-727A-410A-A724-794DF409ADAB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StickyTodo.Core", "src\StickyTodo.Core\StickyTodo.Core.csproj", "{EE1E03E5-D662-4B03-A251-AFBCB17267D8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StickyTodo.Infrastructure", "src\StickyTodo.Infrastructure\StickyTodo.Infrastructure.csproj", "{EB83232C-127E-4C24-9661-1DCD5DE8EB26}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StickyTodo.App", "src\StickyTodo.App\StickyTodo.App.csproj", "{A071C3A7-6463-49A2-B6A2-3A743E195554}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{08FE52F6-5B24-4EB3-B98D-161615E5370F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StickyTodo.Tests", "tests\StickyTodo.Tests\StickyTodo.Tests.csproj", "{CC868142-EF1F-4A54-8D70-A6BAD7EAD8E7}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{EE1E03E5-D662-4B03-A251-AFBCB17267D8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EE1E03E5-D662-4B03-A251-AFBCB17267D8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EE1E03E5-D662-4B03-A251-AFBCB17267D8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EE1E03E5-D662-4B03-A251-AFBCB17267D8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EB83232C-127E-4C24-9661-1DCD5DE8EB26}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EB83232C-127E-4C24-9661-1DCD5DE8EB26}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EB83232C-127E-4C24-9661-1DCD5DE8EB26}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EB83232C-127E-4C24-9661-1DCD5DE8EB26}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A071C3A7-6463-49A2-B6A2-3A743E195554}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A071C3A7-6463-49A2-B6A2-3A743E195554}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A071C3A7-6463-49A2-B6A2-3A743E195554}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A071C3A7-6463-49A2-B6A2-3A743E195554}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CC868142-EF1F-4A54-8D70-A6BAD7EAD8E7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CC868142-EF1F-4A54-8D70-A6BAD7EAD8E7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CC868142-EF1F-4A54-8D70-A6BAD7EAD8E7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CC868142-EF1F-4A54-8D70-A6BAD7EAD8E7}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{EE1E03E5-D662-4B03-A251-AFBCB17267D8} = {9F2D7FB8-727A-410A-A724-794DF409ADAB}
+		{EB83232C-127E-4C24-9661-1DCD5DE8EB26} = {9F2D7FB8-727A-410A-A724-794DF409ADAB}
+		{A071C3A7-6463-49A2-B6A2-3A743E195554} = {9F2D7FB8-727A-410A-A724-794DF409ADAB}
+		{CC868142-EF1F-4A54-8D70-A6BAD7EAD8E7} = {08FE52F6-5B24-4EB3-B98D-161615E5370F}
+	EndGlobalSection
+EndGlobal

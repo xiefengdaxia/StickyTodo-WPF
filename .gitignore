@@ -1,0 +1,20 @@
+# 构建产物
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+.vs/
+
+# 测试与覆盖率
+TestResults/
+coverage*.xml
+
+# 运行/调试临时文件
+artifacts/*.tmp
+*.log
+
+# 操作系统
+Thumbs.db
+.DS_Store

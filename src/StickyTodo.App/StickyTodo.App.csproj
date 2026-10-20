@@ -1,0 +1,38 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <!-- 托盘图标用 WinForms 的 NotifyIcon；只为了这一个控件，其余仍走 WPF -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>StickyTodo</AssemblyName>
+    <RootNamespace>StickyTodo.App</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- WFAC010：该分析器假设 UI 是 WinForms；本项目 UI 是 WPF，
+         PerMonitorV2 必须写在 manifest 里才生效，因此保留并抑制此告警 -->
+    <NoWarn>$(NoWarn);WFAC010</NoWarn>
+  </PropertyGroup>
+
+  <!-- WinForms 的隐式 using 会和 WPF 的 Application/MessageBox 冲突，这里去掉 -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\StickyTodo.Core\StickyTodo.Core.csproj" />
+    <ProjectReference Include="..\StickyTodo.Infrastructure\StickyTodo.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="8.0.0" />
+    <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+  </ItemGroup>
+
+</Project>
