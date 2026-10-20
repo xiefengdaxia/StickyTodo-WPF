@@ -25,6 +25,9 @@ public sealed class TodoItem
     /// <summary>已经弹过提醒的时间，避免重复打扰。</summary>
     public DateTimeOffset? RemindedAt { get; set; }
 
+    /// <summary>重复规则（RFC 5545 RRULE，如 FREQ=WEEKLY;BYDAY=MO,WE），null 表示不重复。</summary>
+    public string? Recurrence { get; set; }
+
     public int Sort { get; set; }
 
     public DateTimeOffset CreatedAt { get; init; }

@@ -8,13 +8,13 @@
 |---|---|---|
 | ![便签](artifacts/board-default.png) | ![半透明](artifacts/board-translucent.png) | ![暗色](artifacts/board-dark.png) |
 
-便签/随笔看板、到点提醒、管理面板：
+便签/随笔看板、日历看板、到点提醒、管理面板：
 
-| 便签看板（边写边存） | 到点提醒 | 看板管理 |
-|---|---|---|
-| ![便签看板](artifacts/board-memo.png) | ![提醒](artifacts/reminder.png) | ![管理](artifacts/manager.png) |
+| 便签看板（边写边存） | 日历看板（月视图） | 到点提醒 | 看板管理 |
+|---|---|---|---|
+| ![便签看板](artifacts/board-memo.png) | ![日历](artifacts/calendar.png) | ![提醒](artifacts/reminder.png) | ![管理](artifacts/manager.png) |
 
-带目标日期与提醒的待办列表：`artifacts/board-work.png`
+带目标日期、提醒、重复规则的待办列表：`artifacts/board-work.png`
 
 ---
 
@@ -33,6 +33,7 @@ $exe = ".\src\StickyTodo.App\bin\Debug\net8.0-windows\StickyTodo.exe"
 & $exe --demo                              # 种一份示例数据并打开两个便签窗口（库里没数据时才种）
 & $exe --demo --shot D:\shots              # 演示 + 把每个窗口渲染成 PNG，然后自动退出
 & $exe --demo --reminder-demo --shot D:\shots   # 额外造一条到点提醒，验证弹窗链路
+& $exe --recurrence-demo                    # 重复待办端到端验证（建规则→勾选→滚动→日历展开），退出码 0 = 通过
 & $exe --skin graphite --opacity 0.6 --window-opacity 0.9   # 启动时覆盖外观（也用于截图回归）
 ```
 
@@ -54,19 +55,21 @@ $exe = ".\src\StickyTodo.App\bin\Debug\net8.0-windows\StickyTodo.exe"
 
 ```
 StickyTodo.sln
-├─ src/StickyTodo.Core             领域层（零第三方依赖，可单测）
-│   ├─ Entities/                   Board / BoardWindowState / TodoItem / Tag
+├─ src/StickyTodo.Core             领域层（仅依赖 Ical.Net，无 UI/DB 依赖）
+│   ├─ Entities/                   Board / BoardWindowState / TodoItem / TodoCompletion / Tag / Note
 │   ├─ Abstractions/               ITodoRepository
 │   ├─ Entitlements/               IEntitlementService + PermanentFree / FreeTier
 │   ├─ Geometry/                   SnapRect / WindowSnapper（吸附算法）
-│   └─ Services/                   TodoService（用例 + 权益闸门）、TodoOrdering（排序）
+│   ├─ Calendar/                   MonthGrid（月网格）、CalendarProjection（待办投影到日期）
+│   ├─ Recurrence/                 RecurrenceEngine（RFC 5545 RRULE）
+│   └─ Services/                   TodoService、AppSettingsService、TodoOrdering、DueDateText
 ├─ src/StickyTodo.Infrastructure   基础设施（SQLite / 文件系统）
 │   ├─ Persistence/SqliteTodoRepository.cs
 │   └─ AppPaths.cs
 ├─ src/StickyTodo.App              WPF 表现层（net8.0-windows）
 │   ├─ App.xaml(.cs)               最小 Host + DI + Serilog + 单实例 + 自检/演示
-│   ├─ Views/                      ManagerWindow / BoardWindow / PromptWindow
-│   ├─ ViewModels/                 CommunityToolkit.Mvvm
+│   ├─ Views/                      ManagerWindow / BoardWindow / MemoBoardWindow / CalendarWindow / PromptWindow / ReminderPopup
+│   ├─ ViewModels/                 CommunityToolkit.Mvvm（四类看板各一个）
 │   ├─ Services/                   WindowManager / TrayService / ScreenHelper
 │   └─ Converters/
 └─ tests/StickyTodo.Tests          xUnit
@@ -87,18 +90,28 @@ StickyTodo.sln
 
 **看板**
 - 一个看板一个独立窗口，可同时开多个；再从托盘/管理面板打开同一个看板会激活已有窗口
-- **两种看板类型**：待办看板（清单）与便签看板（一整张纸，边写边自动保存，显示字数与保存时间）
+- **三种看板类型**：待办看板（清单）、便签看板（一整张纸，边写边自动保存）、日历看板（月视图）
 - 窗口位置与大小按看板分别记忆（重启后回到原位）；换显示器后自动夹回可见区域
 - **贴边吸附**：拖到屏幕边缘、或靠近其它便签窗口时自动对齐（纸面边缘对齐，排除投影留白）
-- 管理面板：新建待办/便签看板、重命名、删除、双击打开，显示类型与待办数
+- 管理面板：新建待办/便签/日历看板、重命名、删除、双击打开，显示类型与待办数
 - 托盘图标：可勾选式开关任意看板窗口、显示/隐藏全部、打开管理面板、退出；点 X 只收进托盘
+
+**日历看板**
+- 月视图固定 6 周网格（周一开头），今天高亮、周末标红、跨月日期淡化
+- 有日程的格子显示色点 + 标题摘要；下方是选中日期的日程列表
+- 上月/下月/今天导航；点日程可勾选完成，勾选后自动刷新
+- **拖日程到别的日期格 = 改期**（保留原时刻，只换日期）
+- 数据来自**所有看板**的待办，重复待办会按规则展开成多次显示
 
 **待办**
 - 回车快速添加、勾选完成（划线灰显）、悬停删除、显示/隐藏已完成
 - **目标日期（倒数日）**：右键设置今天/明天/本周末/自定义，行上显示「还剩 N 天 / 今天到期 / 已过期 N 天」，过期标红
 - **到点提醒**：右键设 30 分钟后 / 1 小时后 / 今天 18:00 / 明天 9:00 / 自定义，到点弹右下角小窗 + 托盘气泡，可「稍后 10 分钟」；20 秒轮询一次，全部本地
+- **重复待办（RFC 5545 RRULE）**：右键选「每天 / 每个工作日 / 每周 / 每两周 / 每月 / 每月最后一天 / 每年」，或填自定义 RRULE（如 `FREQ=MONTHLY;BYDAY=2TU`）
+  - 勾选完成时不会消失，而是**记一笔完成历史 + 目标日期滚到下一次**（提醒时间跟着顺延）
+  - 行上显示 🔁 徽标与中文描述（「每周五」「每月最后一天」）
 - **拖拽排序**（用「移到某条之前」而不是下标，因此先按标签过滤再拖动也不会错位）
-- 右键菜单：切换完成状态、挂/摘标签、设目标日期、设提醒、删除
+- 右键菜单：切换完成状态、挂/摘标签、设目标日期、设提醒、设重复、删除
 
 **标签**
 - 全局标签，一条待办可挂多个；筛选胶囊 `全部 / 未分类 / 各标签`，带计数
@@ -121,9 +134,11 @@ StickyTodo.sln
 
 ```sql
 board(id, name, sort, is_default, kind, created_at,
-      win_left, win_top, win_width, win_height)          -- kind: todo | memo
+      win_left, win_top, win_width, win_height)          -- kind: todo | memo | calendar
 todo(id, board_id→board.id ON DELETE CASCADE, title, note,
-     is_done, done_at, due_at, remind_at, reminded_at, sort, created_at, updated_at)
+     is_done, done_at, due_at, remind_at, reminded_at, recurrence,
+     sort, created_at, updated_at)                        -- recurrence: RFC5545 RRULE
+todo_completion(id, todo_id→todo.id, occurrence_at, completed_at)
 tag(id, name UNIQUE COLLATE NOCASE, color, sort, created_at)
 todo_tag(todo_id→todo.id, tag_id→tag.id, PRIMARY KEY(todo_id, tag_id))
 note(id, board_id→board.id UNIQUE, content, created_at, updated_at)
@@ -193,11 +208,17 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 - [x] 到点提醒：本地轮询 + 右下角提醒小窗 + 托盘气泡 + 稍后 10 分钟
 - [x] 全局快捷键：新建待办 / 显示隐藏全部便签 / 锁定当前看板
 
-**M3 第二批（待做）**
-- [ ] 日历看板（月视图 + 当日日程列表 + 拖待办到日期）
-- [ ] 重复待办：基于 iCalendar RRULE（`Ical.Net`），日/周/月/年/工作日/第 N 个周几
+**M3 第二批（已完成）**
+- [x] 日历看板：月视图 6 周网格 + 当日日程列表 + 拖拽改期
+- [x] 重复待办：基于 iCalendar RRULE（`Ical.Net`），日/周/月/年/工作日/第 N 个周几
+- [x] 重复待办勾选语义：记完成历史 + 目标日期滚动，不消失
+- [x] 重复规则中文描述 + 自定义 RRULE 输入 + 校验
+
+**M4 待做**
 - [ ] 看板内搜索、多标签同时筛选
 - [ ] 导入导出 Excel（NPOI）/ ICS 订阅
+- [ ] 日历周视图 / 日视图
+- [ ] 重复规则的「跳过这一次」与「编辑单次」
 
 **M4 外延**
 - [ ] ICS 订阅与导入导出
@@ -212,5 +233,6 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 - 没有标题栏自定义皮肤，用的是系统标题栏（拖拽/贴边依赖它，改动前要考虑手感）。
 - 吸附按窗口外框计算，不同 DPI 显示器之间是近似值。
 - 标签筛选是单选胶囊，多头筛选（同时选两个标签）还没做。
-- `due_at` 已入库但尚无 UI 与提醒逻辑（M3）。
-- UI 层没有自动化测试，靠 `--selftest` + `--shot` 做回归。
+- 日历只做月视图；重复规则暂不支持「跳过这一次」和「只改单次」（改了就改整条规则）。
+- 重复待办的完成历史目前只记录、未展示（将来用在「本月完成了多少次」这类统计上）。
+- UI 层没有自动化测试，靠 `--selftest` / `--recurrence-demo` / `--shot` 做回归。

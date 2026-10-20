@@ -24,6 +24,12 @@ public partial class ManagerWindow : Window
         Loaded += async (_, _) => await _viewModel.LoadAsync();
     }
 
+    /// <summary>外部（比如演示数据种完之后）要求刷新列表。</summary>
+    public async Task RefreshAsync()
+    {
+        await _viewModel.LoadAsync();
+    }
+
     private Board? SelectedBoard => _viewModel.SelectedBoard?.Board;
 
     private async void CreateTodo_Click(object sender, RoutedEventArgs e) =>
@@ -32,14 +38,19 @@ public partial class ManagerWindow : Window
     private async void CreateMemo_Click(object sender, RoutedEventArgs e) =>
         await CreateBoardAsync(BoardKind.Memo);
 
+    private async void CreateCalendar_Click(object sender, RoutedEventArgs e) =>
+        await CreateBoardAsync(BoardKind.Calendar);
+
     private async Task CreateBoardAsync(BoardKind kind)
     {
-        var name = PromptWindow.Prompt(
-            this,
-            kind == BoardKind.Memo ? "新建便签看板" : "新建待办看板",
-            "看板名称",
-            kind == BoardKind.Memo ? "新便签" : "新看板");
+        var (title, initial) = kind switch
+        {
+            BoardKind.Memo => ("新建便签看板", "新便签"),
+            BoardKind.Calendar => ("新建日历看板", "日历"),
+            _ => ("新建待办看板", "新看板"),
+        };
 
+        var name = PromptWindow.Prompt(this, title, "看板名称", initial);
         if (name is null)
         {
             return;

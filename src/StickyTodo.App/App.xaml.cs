@@ -13,6 +13,7 @@ using StickyTodo.App.Views;
 using StickyTodo.Core.Abstractions;
 using StickyTodo.Core.Entities;
 using StickyTodo.Core.Entitlements;
+using StickyTodo.Core.Recurrence;
 using StickyTodo.Core.Services;
 using StickyTodo.Infrastructure;
 using StickyTodo.Infrastructure.Persistence;
@@ -34,6 +35,13 @@ public partial class App : System.Windows.Application
         if (e.Args.Contains("--selftest", StringComparer.OrdinalIgnoreCase))
         {
             RunSelfTest();
+            return;
+        }
+
+        // 无界面回归：验证重复待办「勾选后滚到下一次」的完整链路
+        if (e.Args.Contains("--recurrence-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunRecurrenceDemo();
             return;
         }
 
@@ -91,6 +99,7 @@ public partial class App : System.Windows.Application
             if (isDemo)
             {
                 RunDemo(shotDirectory, e.Args.Contains("--reminder-demo", StringComparer.OrdinalIgnoreCase));
+                _ = manager.RefreshAsync();
             }
 
             Log.Information("StickyTodo 启动完成，数据目录 {Directory}", AppPaths.DataDirectory);
@@ -189,6 +198,58 @@ public partial class App : System.Windows.Application
     }
 
     /// <summary>
+    /// --recurrence-demo：不开界面，验证重复待办的完整链路（建规则 → 勾选 → 滚动 → 日历展开）。
+    /// 输出到日志，退出码 0 表示全部断言通过。
+    /// </summary>
+    private void RunRecurrenceDemo()
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+            var repository = new SqliteTodoRepository(AppPaths.DatabasePath);
+            repository.Initialize();
+            var service = new TodoService(repository, new PermanentFreeEntitlement());
+            var board = service.EnsureDefaultBoard();
+
+            var start = DateTimeOffset.Now.Date.AddHours(9);
+            var todo = service.AddTodo(board.Id, "每周复盘", start);
+            service.SetRecurrence(todo.Id, "FREQ=WEEKLY;BYDAY=FR");
+
+            var item = service.GetTodos(board.Id).First(t => t.Id == todo.Id);
+            Log.Information("[recurrence] 规则={Rule} 描述={Desc} 下一次={Next}",
+                item.Recurrence, RecurrenceEngine.Describe(item.Recurrence), service.GetNextOccurrence(item));
+
+            var before = item.DueAt;
+            service.CompleteOccurrence(todo.Id);
+            var after = service.GetTodos(board.Id).First(t => t.Id == todo.Id);
+
+            Log.Information("[recurrence] 勾选后：原来={Before:yyyy-MM-dd ddd} 现在={After:yyyy-MM-dd ddd} 未完成={Undone} 完成历史={History}",
+                before, after.DueAt, !after.IsDone, service.GetCompletions(todo.Id).Count);
+
+            var from = DateTimeOffset.Now.Date.AddDays(-1);
+            var to = from.AddDays(60);
+            var entries = service.GetCalendarEntries(from, to);
+            Log.Information("[recurrence] 未来 60 天日历展开 {Count} 次：{Days}",
+                entries.Count, string.Join(", ", entries.Select(x => x.Occurrence.ToString("MM-dd"))));
+
+            var ok = after.DueAt > before && !after.IsDone
+                     && service.GetCompletions(todo.Id).Count == 1
+                     && entries.Count >= 8;
+
+            Log.CloseAndFlush();
+            Shutdown(ok ? 0 : 2);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[recurrence] 失败");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
     /// --demo：库里还没有任何待办时种一份示例数据，并打开两个便签窗口摆到相邻位置，
     /// 用来验证多窗口 + 吸附 + 自动截图的回归链路（截图脚本见 tools/capture-demo.ps1）。
     /// </summary>
@@ -236,9 +297,20 @@ public partial class App : System.Windows.Application
                 "小黄条式的便签用法：把几个看板摊在桌面上，写今天要做的事。");
         }
 
+        // 日历看板（月视图）
+        var calendarBoard = service.GetBoards().FirstOrDefault(b => b.Kind == BoardKind.Calendar)
+            ?? service.CreateBoard("日历", BoardKind.Calendar);
+
+        // 重复待办示例：每周一次，落在日历上能看到展开
+        if (!service.GetTodos(workBoard.Id).Any(t => t.Recurrence is not null))
+        {
+            var weekly = service.AddTodo(workBoard.Id, "每周复盘", NextWeekday(DateTimeOffset.Now, DayOfWeek.Friday));
+            service.SetRecurrence(weekly.Id, "FREQ=WEEKLY;BYDAY=FR");        }
+
         var first = windows.OpenBoard(defaultBoard);
         var second = windows.OpenBoard(workBoard);
         var third = windows.OpenBoard(memoBoard);
+        var fourth = windows.OpenBoard(calendarBoard);
 
         if (fireReminder)
         {
@@ -263,6 +335,8 @@ public partial class App : System.Windows.Application
             second.Top = 140;
             third.Left = 700;
             third.Top = 140;
+            fourth.Left = 1000;
+            fourth.Top = 60;
             Log.Information("[demo] 窗口1=({L1},{T1},{W1}x{H1}) 窗口2=({L2},{T2},{W2}x{H2})",
                 first.Left, first.Top, first.ActualWidth, first.ActualHeight,
                 second.Left, second.Top, second.ActualWidth, second.ActualHeight);
@@ -385,6 +459,13 @@ public partial class App : System.Windows.Application
     {
         var index = Array.FindIndex(args, a => string.Equals(a, name, StringComparison.OrdinalIgnoreCase));
         return index >= 0 && index + 1 < args.Length ? args[index + 1] : null;
+    }
+
+    /// <summary>下一个指定星期几（含今天）。</summary>
+    private static DateTimeOffset NextWeekday(DateTimeOffset from, DayOfWeek target)
+    {
+        var delta = ((int)target - (int)from.DayOfWeek + 7) % 7;
+        return from.Date.AddDays(delta == 0 ? 7 : delta).AddHours(9);
     }
 
     /// <summary>无界面自检：建库 + 种子看板 + 打印关键信息，成功退出码 0。</summary>

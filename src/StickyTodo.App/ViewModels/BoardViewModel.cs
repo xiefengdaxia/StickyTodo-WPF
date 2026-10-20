@@ -150,6 +150,22 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
     /// <summary>提醒弹窗里点「稍后」。</summary>
     public void Snooze(string todoId, TimeSpan delay) => _service.Snooze(todoId, delay);
 
+    // ---------- 重复规则 ----------
+
+    public async Task SetRecurrenceAsync(TodoRowViewModel row, string? rrule)
+    {
+        try
+        {
+            ErrorText = null;
+            await Task.Run(() => _service.SetRecurrence(row.Id, rrule));
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorText = ex.Message;
+        }
+    }
+
     public async Task RenameBoardAsync(string name)
     {
         try
@@ -317,7 +333,21 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
         try
         {
             ErrorText = null;
-            await Task.Run(() => _service.SetDone(row.Id, !row.IsDone));
+            var isRecurring = !string.IsNullOrWhiteSpace(row.Item.Recurrence);
+
+            await Task.Run(() =>
+            {
+                if (isRecurring && !row.IsDone)
+                {
+                    // 重复待办：勾选 = 记一次完成 + 目标日期滚到下一次（不消失）
+                    _service.CompleteOccurrence(row.Id);
+                }
+                else
+                {
+                    _service.SetDone(row.Id, !row.IsDone);
+                }
+            });
+
             await LoadAsync();
         }
         catch (Exception ex)

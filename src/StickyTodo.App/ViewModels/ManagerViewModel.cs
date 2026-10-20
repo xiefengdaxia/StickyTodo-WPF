@@ -32,7 +32,11 @@ public sealed class BoardRowViewModel
 
     public string Summary => IsMemo
         ? "便签 · 边写边存"
-        : $"{Pending} 待办 · {Done} 已完成";
+        : IsCalendar
+            ? "月视图 · 汇总所有看板的目标日期"
+            : $"{Pending} 待办 · {Done} 已完成";
+
+    public bool IsCalendar => Board.Kind == BoardKind.Calendar;
 
     public string WindowHint => Board.Window is null ? string.Empty : "已记住窗口位置";
 }

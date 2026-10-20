@@ -12,7 +12,7 @@ namespace StickyTodo.Infrastructure.Persistence;
 /// </summary>
 public sealed class SqliteTodoRepository : ITodoRepository
 {
-    private const int CurrentSchemaVersion = 4;
+    private const int CurrentSchemaVersion = 5;
 
     private readonly string _connectionString;
 
@@ -61,6 +61,11 @@ public sealed class SqliteTodoRepository : ITodoRepository
         if (version < 4)
         {
             connection.Execute(SchemaV4, transaction: tx);
+        }
+
+        if (version < 5)
+        {
+            connection.Execute(SchemaV5, transaction: tx);
         }
 
         connection.Execute($"PRAGMA user_version={CurrentSchemaVersion};", transaction: tx);
@@ -157,6 +162,22 @@ public sealed class SqliteTodoRepository : ITodoRepository
         );
 
         CREATE UNIQUE INDEX IF NOT EXISTS ux_note_board ON note (board_id);
+        """;
+
+    private const string SchemaV5 = """
+        -- 重复规则（RFC 5545 RRULE），NULL = 不重复
+        ALTER TABLE todo ADD COLUMN recurrence TEXT NULL;
+
+        -- 重复待办的完成历史：每次勾选记一笔，不删除主记录
+        CREATE TABLE IF NOT EXISTS todo_completion (
+            id            TEXT    NOT NULL PRIMARY KEY,
+            todo_id       TEXT    NOT NULL,
+            occurrence_at INTEGER NOT NULL,
+            completed_at  INTEGER NOT NULL,
+            FOREIGN KEY (todo_id) REFERENCES todo(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS ix_completion_todo ON todo_completion (todo_id, completed_at);
         """;
 
     // ---------------- 看板 ----------------
@@ -305,6 +326,7 @@ public sealed class SqliteTodoRepository : ITodoRepository
                    due_at = @DueAt,
                    remind_at = @RemindAt,
                    reminded_at = @RemindedAt,
+                   recurrence = @Recurrence,
                    sort = @Sort,
                    updated_at = @UpdatedAt
              WHERE id = @Id;
@@ -319,6 +341,7 @@ public sealed class SqliteTodoRepository : ITodoRepository
                 DueAt = ToUnix(item.DueAt),
                 RemindAt = ToUnix(item.RemindAt),
                 RemindedAt = ToUnix(item.RemindedAt),
+                item.Recurrence,
                 item.Sort,
                 UpdatedAt = ToUnix(item.UpdatedAt),
             }) > 0;
@@ -444,6 +467,77 @@ public sealed class SqliteTodoRepository : ITodoRepository
         tx.Commit();
     }
 
+    // ---------------- 重复规则 / 完成历史 / 日历 ----------------
+
+    public bool SetRecurrence(string todoId, string? rrule)
+    {
+        using var connection = Open();
+        return connection.Execute(
+            "UPDATE todo SET recurrence = @rrule, updated_at = @now WHERE id = @todoId;",
+            new { todoId, rrule, now = ToUnix(DateTimeOffset.Now) }) > 0;
+    }
+
+    public IReadOnlyList<TodoCompletion> GetCompletions(string todoId, int limit = 50)
+    {
+        using var connection = Open();
+        return connection.Query<CompletionRow>(
+                """
+                SELECT * FROM todo_completion
+                 WHERE todo_id = @todoId
+                 ORDER BY completed_at DESC
+                 LIMIT @limit;
+                """,
+                new { todoId, limit })
+            .Select(r => new TodoCompletion
+            {
+                Id = r.id,
+                TodoId = r.todo_id,
+                OccurrenceAt = FromUnix(r.occurrence_at),
+                CompletedAt = FromUnix(r.completed_at),
+            })
+            .ToList();
+    }
+
+    public void AddCompletion(string todoId, DateTimeOffset occurrenceAt, DateTimeOffset completedAt)
+    {
+        using var connection = Open();
+        connection.Execute(
+            """
+            INSERT INTO todo_completion (id, todo_id, occurrence_at, completed_at)
+            VALUES (@id, @todoId, @occurrenceAt, @completedAt);
+            """,
+            new
+            {
+                id = NewId(),
+                todoId,
+                occurrenceAt = ToUnix(occurrenceAt),
+                completedAt = ToUnix(completedAt),
+            });
+    }
+
+    /// <summary>
+    /// 日历取数：目标日期在区间内的所有看板待办。
+    /// 重复规则只在「目标日期早于区间」时才会有跨界展开，因此这里额外把有规则的待办也带上，
+    /// 由 <c>CalendarProjection</c> 负责展开。
+    /// </summary>
+    public IReadOnlyList<TodoItem> GetTodosWithDue(DateTimeOffset from, DateTimeOffset to)
+    {
+        using var connection = Open();
+        return connection.Query<TodoRow>(
+                """
+                SELECT * FROM todo
+                 WHERE is_done = 0
+                   AND (
+                        (due_at IS NOT NULL AND due_at BETWEEN @from AND @to)
+                     OR (recurrence IS NOT NULL AND due_at IS NOT NULL AND due_at <= @to)
+                   )
+                 ORDER BY due_at;
+                """,
+                new { from = ToUnix(from), to = ToUnix(to) })
+            .Select(ToTodo)
+            .ToList();
+    }
+
     // ---------------- 便签正文 / 提醒 / 设置 ----------------
 
     public Note? GetNote(string boardId)
@@ -563,6 +657,7 @@ public sealed class SqliteTodoRepository : ITodoRepository
         DueAt = FromUnix(row.due_at),
         RemindAt = FromUnix(row.remind_at),
         RemindedAt = FromUnix(row.reminded_at),
+        Recurrence = row.recurrence,
         Sort = row.sort,
         CreatedAt = FromUnix(row.created_at),
         UpdatedAt = FromUnix(row.updated_at),
@@ -594,6 +689,7 @@ public sealed class SqliteTodoRepository : ITodoRepository
         public long? due_at { get; set; }
         public long? remind_at { get; set; }
         public long? reminded_at { get; set; }
+        public string? recurrence { get; set; }
         public int sort { get; set; }
         public long created_at { get; set; }
         public long updated_at { get; set; }
@@ -618,5 +714,13 @@ public sealed class SqliteTodoRepository : ITodoRepository
     {
         public string key { get; set; } = string.Empty;
         public string value { get; set; } = string.Empty;
+    }
+
+    private sealed class CompletionRow
+    {
+        public string id { get; set; } = string.Empty;
+        public string todo_id { get; set; } = string.Empty;
+        public long occurrence_at { get; set; }
+        public long completed_at { get; set; }
     }
 }

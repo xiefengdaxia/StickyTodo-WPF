@@ -9,6 +9,7 @@ using StickyTodo.App.Services;
 using StickyTodo.App.ViewModels;
 using StickyTodo.Core.Entities;
 using StickyTodo.Core.Geometry;
+using StickyTodo.Core.Recurrence;
 
 namespace StickyTodo.App.Views;
 
@@ -505,6 +506,9 @@ public partial class BoardWindow : Window, IStickyWindow
 
         menu.Items.Add(remindMenu);
 
+        // 重复规则（RFC 5545 RRULE）
+        menu.Items.Add(BuildRecurrenceMenu(row));
+
         menu.Items.Add(new Separator());
         var remove = new MenuItem { Header = "删除待办" };
         remove.Click += async (_, _) => await _viewModel.DeleteAsync(row);
@@ -529,6 +533,66 @@ public partial class BoardWindow : Window, IStickyWindow
         };
         item.Click += async (_, _) => await _viewModel.SetDueAsync(row, value);
         return item;
+    }
+
+    /// <summary>重复规则菜单：常用预设 + 自定义 RRULE + 清除。</summary>
+    private MenuItem BuildRecurrenceMenu(TodoRowViewModel row)
+    {
+        var rule = row.Item.Recurrence;
+        var menu = new MenuItem
+        {
+            Header = string.IsNullOrWhiteSpace(rule)
+                ? "重复"
+                : $"重复（{RecurrenceEngine.Describe(rule)}）",
+        };
+
+        foreach (var (name, preset) in RecurrenceEngine.Presets)
+        {
+            var item = new MenuItem
+            {
+                Header = name,
+                IsCheckable = true,
+                IsChecked = string.Equals(rule, preset, StringComparison.OrdinalIgnoreCase),
+            };
+            item.Click += async (_, _) => await _viewModel.SetRecurrenceAsync(row, preset);
+            menu.Items.Add(item);
+        }
+
+        menu.Items.Add(new Separator());
+
+        var custom = new MenuItem { Header = "自定义规则…" };
+        custom.Click += async (_, _) =>
+        {
+            var text = PromptWindow.Prompt(
+                this,
+                "自定义重复规则",
+                "RFC 5545 RRULE，例如 FREQ=WEEKLY;BYDAY=MO,WE",
+                rule ?? "FREQ=WEEKLY");
+
+            if (text is null)
+            {
+                return;
+            }
+
+            if (!RecurrenceEngine.IsValid(text))
+            {
+                MessageBox.Show($"这条规则看不懂：{text}", "规则无效", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            await _viewModel.SetRecurrenceAsync(row, text);
+        };
+        menu.Items.Add(custom);
+
+        if (!string.IsNullOrWhiteSpace(rule))
+        {
+            var clear = new MenuItem { Header = "不再重复" };
+            clear.Click += async (_, _) => await _viewModel.SetRecurrenceAsync(row, null);
+            menu.Items.Add(new Separator());
+            menu.Items.Add(clear);
+        }
+
+        return menu;
     }
 
     private MenuItem BuildRemindItem(string header, DateTimeOffset value, TodoRowViewModel row)

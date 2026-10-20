@@ -1,4 +1,5 @@
 using StickyTodo.Core.Abstractions;
+using StickyTodo.Core.Calendar;
 using StickyTodo.Core.Entities;
 using StickyTodo.Core.Entitlements;
 
@@ -182,6 +183,67 @@ public sealed class TodoService
     {
         _repository.SetRemindAt(todoId, DateTimeOffset.Now.Add(delay));
         _repository.MarkReminded(todoId, null);
+    }
+
+    // ---------- 重复待办 ----------
+
+    public void SetRecurrence(string todoId, string? rrule)
+    {
+        if (!string.IsNullOrWhiteSpace(rrule) && !Recurrence.RecurrenceEngine.IsValid(rrule))
+        {
+            throw new ArgumentException($"看不懂的重复规则：{rrule}", nameof(rrule));
+        }
+
+        _repository.SetRecurrence(todoId, string.IsNullOrWhiteSpace(rrule) ? null : rrule.Trim());
+    }
+
+    /// <summary>这条重复待办下一次什么时候发生（没有规则或已经结束返回 null）。</summary>
+    public DateTimeOffset? GetNextOccurrence(TodoItem item)
+    {
+        if (string.IsNullOrWhiteSpace(item.Recurrence))
+        {
+            return null;
+        }
+
+        var anchor = item.DueAt ?? item.CreatedAt;
+        return Recurrence.RecurrenceEngine.Next(anchor, item.Recurrence, anchor);
+    }
+
+    /// <summary>
+    /// 勾选完成。重复待办不是「做完就没了」：记一笔完成历史，把目标日期滚到下一次，
+    /// 提醒也重置，下次到点会再响。
+    /// </summary>
+    public void CompleteOccurrence(string todoId)
+    {
+        var item = _repository.GetTodo(todoId) ?? throw new InvalidOperationException($"待办不存在：{todoId}");
+
+        var next = GetNextOccurrence(item);
+        if (next is null)
+        {
+            SetDone(todoId, true);
+            return;
+        }
+
+        var occurrence = item.DueAt ?? DateTimeOffset.Now;
+        _repository.AddCompletion(todoId, occurrence, DateTimeOffset.Now);
+        _repository.SetDueAt(todoId, next);
+        if (item.RemindAt is not null)
+        {
+            // 提醒时间跟着往后挪一格
+            _repository.SetRemindAt(todoId, next);
+            _repository.MarkReminded(todoId, null);
+        }
+    }
+
+    public IReadOnlyList<TodoCompletion> GetCompletions(string todoId, int limit = 50) =>
+        _repository.GetCompletions(todoId, limit);
+
+    // ---------- 日历 ----------
+
+    public IReadOnlyList<CalendarEntry> GetCalendarEntries(DateTimeOffset from, DateTimeOffset to)
+    {
+        var todos = _repository.GetTodosWithDue(from, to);
+        return CalendarProjection.Project(todos, from, to);
     }
 
     private static string Require(string value, string field)

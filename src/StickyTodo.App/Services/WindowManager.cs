@@ -54,9 +54,14 @@ public sealed class WindowManager
             return existing;
         }
 
-        Window window = board.Kind == BoardKind.Memo
-            ? new MemoBoardWindow(new MemoBoardViewModel(_todoService, board, _settings, _skinService), this)
-            : new BoardWindow(new BoardViewModel(_todoService, board, _settings, _skinService), this);
+        Window window = board.Kind switch
+        {
+            BoardKind.Memo => new MemoBoardWindow(
+                new MemoBoardViewModel(_todoService, board, _settings, _skinService), this),
+            BoardKind.Calendar => new CalendarWindow(
+                new CalendarViewModel(_todoService, board, _settings, _skinService), this),
+            _ => new BoardWindow(new BoardViewModel(_todoService, board, _settings, _skinService), this),
+        };
 
         _windows[board.Id] = window;
         window.Closed += (_, _) =>
@@ -127,8 +132,17 @@ public sealed class WindowManager
                 case MemoBoardWindow memo:
                     memo.RefreshAppearance();
                     break;
+                case CalendarWindow calendar:
+                    calendar.RefreshAppearance();
+                    break;
             }
         }
+    }
+
+    /// <summary>日历里删除待办；删完让相关窗口各自刷新（各窗口的 LoadAsync 是幂等的）。</summary>
+    public void DeleteTodoAndRefresh(string todoId)
+    {
+        _todoService.Delete(todoId);
     }
 
     /// <summary>全局快捷键：一键显示/隐藏全部便签。</summary>

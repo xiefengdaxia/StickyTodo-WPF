@@ -1,4 +1,5 @@
 using StickyTodo.Core.Entities;
+using StickyTodo.Core.Recurrence;
 using StickyTodo.Core.Services;
 
 namespace StickyTodo.App.ViewModels;
@@ -22,6 +23,9 @@ public sealed class TodoRowViewModel
             : remind.Value.Date == now.Date
                 ? $"提醒 {remind.Value:HH:mm}"
                 : $"提醒 {remind.Value:M月d日 HH:mm}";
+
+        RecurrenceText = RecurrenceEngine.Describe(item.Recurrence);
+        IsRecurring = RecurrenceText.Length > 0;
     }
 
     public TodoItem Item { get; }
@@ -46,4 +50,9 @@ public sealed class TodoRowViewModel
     public string RemindText { get; }
 
     public bool HasReminder { get; }
+
+    /// <summary>重复规则的中文描述，空串表示不重复。</summary>
+    public string RecurrenceText { get; }
+
+    public bool IsRecurring { get; }
 }

@@ -308,6 +308,18 @@
                                                        Opacity="0.8"
                                                        Foreground="{DynamicResource Brush.InkSoft}"
                                                        Visibility="{Binding HasReminder, Converter={StaticResource BoolToVis}}" />
+
+                                            <Border Margin="5,0,0,0"
+                                                    Padding="5,1"
+                                                    CornerRadius="6"
+                                                    Background="#332E7D32"
+                                                    VerticalAlignment="Center"
+                                                    Visibility="{Binding IsRecurring, Converter={StaticResource BoolToVis}}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="🔁 " FontSize="9" />
+                                                    <TextBlock Text="{Binding RecurrenceText}" FontSize="10" Foreground="#FF2E7D32" />
+                                                </StackPanel>
+                                            </Border>
                                         </StackPanel>
 
                                         <TextBlock Text="{Binding TagText}"

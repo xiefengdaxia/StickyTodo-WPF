@@ -68,4 +68,14 @@ public interface ITodoRepository
 
     /// <summary>传 null 表示清空（改过提醒时间后要重置，好让它再次弹出）。</summary>
     bool MarkReminded(string todoId, DateTimeOffset? remindedAt);
+
+    // ---- 重复规则 ----
+    bool SetRecurrence(string todoId, string? rrule);
+
+    IReadOnlyList<TodoCompletion> GetCompletions(string todoId, int limit = 50);
+
+    void AddCompletion(string todoId, DateTimeOffset occurrenceAt, DateTimeOffset completedAt);
+
+    /// <summary>所有看板中目标日期落在区间内的待办（日历用）。</summary>
+    IReadOnlyList<TodoItem> GetTodosWithDue(DateTimeOffset from, DateTimeOffset to);
 }

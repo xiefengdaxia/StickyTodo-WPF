@@ -52,7 +52,13 @@ public sealed class SchemaMigrationTests : IDisposable
         repository.MarkReminded(todo.Id, DateTimeOffset.Now);
         Assert.Empty(repository.GetDueReminders(DateTimeOffset.Now));
 
-        Assert.Equal(4L, ReadSchemaVersion());
+        // v5：重复规则与完成历史
+        repository.SetRecurrence(todo.Id, "FREQ=DAILY");
+        Assert.Equal("FREQ=DAILY", repository.GetTodo(todo.Id)!.Recurrence);
+        repository.AddCompletion(todo.Id, DateTimeOffset.Now, DateTimeOffset.Now);
+        Assert.Single(repository.GetCompletions(todo.Id));
+
+        Assert.Equal(5L, ReadSchemaVersion());
     }
 
     private long ReadSchemaVersion()
