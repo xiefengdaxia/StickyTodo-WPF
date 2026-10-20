@@ -41,7 +41,7 @@ public sealed class TodoService
 
     public Board? GetBoard(string boardId) => _repository.GetBoards().FirstOrDefault(b => b.Id == boardId);
 
-    public Board CreateBoard(string name)
+    public Board CreateBoard(string name, BoardKind kind = BoardKind.Todo)
     {
         var clean = Require(name, "看板名称");
         if (_repository.GetBoards().Count >= _entitlement.MaxBoards)
@@ -50,7 +50,7 @@ public sealed class TodoService
                 $"{_entitlement.DisplayName}最多支持 {_entitlement.MaxBoards} 个看板，当前已达上限。");
         }
 
-        return _repository.AddBoard(clean);
+        return _repository.AddBoard(clean, kind);
     }
 
     public bool RenameBoard(string boardId, string name) =>
@@ -147,6 +147,42 @@ public sealed class TodoService
 
     public void SetTodoTags(string todoId, IReadOnlyList<string> tagIds) =>
         _repository.SetTodoTags(todoId, tagIds);
+
+    // ---------- 便签/随笔 ----------
+
+    public Note? GetNote(string boardId) => _repository.GetNote(boardId);
+
+    public Note SaveNote(string boardId, string content) =>
+        _repository.SaveNote(boardId, content ?? string.Empty);
+
+    // ---------- 倒数日与提醒 ----------
+
+    public IReadOnlyList<TodoItem> GetDueReminders(DateTimeOffset now) =>
+        _repository.GetDueReminders(now);
+
+    public void SetDueAt(string todoId, DateTimeOffset? dueAt)
+    {
+        var item = _repository.GetTodo(todoId) ?? throw new InvalidOperationException($"待办不存在：{todoId}");
+        item.DueAt = dueAt;
+        item.UpdatedAt = DateTimeOffset.Now;
+        _repository.SetDueAt(todoId, dueAt);
+    }
+
+    public void SetRemindAt(string todoId, DateTimeOffset? remindAt)
+    {
+        _repository.SetRemindAt(todoId, remindAt);
+        _repository.MarkReminded(todoId, null);
+    }
+
+    public void MarkReminded(string todoId, DateTimeOffset remindedAt) =>
+        _repository.MarkReminded(todoId, remindedAt);
+
+    /// <summary>稍后提醒：把提醒时间往后推。</summary>
+    public void Snooze(string todoId, TimeSpan delay)
+    {
+        _repository.SetRemindAt(todoId, DateTimeOffset.Now.Add(delay));
+        _repository.MarkReminded(todoId, null);
+    }
 
     private static string Require(string value, string field)
     {

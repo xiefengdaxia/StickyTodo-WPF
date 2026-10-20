@@ -7,14 +7,28 @@ using StickyTodo.Core.Services;
 
 namespace StickyTodo.App.Services;
 
+/// <summary>便签窗口的公共能力（待办看板 / 便签看板都要）。</summary>
+public interface IStickyWindow
+{
+    string BoardId { get; }
+
+    void ToggleLock();
+
+    void ShowAndActivate();
+}
+
 /// <summary>
 /// 便签窗口的生命周期：一个看板最多一个窗口，重复打开就激活已有窗口。
-/// 同时给吸附算法提供其它窗口的矩形。
+/// 同时给吸附算法提供其它窗口的矩形，并记住最后活跃的看板（给全局快捷键用）。
 /// </summary>
 public sealed class WindowManager
 {
     private readonly TodoService _todoService;
-    private readonly Dictionary<string, BoardWindow> _windows = new();
+    private readonly AppSettingsService _settings;
+    private readonly SkinService _skinService;
+    private readonly Dictionary<string, Window> _windows = new();
+
+    private string? _activeBoardId;
 
     public WindowManager(TodoService todoService, AppSettingsService settings, SkinService skinService)
     {
@@ -23,9 +37,6 @@ public sealed class WindowManager
         _skinService = skinService;
     }
 
-    private readonly AppSettingsService _settings;
-    private readonly SkinService _skinService;
-
     /// <summary>打开的窗口数变化时触发（托盘菜单据此刷新）。</summary>
     public event EventHandler? BoardsChanged;
 
@@ -33,29 +44,30 @@ public sealed class WindowManager
 
     public bool IsBoardOpen(string boardId) => _windows.ContainsKey(boardId);
 
-    public BoardWindow OpenBoard(Board board)
+    public string? ActiveBoardId => _activeBoardId;
+
+    public Window OpenBoard(Board board)
     {
         if (_windows.TryGetValue(board.Id, out var existing))
         {
-            if (existing.WindowState == WindowState.Minimized)
-            {
-                existing.WindowState = WindowState.Normal;
-            }
-
-            existing.Activate();
+            Activate(existing);
             return existing;
         }
 
-        var viewModel = new BoardViewModel(_todoService, board, _settings, _skinService);
-        var window = new BoardWindow(viewModel, this);
+        Window window = board.Kind == BoardKind.Memo
+            ? new MemoBoardWindow(new MemoBoardViewModel(_todoService, board, _settings, _skinService), this)
+            : new BoardWindow(new BoardViewModel(_todoService, board, _settings, _skinService), this);
+
         _windows[board.Id] = window;
         window.Closed += (_, _) =>
         {
             _windows.Remove(board.Id);
             BoardsChanged?.Invoke(this, EventArgs.Empty);
         };
+        window.Activated += (_, _) => _activeBoardId = board.Id;
 
         window.Show();
+        _activeBoardId = board.Id;
         BoardsChanged?.Invoke(this, EventArgs.Empty);
         return window;
     }
@@ -63,6 +75,14 @@ public sealed class WindowManager
     public void CloseBoard(string boardId)
     {
         if (_windows.TryGetValue(boardId, out var window))
+        {
+            window.Close();
+        }
+    }
+
+    public void CloseAll()
+    {
+        foreach (var window in _windows.Values.ToList())
         {
             window.Close();
         }
@@ -77,14 +97,6 @@ public sealed class WindowManager
         }
     }
 
-    public void CloseAll()
-    {
-        foreach (var window in _windows.Values.ToList())
-        {
-            window.Close();
-        }
-    }
-
     /// <summary>其它可见便签窗口的矩形（已按阴影留白内缩），供吸附计算使用。</summary>
     public IReadOnlyList<SnapRect> GetOtherWindowRects(Window exclude, double margin = 0) =>
         _windows.Values
@@ -96,19 +108,94 @@ public sealed class WindowManager
                 Math.Max(1, w.ActualHeight - (margin * 2))))
             .ToList();
 
-    /// <summary>皮肤或透明度变了，通知所有便签刷新菜单勾选状态。</summary>
-    public void NotifyAppearanceChanged()
-    {
-        foreach (var window in _windows.Values)
-        {
-            window.RefreshAppearance();
-        }
-    }
-
-    /// <summary>重新套用皮肤资源（改设置、切皮肤后调用）。</summary>
+    /// <summary>皮肤/透明度变了：重刷资源 + 通知各窗口刷新绑定值。</summary>
     public void ApplySkin(string? skinKey = null, double? opacity = null)
     {
         _skinService.Apply(skinKey, opacity);
         NotifyAppearanceChanged();
+    }
+
+    public void NotifyAppearanceChanged()
+    {
+        foreach (var window in _windows.Values)
+        {
+            switch (window)
+            {
+                case BoardWindow board:
+                    board.RefreshAppearance();
+                    break;
+                case MemoBoardWindow memo:
+                    memo.RefreshAppearance();
+                    break;
+            }
+        }
+    }
+
+    /// <summary>全局快捷键：一键显示/隐藏全部便签。</summary>
+    public void ToggleBoardsVisibility()
+    {
+        if (_windows.Count == 0)
+        {
+            return;
+        }
+
+        var anyVisible = _windows.Values.Any(w => w.IsVisible);
+        foreach (var window in _windows.Values)
+        {
+            if (anyVisible)
+            {
+                window.Hide();
+            }
+            else
+            {
+                window.Show();
+            }
+        }
+    }
+
+    /// <summary>全局快捷键：锁定/解锁最后活跃的便签。</summary>
+    public bool ToggleActiveLock()
+    {
+        if (_activeBoardId is not null && _windows.TryGetValue(_activeBoardId, out var window) && window is IStickyWindow sticky)
+        {
+            sticky.ToggleLock();
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>全局快捷键：打开默认看板并把焦点给到新增输入框。</summary>
+    public void OpenDefaultBoardForNewTodo()
+    {
+        var board = _todoService.GetBoards().FirstOrDefault(b => b.IsDefault)
+            ?? _todoService.EnsureDefaultBoard();
+
+        if (board.Kind == BoardKind.Memo)
+        {
+            board = _todoService.GetBoards().FirstOrDefault(b => b.Kind == BoardKind.Todo)
+                ?? _todoService.EnsureDefaultBoard();
+        }
+
+        var window = OpenBoard(board);
+        if (window is BoardWindow boardWindow)
+        {
+            boardWindow.FocusNewTodo();
+        }
+    }
+
+    private static void Activate(Window window)
+    {
+        if (!window.IsVisible)
+        {
+            window.Show();
+        }
+
+        if (window.WindowState == WindowState.Minimized)
+        {
+            window.WindowState = WindowState.Normal;
+        }
+
+        window.Activate();
     }
 }

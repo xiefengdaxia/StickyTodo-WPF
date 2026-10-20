@@ -15,7 +15,7 @@ namespace StickyTodo.App.Views;
 /// <summary>
 /// 一个看板一个窗口：位置/大小会被记住，拖到边缘或其它便签旁边会自动吸附。
 /// </summary>
-public partial class BoardWindow : Window
+public partial class BoardWindow : Window, IStickyWindow
 {
     /// <summary>便签外圈留给阴影的空白，吸附时要把它排除掉，否则纸面离屏幕边缘差 10px。</summary>
     private const double ShadowMargin = 10d;
@@ -119,56 +119,34 @@ public partial class BoardWindow : Window
             return;
         }
 
-        var menu = new ContextMenu();
-
-        var skinMenu = new MenuItem { Header = "皮肤" };
-        foreach (var skin in NoteSkins.All)
-        {
-            var item = new MenuItem
-            {
-                Header = skin.DisplayName,
-                IsCheckable = true,
-                IsChecked = string.Equals(skin.Key, _viewModel.CurrentSkinKey, StringComparison.OrdinalIgnoreCase),
-            };
-            var key = skin.Key;
-            item.Click += (_, _) =>
-            {
-                _viewModel.SetSkin(key);
-                _windows.NotifyAppearanceChanged();
-            };
-            skinMenu.Items.Add(item);
-        }
-
-        menu.Items.Add(skinMenu);
-
-        var opacityMenu = new MenuItem { Header = "背景透明度" };
-        for (var percent = 40; percent <= 100; percent += 10)
-        {
-            var value = percent / 100d;
-            var item = new MenuItem
-            {
-                Header = $"{percent}%",
-                IsCheckable = true,
-                IsChecked = Math.Abs(_viewModel.CurrentOpacity - value) < 0.02,
-            };
-            item.Click += (_, _) =>
-            {
-                _viewModel.SetOpacity(value);
-                _windows.NotifyAppearanceChanged();
-            };
-            opacityMenu.Items.Add(item);
-        }
-
-        menu.Items.Add(opacityMenu);
-
-        var hint = new MenuItem { Header = "透明度只影响背景，文字始终清晰", IsEnabled = false };
-        menu.Items.Add(new Separator());
-        menu.Items.Add(hint);
-
-        menu.PlacementTarget = element;
-        menu.IsOpen = true;
+        AppearanceMenu.Show(element, _viewModel, _windows);
         e.Handled = true;
     }
+
+    /// <summary>全局快捷键 Ctrl+Alt+N：打开后把光标放到新增输入框。</summary>
+    public void FocusNewTodo()
+    {
+        ShowAndActivate();
+        InputBox.Focus();
+        InputBox.SelectAll();
+    }
+
+    public void ShowAndActivate()
+    {
+        Show();
+        if (WindowState == WindowState.Minimized)
+        {
+            WindowState = WindowState.Normal;
+        }
+
+        Activate();
+    }
+
+    public void ToggleLock() => _viewModel.ToggleLock();
+
+    public string BoardId => _viewModel.BoardId;
+
+    public void RefreshAppearance() => _viewModel.RefreshAppearance();
 
     // ---------------- 位置记忆与吸附 ----------------
 
@@ -469,12 +447,101 @@ public partial class BoardWindow : Window
         tagMenu.Items.Add(newTag);
         menu.Items.Add(tagMenu);
 
+        // 目标日期（倒数日）
+        var dueMenu = new MenuItem { Header = "目标日期" };
+        var today = DateTimeOffset.Now.Date;
+        dueMenu.Items.Add(BuildDateItem("今天", today, row));
+        dueMenu.Items.Add(BuildDateItem("明天", today.AddDays(1), row));
+        dueMenu.Items.Add(BuildDateItem("本周末", NextWeekend(today), row));
+
+        var customDue = new MenuItem { Header = "自定义…" };
+        customDue.Click += async (_, _) =>
+        {
+            var text = PromptWindow.Prompt(this, "目标日期", "格式 yyyy-MM-dd", today.ToString("yyyy-MM-dd"));
+            if (text is not null && DateTimeOffset.TryParse(text, out var parsed))
+            {
+                await _viewModel.SetDueAsync(row, parsed);
+            }
+        };
+        dueMenu.Items.Add(customDue);
+
+        if (row.Item.DueAt is not null)
+        {
+            var clearDue = new MenuItem { Header = "清除目标日期" };
+            clearDue.Click += async (_, _) => await _viewModel.SetDueAsync(row, null);
+            dueMenu.Items.Add(new Separator());
+            dueMenu.Items.Add(clearDue);
+        }
+
+        menu.Items.Add(dueMenu);
+
+        // 提醒
+        var remindMenu = new MenuItem { Header = "提醒" };
+        var now = DateTimeOffset.Now;
+        remindMenu.Items.Add(BuildRemindItem("30 分钟后", now.AddMinutes(30), row));
+        remindMenu.Items.Add(BuildRemindItem("1 小时后", now.AddHours(1), row));
+        remindMenu.Items.Add(BuildRemindItem("今天 18:00", today.AddHours(18), row));
+        remindMenu.Items.Add(BuildRemindItem("明天 9:00", today.AddDays(1).AddHours(9), row));
+
+        var customRemind = new MenuItem { Header = "自定义…" };
+        customRemind.Click += async (_, _) =>
+        {
+            var text = PromptWindow.Prompt(this, "提醒时间", "格式 yyyy-MM-dd HH:mm",
+                now.AddHours(1).ToString("yyyy-MM-dd HH:mm"));
+            if (text is not null && DateTimeOffset.TryParse(text, out var parsed))
+            {
+                await _viewModel.SetRemindAsync(row, parsed);
+            }
+        };
+        remindMenu.Items.Add(customRemind);
+
+        if (row.Item.RemindAt is not null)
+        {
+            var clearRemind = new MenuItem { Header = "清除提醒" };
+            clearRemind.Click += async (_, _) => await _viewModel.SetRemindAsync(row, null);
+            remindMenu.Items.Add(new Separator());
+            remindMenu.Items.Add(clearRemind);
+        }
+
+        menu.Items.Add(remindMenu);
+
         menu.Items.Add(new Separator());
         var remove = new MenuItem { Header = "删除待办" };
         remove.Click += async (_, _) => await _viewModel.DeleteAsync(row);
         menu.Items.Add(remove);
 
         TodoList.ContextMenu = menu;
+    }
+
+    private static DateTimeOffset NextWeekend(DateTimeOffset today)
+    {
+        var delta = ((int)DayOfWeek.Saturday - (int)today.DayOfWeek + 7) % 7;
+        return today.AddDays(delta == 0 ? 7 : delta);
+    }
+
+    private MenuItem BuildDateItem(string header, DateTimeOffset value, TodoRowViewModel row)
+    {
+        var item = new MenuItem
+        {
+            Header = header,
+            IsCheckable = true,
+            IsChecked = row.Item.DueAt is { } due && due.Date == value.Date,
+        };
+        item.Click += async (_, _) => await _viewModel.SetDueAsync(row, value);
+        return item;
+    }
+
+    private MenuItem BuildRemindItem(string header, DateTimeOffset value, TodoRowViewModel row)
+    {
+        var item = new MenuItem
+        {
+            Header = header,
+            IsCheckable = true,
+            IsChecked = row.Item.RemindAt is { } remind
+                        && Math.Abs((remind - value).TotalMinutes) < 1,
+        };
+        item.Click += async (_, _) => await _viewModel.SetRemindAsync(row, value);
+        return item;
     }
 
     // ---------------- 拖拽排序 ----------------
@@ -547,7 +614,4 @@ public partial class BoardWindow : Window
 
         return null;
     }
-
-    /// <summary>皮肤/透明度变了之后刷新绑定（菜单勾选状态）。</summary>
-    public void RefreshAppearance() => _viewModel.RefreshAppearance();
 }

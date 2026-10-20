@@ -11,6 +11,7 @@ using StickyTodo.App.Services;
 using StickyTodo.App.ViewModels;
 using StickyTodo.App.Views;
 using StickyTodo.Core.Abstractions;
+using StickyTodo.Core.Entities;
 using StickyTodo.Core.Entitlements;
 using StickyTodo.Core.Services;
 using StickyTodo.Infrastructure;
@@ -59,10 +60,11 @@ public partial class App : System.Windows.Application
             repository.Initialize();
             _host.Services.GetRequiredService<TodoService>().EnsureDefaultBoard();
 
-            // 命令行覆盖（演示/截图回归用）：--skin mint --opacity 0.6
+            // 命令行覆盖（演示/截图回归用）：--skin mint --opacity 0.6 --window-opacity 0.9
             var skinService = _host.Services.GetRequiredService<SkinService>();
             var skinOverride = ReadOptionValue(e.Args, "--skin");
             var opacityOverride = ReadOptionValue(e.Args, "--opacity");
+            var windowOpacityOverride = ReadOptionValue(e.Args, "--window-opacity");
             skinService.Apply(
                 skinOverride,
                 double.TryParse(opacityOverride, System.Globalization.NumberStyles.Float,
@@ -70,15 +72,25 @@ public partial class App : System.Windows.Application
                     ? parsedOpacity
                     : null);
 
+            if (double.TryParse(windowOpacityOverride, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var parsedWindowOpacity))
+            {
+                skinService.SetWindowOpacity(parsedWindowOpacity);
+            }
+
             var manager = _host.Services.GetRequiredService<ManagerWindow>();
             MainWindow = manager;
             manager.Show();
 
-            _host.Services.GetRequiredService<TrayService>().Start();
+            var tray = _host.Services.GetRequiredService<TrayService>();
+            tray.Start();
+
+            StartReminderPump(tray);
+            AttachHotKeys(manager);
 
             if (isDemo)
             {
-                RunDemo(shotDirectory);
+                RunDemo(shotDirectory, e.Args.Contains("--reminder-demo", StringComparer.OrdinalIgnoreCase));
             }
 
             Log.Information("StickyTodo 启动完成，数据目录 {Directory}", AppPaths.DataDirectory);
@@ -125,6 +137,8 @@ public partial class App : System.Windows.Application
                 services.AddSingleton<SkinService>();
                 services.AddSingleton<WindowManager>();
                 services.AddSingleton<TrayService>();
+                services.AddSingleton<ReminderPump>();
+                services.AddSingleton<HotKeyService>();
                 services.AddSingleton<ManagerViewModel>();
                 services.AddSingleton<ManagerWindow>();
             })
@@ -132,10 +146,53 @@ public partial class App : System.Windows.Application
     }
 
     /// <summary>
+    /// 本地提醒：到点弹一个右下角小窗 + 托盘气泡。全部在本机完成。
+    /// </summary>
+    private void StartReminderPump(TrayService tray)
+    {
+        var pump = _host!.Services.GetRequiredService<ReminderPump>();
+        var todoService = _host.Services.GetRequiredService<TodoService>();
+
+        pump.ReminderDue += (_, item) =>
+        {
+            try
+            {
+                tray.Notify("待办提醒", item.Title);
+
+                var boardName = todoService.GetBoards()
+                    .FirstOrDefault(b => b.Id == item.BoardId)?.Name ?? "看板";
+
+                new ReminderPopup(item, boardName, todoService).Show();
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "弹出提醒失败");
+            }
+        };
+
+        pump.Start();
+    }
+
+    private void AttachHotKeys(Window host)
+    {
+        var hotKeys = _host!.Services.GetRequiredService<HotKeyService>();
+        var windows = _host.Services.GetRequiredService<WindowManager>();
+
+        hotKeys.Attach(
+            host,
+            onNewTodo: windows.OpenDefaultBoardForNewTodo,
+            onToggleBoards: windows.ToggleBoardsVisibility,
+            onLockActive: () => windows.ToggleActiveLock());
+
+        Log.Information("全局快捷键已注册：{New} 新建待办 / {Toggle} 显示隐藏 / {Lock} 锁定当前看板",
+            HotKeyService.NewTodoHotKey, HotKeyService.ToggleBoardsHotKey, HotKeyService.LockActiveHotKey);
+    }
+
+    /// <summary>
     /// --demo：库里还没有任何待办时种一份示例数据，并打开两个便签窗口摆到相邻位置，
     /// 用来验证多窗口 + 吸附 + 自动截图的回归链路（截图脚本见 tools/capture-demo.ps1）。
     /// </summary>
-    private void RunDemo(string? shotDirectory)
+    private void RunDemo(string? shotDirectory, bool fireReminder)
     {
         var service = _host!.Services.GetRequiredService<TodoService>();
         var windows = _host.Services.GetRequiredService<WindowManager>();
@@ -148,24 +205,51 @@ public partial class App : System.Windows.Application
         {
             service.AddTodo(defaultBoard.Id, "把便签拖到屏幕边缘，会自动贴边吸附");
             service.AddTodo(defaultBoard.Id, "拖住待办上下拖动可以排序");
-            service.AddTodo(defaultBoard.Id, "右键待办可以挂标签");
+            service.AddTodo(defaultBoard.Id, "右键待办可以挂标签 / 设目标日期 / 设提醒");
 
             var done = service.AddTodo(defaultBoard.Id, "写下第一条待办：已完成的样子");
             service.SetDone(done.Id, true);
 
-            service.AddTodo(workBoard.Id, "整理本周发布清单");
+            var meeting = service.AddTodo(workBoard.Id, "整理本周发布清单");
+            service.SetDueAt(meeting.Id, DateTimeOffset.Now.Date.AddDays(2));
+            service.SetRemindAt(meeting.Id, DateTimeOffset.Now.AddMinutes(20));
+
             service.AddTodo(workBoard.Id, "周一 10:00 项目周会");
 
             if (!service.GetTags().Any())
             {
                 var important = service.CreateTag("重要");
-                var firstWorkTodo = service.GetTodos(workBoard.Id).First();
-                service.SetTodoTags(firstWorkTodo.Id, [important.Id]);
+                service.SetTodoTags(meeting.Id, [important.Id]);
             }
+        }
+
+        // 便签/随笔看板：一张大白纸
+        var memoBoard = service.GetBoards().FirstOrDefault(b => b.Kind == BoardKind.Memo)
+            ?? service.CreateBoard("随手记", BoardKind.Memo);
+        if (string.IsNullOrWhiteSpace(service.GetNote(memoBoard.Id)?.Content))
+        {
+            service.SaveNote(memoBoard.Id,
+                "随手记\n\n" +
+                "· 这个看板只有一张纸，边写边自动保存\n" +
+                "· 左下角会显示字数与保存时间\n" +
+                "· 想清空就全选删掉，内容会立刻同步到本地数据库\n\n" +
+                "小黄条式的便签用法：把几个看板摊在桌面上，写今天要做的事。");
         }
 
         var first = windows.OpenBoard(defaultBoard);
         var second = windows.OpenBoard(workBoard);
+        var third = windows.OpenBoard(memoBoard);
+
+        if (fireReminder)
+        {
+            // --reminder-demo：造一条已经到点的提醒，立刻走一遍「查询 → 标记 → 弹窗」链路
+            var target = service.GetTodos(workBoard.Id).FirstOrDefault();
+            if (target is not null)
+            {
+                service.SetRemindAt(target.Id, DateTimeOffset.Now.AddMinutes(-1));
+                _ = _host!.Services.GetRequiredService<ReminderPump>().CheckAsync();
+            }
+        }
 
         // 先摆第一个窗口（会被吸到屏幕左边），再摆第二个（会吸到第一个的右边）。
         // 坐标故意偏几像素，用来验证吸附确实生效（窗口外圈 10px 是阴影留白，不算纸面）。
@@ -177,6 +261,8 @@ public partial class App : System.Windows.Application
             first.Top = 140;
             second.Left = 336;
             second.Top = 140;
+            third.Left = 700;
+            third.Top = 140;
             Log.Information("[demo] 窗口1=({L1},{T1},{W1}x{H1}) 窗口2=({L2},{T2},{W2}x{H2})",
                 first.Left, first.Top, first.ActualWidth, first.ActualHeight,
                 second.Left, second.Top, second.ActualWidth, second.ActualHeight);

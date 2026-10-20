@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
+using StickyTodo.App.Services;
 using StickyTodo.Core.Entities;
 using StickyTodo.Core.Entitlements;
 using StickyTodo.Core.Services;
@@ -21,11 +22,17 @@ public sealed class BoardRowViewModel
 
     public string Name => Board.Name;
 
+    public string KindText => BoardKinds.DisplayName(Board.Kind);
+
+    public bool IsMemo => Board.Kind == BoardKind.Memo;
+
     public int Pending { get; }
 
     public int Done { get; }
 
-    public string Summary => $"{Pending} 待办 · {Done} 已完成";
+    public string Summary => IsMemo
+        ? "便签 · 边写边存"
+        : $"{Pending} 待办 · {Done} 已完成";
 
     public string WindowHint => Board.Window is null ? string.Empty : "已记住窗口位置";
 }
@@ -50,6 +57,10 @@ public partial class ManagerViewModel : ObservableObject
             : $"{_entitlement.DisplayName} · 可升级";
 
     public string StorageHint => "全部数据保存在本机 SQLite，程序不发起任何网络请求";
+
+    public string FooterHint =>
+        $"全部本地存储，不联网 · 快捷键：{HotKeyService.NewTodoHotKey} 新建待办 / " +
+        $"{HotKeyService.ToggleBoardsHotKey} 显示隐藏便签 / {HotKeyService.LockActiveHotKey} 锁定当前看板";
 
     [ObservableProperty]
     private string? _errorText;
@@ -81,12 +92,12 @@ public partial class ManagerViewModel : ObservableObject
         }
     }
 
-    public async Task<Board?> CreateBoardAsync(string name)
+    public async Task<Board?> CreateBoardAsync(string name, BoardKind kind = BoardKind.Todo)
     {
         try
         {
             ErrorText = null;
-            var board = await Task.Run(() => _service.CreateBoard(name));
+            var board = await Task.Run(() => _service.CreateBoard(name, kind));
             await LoadAsync();
             return board;
         }

@@ -40,7 +40,19 @@ public sealed class SchemaMigrationTests : IDisposable
         repository.SetSetting("appearance.skin", "graphite");
         Assert.Equal("graphite", repository.GetSettings()["appearance.skin"]);
 
-        Assert.Equal(3L, ReadSchemaVersion());
+        // v4：看板类型默认 todo、便签正文、提醒字段
+        Assert.Equal(BoardKind.Todo, board.Kind);
+        var saved = repository.SaveNote(board.Id, "迁移后的随手记");
+        Assert.Equal("迁移后的随手记", repository.GetNote(board.Id)!.Content);
+
+        var remindAt = DateTimeOffset.Now.AddMinutes(-1);
+        repository.SetRemindAt(todo.Id, remindAt);
+        var due = Assert.Single(repository.GetDueReminders(DateTimeOffset.Now));
+        Assert.Equal(todo.Id, due.Id);
+        repository.MarkReminded(todo.Id, DateTimeOffset.Now);
+        Assert.Empty(repository.GetDueReminders(DateTimeOffset.Now));
+
+        Assert.Equal(4L, ReadSchemaVersion());
     }
 
     private long ReadSchemaVersion()

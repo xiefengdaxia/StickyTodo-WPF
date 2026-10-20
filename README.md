@@ -8,9 +8,13 @@
 |---|---|---|
 | ![便签](artifacts/board-default.png) | ![半透明](artifacts/board-translucent.png) | ![暗色](artifacts/board-dark.png) |
 
-管理面板：
+便签/随笔看板、到点提醒、管理面板：
 
-![看板管理](artifacts/manager.png)
+| 便签看板（边写边存） | 到点提醒 | 看板管理 |
+|---|---|---|
+| ![便签看板](artifacts/board-memo.png) | ![提醒](artifacts/reminder.png) | ![管理](artifacts/manager.png) |
+
+带目标日期与提醒的待办列表：`artifacts/board-work.png`
 
 ---
 
@@ -28,6 +32,8 @@ $exe = ".\src\StickyTodo.App\bin\Debug\net8.0-windows\StickyTodo.exe"
 & $exe --selftest                          # 无界面自检：建库 + 种子看板，退出码 0
 & $exe --demo                              # 种一份示例数据并打开两个便签窗口（库里没数据时才种）
 & $exe --demo --shot D:\shots              # 演示 + 把每个窗口渲染成 PNG，然后自动退出
+& $exe --demo --reminder-demo --shot D:\shots   # 额外造一条到点提醒，验证弹窗链路
+& $exe --skin graphite --opacity 0.6 --window-opacity 0.9   # 启动时覆盖外观（也用于截图回归）
 ```
 
 `--shot` 用 `RenderTargetBitmap` 渲染窗口自身，不依赖屏幕截图，因此**不受 DPI 缩放/窗口遮挡影响**，可以直接放进 CI 做 UI 回归（产物见 `artifacts/`）。
@@ -81,41 +87,52 @@ StickyTodo.sln
 
 **看板**
 - 一个看板一个独立窗口，可同时开多个；再从托盘/管理面板打开同一个看板会激活已有窗口
+- **两种看板类型**：待办看板（清单）与便签看板（一整张纸，边写边自动保存，显示字数与保存时间）
 - 窗口位置与大小按看板分别记忆（重启后回到原位）；换显示器后自动夹回可见区域
 - **贴边吸附**：拖到屏幕边缘、或靠近其它便签窗口时自动对齐（纸面边缘对齐，排除投影留白）
-- 管理面板：新建 / 重命名 / 删除 / 双击打开，显示每个看板的待办与完成数
-- 托盘图标：菜单里可勾选式开关任意看板窗口、打开管理面板、退出；点 X 只收进托盘
+- 管理面板：新建待办/便签看板、重命名、删除、双击打开，显示类型与待办数
+- 托盘图标：可勾选式开关任意看板窗口、显示/隐藏全部、打开管理面板、退出；点 X 只收进托盘
 
 **待办**
 - 回车快速添加、勾选完成（划线灰显）、悬停删除、显示/隐藏已完成
+- **目标日期（倒数日）**：右键设置今天/明天/本周末/自定义，行上显示「还剩 N 天 / 今天到期 / 已过期 N 天」，过期标红
+- **到点提醒**：右键设 30 分钟后 / 1 小时后 / 今天 18:00 / 明天 9:00 / 自定义，到点弹右下角小窗 + 托盘气泡，可「稍后 10 分钟」；20 秒轮询一次，全部本地
 - **拖拽排序**（用「移到某条之前」而不是下标，因此先按标签过滤再拖动也不会错位）
-- 右键菜单：切换完成状态、挂/摘标签、新建标签、删除
+- 右键菜单：切换完成状态、挂/摘标签、设目标日期、设提醒、删除
 
 **标签**
 - 全局标签，一条待办可挂多个；筛选胶囊 `全部 / 未分类 / 各标签`，带计数
 - 新建/重命名/删除标签；删除标签不影响待办本身
 
+**全局快捷键**（可在别处窗口抢焦点时使用）
+- `Ctrl+Alt+N` 新建待办（打开默认待办看板并聚焦输入框）
+- `Ctrl+Alt+H` 显示 / 隐藏全部便签
+- `Ctrl+Alt+L` 锁定 / 解锁当前活跃看板
+- 注册失败（被别的程序占用）时静默跳过，不影响启动
+
 **其他**
 - 单实例（`Local\StickyTodo.SingleInstance`）
 - Serilog 滚动日志 + 全局异常兜底
-- 数据库自动迁移（`PRAGMA user_version`，已实现 v1→v2）
+- 数据库自动迁移（`PRAGMA user_version`，已实现 v1→v4）
 
 ---
 
 ## 4. 数据模型
 
 ```sql
-board(id, name, sort, is_default, created_at,
-      win_left, win_top, win_width, win_height)          -- 窗口位置记忆
+board(id, name, sort, is_default, kind, created_at,
+      win_left, win_top, win_width, win_height)          -- kind: todo | memo
 todo(id, board_id→board.id ON DELETE CASCADE, title, note,
-     is_done, done_at, due_at, sort, created_at, updated_at)
+     is_done, done_at, due_at, remind_at, reminded_at, sort, created_at, updated_at)
 tag(id, name UNIQUE COLLATE NOCASE, color, sort, created_at)
 todo_tag(todo_id→todo.id, tag_id→tag.id, PRIMARY KEY(todo_id, tag_id))
+note(id, board_id→board.id UNIQUE, content, created_at, updated_at)
+setting(key PRIMARY KEY, value)
 ```
 
 设计要点：
 
-- **时间统一存 Unix 秒（INTEGER）**，避开 SQLite 的时区/字符串解析歧义，`DateTimeOffset` 只在仓储边界转换。
+- **时间统一存 Unix 秒（INTEGER）**，读出时 `.ToLocalTime()` 还原成本地时间（否则显示的提醒时间会差一个时区，这个坑已经踩过并修掉）；`DateTimeOffset` 只在仓储边界转换。
 - **逻辑外键 + 级联删除**：每个连接开 `Foreign Keys=True`，删看板自动清待办，删标签自动清关联。
 - **WAL 模式**（`journal_mode=WAL`、`synchronous=NORMAL`），多窗口并发读更稳。
 - **迁移用 `PRAGMA user_version` 递增**，`Initialize()` 幂等；`SchemaMigrationTests` 用一个 v1 老库验证自动升级且数据不丢。
@@ -165,18 +182,21 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 **M2.5 外观（已完成）**
 - [x] 无边框 + 圆角 + 投影 + 自绘标题栏 + 边缘缩放
 - [x] 背景半透明（10 档，默认 92%），文字始终清晰
+- [x] **整窗透明度**（连文字一起，6 档）可与背景透明度**分别调**
 - [x] 6 套皮肤（含暗色），皮肤画刷走 `DynamicResource`，切换即时全局生效
 - [x] 置顶 / 锁定（按看板记忆，存 `setting` 表）
 - [x] 截图回归带假桌面背景，一眼验证透明度
 
-**M3 追平 YYNote 的功能面（待排优先级）**
-- [ ] 便签 / 随笔看板（沉浸写作，自动保存）
-- [ ] 倒数日（`due_at` 已有，补 UI + 天数计算）
-- [ ] 到期提醒：本地弹窗 + 托盘气泡（不引入任何推送服务）
+**M3 第一批（已完成）**
+- [x] 看板类型：待办看板 / 便签看板（沉浸写作，800ms 防抖自动保存，字数与保存时间）
+- [x] 倒数日：目标日期 + 「还剩 N 天 / 已过期 N 天」行内徽标
+- [x] 到点提醒：本地轮询 + 右下角提醒小窗 + 托盘气泡 + 稍后 10 分钟
+- [x] 全局快捷键：新建待办 / 显示隐藏全部便签 / 锁定当前看板
+
+**M3 第二批（待做）**
+- [ ] 日历看板（月视图 + 当日日程列表 + 拖待办到日期）
 - [ ] 重复待办：基于 iCalendar RRULE（`Ical.Net`），日/周/月/年/工作日/第 N 个周几
-- [ ] 日历看板（月视图）+ 日程列表看板
-- [ ] 全局快捷键（新建待办 / 呼出所有便签 / 锁定）
-- [ ] 看板内搜索与按标签多选筛选
+- [ ] 看板内搜索、多标签同时筛选
 - [ ] 导入导出 Excel（NPOI）/ ICS 订阅
 
 **M4 外延**

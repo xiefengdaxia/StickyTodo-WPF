@@ -21,6 +21,8 @@ public sealed class SkinService
 
     public double Opacity => _settings.Opacity;
 
+    public double WindowOpacity => _settings.WindowOpacity;
+
     /// <summary>按当前设置（或指定皮肤/透明度）刷新资源。</summary>
     public void Apply(string? skinKey = null, double? opacity = null)
     {
@@ -58,5 +60,11 @@ public sealed class SkinService
     {
         _settings.Opacity = opacity;
         Apply(opacity: _settings.Opacity);
+    }
+
+    /// <summary>调整整窗透明度并持久化（连文字一起变淡）。</summary>
+    public void SetWindowOpacity(double opacity)
+    {
+        _settings.WindowOpacity = opacity;
     }
 }

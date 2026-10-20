@@ -12,7 +12,7 @@ namespace StickyTodo.Infrastructure.Persistence;
 /// </summary>
 public sealed class SqliteTodoRepository : ITodoRepository
 {
-    private const int CurrentSchemaVersion = 3;
+    private const int CurrentSchemaVersion = 4;
 
     private readonly string _connectionString;
 
@@ -56,6 +56,11 @@ public sealed class SqliteTodoRepository : ITodoRepository
         if (version < 3)
         {
             connection.Execute(SchemaV3, transaction: tx);
+        }
+
+        if (version < 4)
+        {
+            connection.Execute(SchemaV4, transaction: tx);
         }
 
         connection.Execute($"PRAGMA user_version={CurrentSchemaVersion};", transaction: tx);
@@ -131,6 +136,29 @@ public sealed class SqliteTodoRepository : ITodoRepository
         );
         """;
 
+    private const string SchemaV4 = """
+        -- 看板类型：todo=待办清单，memo=便签/随笔
+        ALTER TABLE board ADD COLUMN kind TEXT NOT NULL DEFAULT 'todo';
+
+        -- 提醒：到点弹窗；reminded_at 记录已提醒过，避免重复打扰
+        ALTER TABLE todo ADD COLUMN remind_at   INTEGER NULL;
+        ALTER TABLE todo ADD COLUMN reminded_at INTEGER NULL;
+
+        CREATE INDEX IF NOT EXISTS ix_todo_remind ON todo (remind_at, reminded_at);
+
+        -- 便签/随笔正文，一个看板一条
+        CREATE TABLE IF NOT EXISTS note (
+            id         TEXT    NOT NULL PRIMARY KEY,
+            board_id   TEXT    NOT NULL,
+            content    TEXT    NOT NULL DEFAULT '',
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            FOREIGN KEY (board_id) REFERENCES board(id) ON DELETE CASCADE
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_note_board ON note (board_id);
+        """;
+
     // ---------------- 看板 ----------------
 
     public IReadOnlyList<Board> GetBoards()
@@ -138,7 +166,7 @@ public sealed class SqliteTodoRepository : ITodoRepository
         using var connection = Open();
         return connection.Query<BoardRow>(
                 """
-                SELECT id, name, sort, is_default, created_at,
+                SELECT id, name, sort, is_default, kind, created_at,
                        win_left, win_top, win_width, win_height
                   FROM board
                  ORDER BY sort, created_at;
@@ -147,7 +175,7 @@ public sealed class SqliteTodoRepository : ITodoRepository
             .ToList();
     }
 
-    public Board AddBoard(string name, bool isDefault = false)
+    public Board AddBoard(string name, BoardKind kind = BoardKind.Todo, bool isDefault = false)
     {
         using var connection = Open();
         var sort = connection.ExecuteScalar<int>("SELECT COALESCE(MAX(sort), -1) + 1 FROM board;");
@@ -157,17 +185,22 @@ public sealed class SqliteTodoRepository : ITodoRepository
             Name = name,
             Sort = sort,
             IsDefault = isDefault,
+            Kind = kind,
             CreatedAt = DateTimeOffset.Now,
         };
 
         connection.Execute(
-            "INSERT INTO board (id, name, sort, is_default, created_at) VALUES (@Id, @Name, @Sort, @IsDefault, @CreatedAt);",
+            """
+            INSERT INTO board (id, name, sort, is_default, kind, created_at)
+            VALUES (@Id, @Name, @Sort, @IsDefault, @Kind, @CreatedAt);
+            """,
             new
             {
                 board.Id,
                 board.Name,
                 board.Sort,
                 IsDefault = isDefault ? 1 : 0,
+                Kind = BoardKinds.ToStorage(kind),
                 CreatedAt = ToUnix(board.CreatedAt),
             });
 
@@ -270,6 +303,8 @@ public sealed class SqliteTodoRepository : ITodoRepository
                    is_done = @IsDone,
                    done_at = @DoneAt,
                    due_at = @DueAt,
+                   remind_at = @RemindAt,
+                   reminded_at = @RemindedAt,
                    sort = @Sort,
                    updated_at = @UpdatedAt
              WHERE id = @Id;
@@ -282,6 +317,8 @@ public sealed class SqliteTodoRepository : ITodoRepository
                 IsDone = item.IsDone ? 1 : 0,
                 DoneAt = ToUnix(item.DoneAt),
                 DueAt = ToUnix(item.DueAt),
+                RemindAt = ToUnix(item.RemindAt),
+                RemindedAt = ToUnix(item.RemindedAt),
                 item.Sort,
                 UpdatedAt = ToUnix(item.UpdatedAt),
             }) > 0;
@@ -407,7 +444,60 @@ public sealed class SqliteTodoRepository : ITodoRepository
         tx.Commit();
     }
 
-    // ---------------- 设置 ----------------
+    // ---------------- 便签正文 / 提醒 / 设置 ----------------
+
+    public Note? GetNote(string boardId)
+    {
+        using var connection = Open();
+        return RepositoryExtensions.GetNote(connection, boardId);
+    }
+
+    public Note SaveNote(string boardId, string content)
+    {
+        using var connection = Open();
+        return RepositoryExtensions.SaveNote(connection, boardId, content);
+    }
+
+    public IReadOnlyList<TodoItem> GetDueReminders(DateTimeOffset now)
+    {
+        using var connection = Open();
+        return connection.Query<TodoRow>(
+                """
+                SELECT * FROM todo
+                 WHERE is_done = 0
+                   AND remind_at IS NOT NULL
+                   AND reminded_at IS NULL
+                   AND remind_at <= @now
+                 ORDER BY remind_at;
+                """,
+                new { now = ToUnix(now) })
+            .Select(ToTodo)
+            .ToList();
+    }
+
+    public bool SetRemindAt(string todoId, DateTimeOffset? remindAt)
+    {
+        using var connection = Open();
+        return connection.Execute(
+            "UPDATE todo SET remind_at = @remindAt, updated_at = @now WHERE id = @todoId;",
+            new { todoId, remindAt = ToUnix(remindAt), now = ToUnix(DateTimeOffset.Now) }) > 0;
+    }
+
+    public bool SetDueAt(string todoId, DateTimeOffset? dueAt)
+    {
+        using var connection = Open();
+        return connection.Execute(
+            "UPDATE todo SET due_at = @dueAt, updated_at = @now WHERE id = @todoId;",
+            new { todoId, dueAt = ToUnix(dueAt), now = ToUnix(DateTimeOffset.Now) }) > 0;
+    }
+
+    public bool MarkReminded(string todoId, DateTimeOffset? remindedAt)
+    {
+        using var connection = Open();
+        return connection.Execute(
+            "UPDATE todo SET reminded_at = @remindedAt WHERE id = @todoId;",
+            new { todoId, remindedAt = ToUnix(remindedAt) }) > 0;
+    }
 
     public IReadOnlyDictionary<string, string> GetSettings()
     {
@@ -433,10 +523,11 @@ public sealed class SqliteTodoRepository : ITodoRepository
 
     private static long? ToUnix(DateTimeOffset? value) => value?.ToUnixTimeSeconds();
 
-    private static DateTimeOffset FromUnix(long value) => DateTimeOffset.FromUnixTimeSeconds(value);
+    private static DateTimeOffset FromUnix(long value) =>
+        DateTimeOffset.FromUnixTimeSeconds(value).ToLocalTime();
 
     private static DateTimeOffset? FromUnix(long? value) =>
-        value is null ? null : DateTimeOffset.FromUnixTimeSeconds(value.Value);
+        value is null ? null : DateTimeOffset.FromUnixTimeSeconds(value.Value).ToLocalTime();
 
     private static Board ToBoard(BoardRow row)
     {
@@ -455,6 +546,7 @@ public sealed class SqliteTodoRepository : ITodoRepository
             Name = row.name,
             Sort = row.sort,
             IsDefault = row.is_default != 0,
+            Kind = BoardKinds.Parse(row.kind),
             CreatedAt = FromUnix(row.created_at),
             Window = window,
         };
@@ -469,6 +561,8 @@ public sealed class SqliteTodoRepository : ITodoRepository
         IsDone = row.is_done != 0,
         DoneAt = FromUnix(row.done_at),
         DueAt = FromUnix(row.due_at),
+        RemindAt = FromUnix(row.remind_at),
+        RemindedAt = FromUnix(row.reminded_at),
         Sort = row.sort,
         CreatedAt = FromUnix(row.created_at),
         UpdatedAt = FromUnix(row.updated_at),
@@ -481,6 +575,7 @@ public sealed class SqliteTodoRepository : ITodoRepository
         public string name { get; set; } = string.Empty;
         public int sort { get; set; }
         public int is_default { get; set; }
+        public string kind { get; set; } = BoardKinds.Todo;
         public long created_at { get; set; }
         public double? win_left { get; set; }
         public double? win_top { get; set; }
@@ -497,6 +592,8 @@ public sealed class SqliteTodoRepository : ITodoRepository
         public int is_done { get; set; }
         public long? done_at { get; set; }
         public long? due_at { get; set; }
+        public long? remind_at { get; set; }
+        public long? reminded_at { get; set; }
         public int sort { get; set; }
         public long created_at { get; set; }
         public long updated_at { get; set; }

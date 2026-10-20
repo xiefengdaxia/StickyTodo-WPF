@@ -19,6 +19,12 @@ public sealed class TodoItem
 
     public DateTimeOffset? DueAt { get; set; }
 
+    /// <summary>到点提醒的时刻，null 表示不提醒。</summary>
+    public DateTimeOffset? RemindAt { get; set; }
+
+    /// <summary>已经弹过提醒的时间，避免重复打扰。</summary>
+    public DateTimeOffset? RemindedAt { get; set; }
+
     public int Sort { get; set; }
 
     public DateTimeOffset CreatedAt { get; init; }

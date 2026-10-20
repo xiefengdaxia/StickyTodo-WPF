@@ -2,6 +2,7 @@ using System;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using StickyTodo.App.Views;
+using StickyTodo.Core.Entities;
 using StickyTodo.Core.Services;
 using Drawing = System.Drawing;
 using WinForms = System.Windows.Forms;
@@ -43,6 +44,10 @@ public sealed class TrayService : IDisposable
         _boardsMenu = new WinForms.ToolStripMenuItem("看板");
         menu.Items.Add(_boardsMenu);
 
+        var toggleAll = new WinForms.ToolStripMenuItem($"显示 / 隐藏全部便签\t{HotKeyService.ToggleBoardsHotKey}");
+        toggleAll.Click += (_, _) => _windows.ToggleBoardsVisibility();
+        menu.Items.Add(toggleAll);
+
         menu.Items.Add(new WinForms.ToolStripSeparator());
 
         var exit = new WinForms.ToolStripMenuItem("退出");
@@ -80,7 +85,7 @@ public sealed class TrayService : IDisposable
 
         foreach (var board in boards)
         {
-            var item = new WinForms.ToolStripMenuItem(board.Name)
+            var item = new WinForms.ToolStripMenuItem($"{board.Name}　({BoardKinds.DisplayName(board.Kind)})")
             {
                 Checked = _windows.IsBoardOpen(board.Id),
                 CheckOnClick = false,
@@ -98,6 +103,26 @@ public sealed class TrayService : IDisposable
                 }
             };
             _boardsMenu.DropDownItems.Add(item);
+        }
+    }
+
+    /// <summary>托盘气泡通知（提醒用，纯本地，不经过任何网络）。</summary>
+    public void Notify(string title, string text)
+    {
+        if (_notifyIcon is null)
+        {
+            return;
+        }
+
+        try
+        {
+            _notifyIcon.BalloonTipTitle = title;
+            _notifyIcon.BalloonTipText = text;
+            _notifyIcon.ShowBalloonTip(6000);
+        }
+        catch (Exception)
+        {
+            // 通知失败不影响主流程
         }
     }
 

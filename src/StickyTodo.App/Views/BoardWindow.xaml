@@ -9,6 +9,7 @@
         Background="Transparent"
         ResizeMode="CanResize"
         ShowInTaskbar="False"
+        Opacity="{Binding WindowOpacity, Mode=OneWay}"
         Topmost="{Binding IsTopmost, Mode=OneWay}"
         FontFamily="Microsoft YaHei UI"
         UseLayoutRounding="True"
@@ -192,7 +193,8 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <TextBox Grid.Column="0"
+                    <TextBox x:Name="InputBox"
+                             Grid.Column="0"
                              Style="{StaticResource TextBox.Flat}"
                              Text="{Binding NewTitle, UpdateSourceTrigger=PropertyChanged}"
                              ToolTip="输入后按回车添加">
@@ -278,6 +280,36 @@
                                                 </Style>
                                             </TextBlock.Style>
                                         </TextBlock>
+
+                                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                            <Border Margin="0,0,5,0"
+                                                    Padding="5,1"
+                                                    CornerRadius="6"
+                                                    Background="#33C0392B"
+                                                    Visibility="{Binding HasCountdown, Converter={StaticResource BoolToVis}}">
+                                                <TextBlock Text="{Binding CountdownText}" FontSize="10">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsOverdue}" Value="True">
+                                                                    <Setter Property="Foreground" Value="#FFC0392B" />
+                                                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Border>
+
+                                            <TextBlock Text="{Binding RemindText}"
+                                                       FontSize="10"
+                                                       VerticalAlignment="Center"
+                                                       Opacity="0.8"
+                                                       Foreground="{DynamicResource Brush.InkSoft}"
+                                                       Visibility="{Binding HasReminder, Converter={StaticResource BoolToVis}}" />
+                                        </StackPanel>
+
                                         <TextBlock Text="{Binding TagText}"
                                                    FontSize="10"
                                                    Margin="0,2,0,0"

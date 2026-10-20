@@ -13,6 +13,9 @@ public sealed class Board
 
     public bool IsDefault { get; set; }
 
+    /// <summary>看板类型：待办清单 or 便签/随笔。</summary>
+    public BoardKind Kind { get; set; } = BoardKind.Todo;
+
     public DateTimeOffset CreatedAt { get; init; }
 
     /// <summary>上次关闭时的窗口位置与大小，没记录过则为 null。</summary>

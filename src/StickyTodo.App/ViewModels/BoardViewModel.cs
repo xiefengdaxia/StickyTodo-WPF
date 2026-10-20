@@ -9,7 +9,7 @@ using StickyTodo.Core.Services;
 namespace StickyTodo.App.ViewModels;
 
 /// <summary>一个看板窗口背后的 ViewModel。所有写操作都走 TodoService。</summary>
-public partial class BoardViewModel : ObservableObject
+public partial class BoardViewModel : ObservableObject, IAppearanceHost
 {
     private readonly TodoService _service;
     private readonly AppSettingsService _settings;
@@ -27,6 +27,7 @@ public partial class BoardViewModel : ObservableObject
         _boardName = board.Name;
         _isTopmost = settings.GetBoardTopmost(board.Id);
         _isLocked = settings.GetBoardLocked(board.Id);
+        _windowOpacity = skin.WindowOpacity;
     }
 
     public Board Board { get; }
@@ -62,9 +63,17 @@ public partial class BoardViewModel : ObservableObject
     [ObservableProperty]
     private bool _isLocked;
 
+    /// <summary>整窗不透明度（连文字一起），绑定到 Window.Opacity。</summary>
+    [ObservableProperty]
+    private double _windowOpacity = 1.0;
+
+    public string BoardKindText => BoardKinds.DisplayName(Board.Kind);
+
     public string CurrentSkinKey => _skin.Current.Key;
 
     public double CurrentOpacity => _skin.Opacity;
+
+    public double CurrentWindowOpacity => _skin.WindowOpacity;
 
     public IReadOnlyList<NoteSkin> Skins => NoteSkins.All;
 
@@ -92,12 +101,54 @@ public partial class BoardViewModel : ObservableObject
         OnPropertyChanged(nameof(CurrentOpacity));
     }
 
+    public void SetWindowOpacity(double opacity)
+    {
+        _skin.SetWindowOpacity(opacity);
+        OnPropertyChanged(nameof(CurrentWindowOpacity));
+        OnPropertyChanged(nameof(WindowOpacity));
+    }
+
     /// <summary>皮肤被别的窗口改过之后刷新一下绑定值。</summary>
     public void RefreshAppearance()
     {
         OnPropertyChanged(nameof(CurrentSkinKey));
         OnPropertyChanged(nameof(CurrentOpacity));
+        OnPropertyChanged(nameof(CurrentWindowOpacity));
+        OnPropertyChanged(nameof(WindowOpacity));
     }
+
+    // ---------- 倒数日与提醒 ----------
+
+    public async Task SetDueAsync(TodoRowViewModel row, DateTimeOffset? dueAt)
+    {
+        try
+        {
+            ErrorText = null;
+            await Task.Run(() => _service.SetDueAt(row.Id, dueAt));
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorText = ex.Message;
+        }
+    }
+
+    public async Task SetRemindAsync(TodoRowViewModel row, DateTimeOffset? remindAt)
+    {
+        try
+        {
+            ErrorText = null;
+            await Task.Run(() => _service.SetRemindAt(row.Id, remindAt));
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorText = ex.Message;
+        }
+    }
+
+    /// <summary>提醒弹窗里点「稍后」。</summary>
+    public void Snooze(string todoId, TimeSpan delay) => _service.Snooze(todoId, delay);
 
     public async Task RenameBoardAsync(string name)
     {
@@ -183,9 +234,10 @@ public partial class BoardViewModel : ObservableObject
         }
 
         Rows.Clear();
+        var now = DateTimeOffset.Now;
         foreach (var item in filtered)
         {
-            Rows.Add(new TodoRowViewModel(item, TagTextOf(item.Id)));
+            Rows.Add(new TodoRowViewModel(item, TagTextOf(item.Id), now));
         }
 
         var scoped = _all.Where(Matches).ToList();

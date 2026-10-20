@@ -10,11 +10,16 @@ public sealed class AppSettingsService
 {
     public const string SkinKey = "appearance.skin";
     public const string OpacityKey = "appearance.opacity";
+    public const string WindowOpacityKey = "appearance.windowOpacity";
 
     public const string DefaultSkin = "sticky-yellow";
     public const double DefaultOpacity = 0.92;
     public const double MinOpacity = 0.35;
     public const double MaxOpacity = 1.0;
+
+    /// <summary>整窗不透明度（连文字一起），默认 100%。</summary>
+    public const double DefaultWindowOpacity = 1.0;
+    public const double MinWindowOpacity = 0.4;
 
     private readonly ITodoRepository _repository;
 
@@ -52,6 +57,24 @@ public sealed class AppSettingsService
             ClampOpacity(value).ToString("0.###", CultureInfo.InvariantCulture));
     }
 
+    /// <summary>整窗不透明度：连文字一起变淡，更像贴在屏幕上的便签。</summary>
+    public double WindowOpacity
+    {
+        get
+        {
+            var raw = GetString(WindowOpacityKey, null);
+            if (raw is null || !double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+            {
+                return DefaultWindowOpacity;
+            }
+
+            return ClampWindowOpacity(value);
+        }
+        set => _repository.SetSetting(
+            WindowOpacityKey,
+            ClampWindowOpacity(value).ToString("0.###", CultureInfo.InvariantCulture));
+    }
+
     /// <summary>便签默认置顶，符合“贴纸感”。</summary>
     public bool GetBoardTopmost(string boardId) => GetBool(BoardTopmostKey(boardId), true);
 
@@ -71,6 +94,16 @@ public sealed class AppSettingsService
         }
 
         return Math.Min(MaxOpacity, Math.Max(MinOpacity, value));
+    }
+
+    public static double ClampWindowOpacity(double value)
+    {
+        if (double.IsNaN(value))
+        {
+            return DefaultWindowOpacity;
+        }
+
+        return Math.Min(MaxOpacity, Math.Max(MinWindowOpacity, value));
     }
 
     private string GetString(string key, string? fallback)

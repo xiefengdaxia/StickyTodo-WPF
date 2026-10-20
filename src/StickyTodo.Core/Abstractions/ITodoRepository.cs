@@ -10,7 +10,7 @@ public interface ITodoRepository
     // ---- 看板 ----
     IReadOnlyList<Board> GetBoards();
 
-    Board AddBoard(string name, bool isDefault = false);
+    Board AddBoard(string name, BoardKind kind = BoardKind.Todo, bool isDefault = false);
 
     bool RenameBoard(string boardId, string name);
 
@@ -52,4 +52,20 @@ public interface ITodoRepository
     IReadOnlyDictionary<string, string> GetSettings();
 
     void SetSetting(string key, string value);
+
+    // ---- 便签/随笔正文 ----
+    Note? GetNote(string boardId);
+
+    Note SaveNote(string boardId, string content);
+
+    // ---- 提醒 ----
+    /// <summary>到点且还没提醒过的未完成待办。</summary>
+    IReadOnlyList<TodoItem> GetDueReminders(DateTimeOffset now);
+
+    bool SetRemindAt(string todoId, DateTimeOffset? remindAt);
+
+    bool SetDueAt(string todoId, DateTimeOffset? dueAt);
+
+    /// <summary>传 null 表示清空（改过提醒时间后要重置，好让它再次弹出）。</summary>
+    bool MarkReminded(string todoId, DateTimeOffset? remindedAt);
 }

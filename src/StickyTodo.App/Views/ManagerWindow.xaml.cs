@@ -26,15 +26,26 @@ public partial class ManagerWindow : Window
 
     private Board? SelectedBoard => _viewModel.SelectedBoard?.Board;
 
-    private async void Create_Click(object sender, RoutedEventArgs e)
+    private async void CreateTodo_Click(object sender, RoutedEventArgs e) =>
+        await CreateBoardAsync(BoardKind.Todo);
+
+    private async void CreateMemo_Click(object sender, RoutedEventArgs e) =>
+        await CreateBoardAsync(BoardKind.Memo);
+
+    private async Task CreateBoardAsync(BoardKind kind)
     {
-        var name = PromptWindow.Prompt(this, "新建看板", "看板名称", "新看板");
+        var name = PromptWindow.Prompt(
+            this,
+            kind == BoardKind.Memo ? "新建便签看板" : "新建待办看板",
+            "看板名称",
+            kind == BoardKind.Memo ? "新便签" : "新看板");
+
         if (name is null)
         {
             return;
         }
 
-        var board = await _viewModel.CreateBoardAsync(name);
+        var board = await _viewModel.CreateBoardAsync(name, kind);
         if (board is not null)
         {
             _windows.OpenBoard(board);
