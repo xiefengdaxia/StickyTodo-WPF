@@ -145,11 +145,11 @@
                                        Style="{StaticResource Text.Caption}"
                                        Margin="0,0,0,6" />
                             <Slider Style="{StaticResource Slider.Slim}"
-                                    Minimum="35"
+                                    Minimum="10"
                                     Maximum="100"
-                                    TickFrequency="1"
-                                    SmallChange="1"
-                                    LargeChange="5"
+                                    TickFrequency="10"
+                                    SmallChange="10"
+                                    LargeChange="10"
                                     IsSnapToTickEnabled="True"
                                     Value="{Binding BackgroundOpacity, Mode=TwoWay}" />
 
@@ -168,11 +168,11 @@
                                        Style="{StaticResource Text.Caption}"
                                        Margin="0,0,0,6" />
                             <Slider Style="{StaticResource Slider.Slim}"
-                                    Minimum="40"
+                                    Minimum="10"
                                     Maximum="100"
-                                    TickFrequency="1"
-                                    SmallChange="1"
-                                    LargeChange="5"
+                                    TickFrequency="10"
+                                    SmallChange="10"
+                                    LargeChange="10"
                                     IsSnapToTickEnabled="True"
                                     Value="{Binding WindowOpacity, Mode=TwoWay}" />
                         </StackPanel>

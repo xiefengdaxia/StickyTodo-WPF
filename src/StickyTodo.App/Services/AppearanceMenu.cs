@@ -39,84 +39,58 @@ internal static class AppearanceMenu
 
         menu.Items.Add(skinMenu);
 
-        // 弹窗里只能点选，精度不够；这里给"按 1% 微调"和"打开设置页精调"两条路
+        // 弹窗里按 10 档选，和设置页滑块保持一致，比 +1% 好点
         var backgroundMenu = new MenuItem
         {
-            Header = $"背景透明度：{Math.Round(host.CurrentOpacity * 100)}%（按 1% 微调）",
+            Header = $"背景透明度：{Math.Round(host.CurrentOpacity * 100)}%",
         };
 
-        AddStep(backgroundMenu, "+1%", 0.01, isBackground: true, host, windows);
-        AddStep(backgroundMenu, "−1%", -0.01, isBackground: true, host, windows);
-        backgroundMenu.Items.Add(new Separator());
-        AddStep(backgroundMenu, "+5%", 0.05, isBackground: true, host, windows);
-        AddStep(backgroundMenu, "−5%", -0.05, isBackground: true, host, windows);
-        backgroundMenu.Items.Add(new Separator());
-        AddPreset(backgroundMenu, "重置为 92%", 0.92, isBackground: true, host, windows);
+        for (var percent = 10; percent <= 100; percent += 10)
+        {
+            backgroundMenu.Items.Add(BuildOpacityItem(percent, isBackground: true, host, windows));
+        }
 
         menu.Items.Add(backgroundMenu);
 
         var windowMenu = new MenuItem
         {
-            Header = $"整窗透明度：{Math.Round(host.CurrentWindowOpacity * 100)}%（按 1% 微调）",
+            Header = $"整窗透明度：{Math.Round(host.CurrentWindowOpacity * 100)}%",
         };
 
-        AddStep(windowMenu, "+1%", 0.01, isBackground: false, host, windows);
-        AddStep(windowMenu, "−1%", -0.01, isBackground: false, host, windows);
-        windowMenu.Items.Add(new Separator());
-        AddStep(windowMenu, "+5%", 0.05, isBackground: false, host, windows);
-        AddStep(windowMenu, "−5%", -0.05, isBackground: false, host, windows);
-        windowMenu.Items.Add(new Separator());
-        AddPreset(windowMenu, "重置为 100%", 1.0, isBackground: false, host, windows);
+        for (var percent = 10; percent <= 100; percent += 10)
+        {
+            windowMenu.Items.Add(BuildOpacityItem(percent, isBackground: false, host, windows));
+        }
 
         menu.Items.Add(windowMenu);
 
         menu.Items.Add(new Separator());
         menu.Items.Add(new MenuItem
         {
-            Header = "精确调整请打开设置页（1% 步进）",
+            Header = "10% 一档；精确调整请打开设置页",
             IsEnabled = false,
         });
 
         return menu;
     }
 
-    /// <summary>加一个「按步长增减」的菜单项。</summary>
-    private static void AddStep(
-        MenuItem parent,
-        string label,
-        double delta,
+    /// <summary>构造一档透明度菜单项（10% 一档，打勾显示当前值）。</summary>
+    private static MenuItem BuildOpacityItem(
+        int percent,
         bool isBackground,
         IAppearanceHost host,
         WindowManager windows)
     {
-        var item = new MenuItem { Header = label };
-        item.Click += (_, _) =>
-        {
-            if (isBackground)
-            {
-                host.SetOpacity(host.CurrentOpacity + delta);
-            }
-            else
-            {
-                host.SetWindowOpacity(host.CurrentWindowOpacity + delta);
-            }
+        var value = percent / 100d;
+        var current = isBackground ? host.CurrentOpacity : host.CurrentWindowOpacity;
 
-            windows.ApplySkin();
+        var item = new MenuItem
+        {
+            Header = $"{percent}%",
+            IsCheckable = true,
+            IsChecked = Math.Abs(current - value) < 0.005,
         };
 
-        parent.Items.Add(item);
-    }
-
-    /// <summary>加一个「重置到固定值」的菜单项。</summary>
-    private static void AddPreset(
-        MenuItem parent,
-        string label,
-        double value,
-        bool isBackground,
-        IAppearanceHost host,
-        WindowManager windows)
-    {
-        var item = new MenuItem { Header = label };
         item.Click += (_, _) =>
         {
             if (isBackground)
@@ -131,6 +105,6 @@ internal static class AppearanceMenu
             windows.ApplySkin();
         };
 
-        parent.Items.Add(item);
+        return item;
     }
 }

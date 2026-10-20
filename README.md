@@ -69,6 +69,8 @@ $exe = ".\src\StickyTodo.App\bin\Debug\net8.0-windows\StickyTodo.exe"
 & $exe --tag-drag-demo                      # 拖到标签全链路（打标签 → 清空标签），退出码 0 = 通过
 & $exe --hover-demo --shot D:\shots         # 截「悬停显示 ✓ ✕」与「已完成悬停显示 ↺」
 & $exe --manager-menu-demo --shot D:\shots  # 主窗体卡片右键菜单（验证含「重命名」「删除」）
+& $exe --settings-reopen-demo              # 反复打开/关闭设置页 5 轮，验证不会崩（退出码 0 = 通过）
+& $exe --window-opacity-demo --shot D:\shots  # 整窗透明度 100/60/40% 并读回 Window.Opacity 断言
 & $exe --ui-probe                           # 打印拖动把手与行的屏幕坐标（配合 tools/drag-test.ps1 做真实鼠标拖拽）
 & $exe --skin graphite --opacity 0.6 --window-opacity 0.9   # 启动时覆盖外观（也用于截图回归）
 ```
@@ -91,7 +93,8 @@ $exe = ".\src\StickyTodo.App\bin\Debug\net8.0-windows\StickyTodo.exe"
 
 ```
 StickyTodo.sln
-├─ src/StickyTodo.Core             领域层（仅依赖 Ical.Net，无 UI/DB 依赖）│   ├─ Entities/                   Board / BoardWindowState / TodoItem / TodoCompletion / Tag / Note
+├─ src/StickyTodo.Core             领域层（仅依赖 Ical.Net，无 UI/DB 依赖）
+│   ├─ Entities/                   Board / BoardWindowState / TodoItem / TodoCompletion / Tag / Note
 │   ├─ Abstractions/               ITodoRepository
 │   ├─ Entitlements/               IEntitlementService + PermanentFree / FreeTier
 │   ├─ Geometry/                   SnapRect / WindowSnapper（吸附算法）
@@ -126,7 +129,7 @@ dotnet run --project tools/IconGen -c Release -- src/StickyTodo.App/Assets/stick
 - **所有窗口都没有系统标题栏**：主窗体、设置页、便签窗口、输入框全部自绘标题栏（可拖动，主窗与设置页支持边缘缩放与最大化）
 - 便签窗口**无边框 + 圆角 + 投影**，边缘 8px 可缩放（自己处理 `WM_NCHITTEST`）
 - **8 套皮肤**：经典黄 / 素白 / 薄荷绿 / 天青蓝 / 淡紫 / 樱花粉 / 石墨夜色 / 午夜墨蓝（暗色皮肤自动切浅色文字）
-- **两种透明度分别可调，步进 1%**：背景透明度 35–100%（只让纸变透、文字始终清晰），整窗透明度 40–100%（连文字一起淡）
+- **两种透明度分别可调，10% 一档共 10 档**：背景透明度 10–100%（只让纸变透、文字始终清晰），整窗透明度 10–100%（连文字一起淡）
 - **只有便签/便签看板/日历看板透明**；主窗体与设置页是不透明窗口
 - 自绘控件：圆角复选框、细滑块、扁平滚动条、分段切换、卡片、**右键菜单**（含子菜单箭头、勾选标记、分隔线，颜色跟随皮肤）
 - 标题栏悬浮按钮：📌 置顶、🔒 锁定、🎨 快速换肤、⋯ 主窗体、✕ 关闭
@@ -277,7 +280,8 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 - [x] **应用图标**：便签纸 + 折角 + 对勾，9 个尺寸（16–256）多尺寸 ICO，窗口与托盘共用
 - [x] **悬停按钮移到行尾最右侧**，第二行标签与标题左边缘对齐
 - [x] **修复锁定后白屏**：`IsEnabled=false` 时 ListBox 默认模板会画出系统白底，改为透明模板
-- [x] **主窗体与设置页改为不透明窗口**，透明度只作用于三类看板；滑块步进 1%
+- [x] **主窗体与设置页改为不透明窗口**，透明度只作用于三类看板；滑块 10% 一档
+- [x] **修复「开关设置窗口后程序崩溃」**：单例窗口被 Close 后再 Show 会抛异常，改为关闭仅隐藏 + 全局异常兜底
 - [x] 置顶 / 锁定（按看板记忆，存 `setting` 表）
 - [x] 截图回归带假桌面背景，一眼验证透明度
 

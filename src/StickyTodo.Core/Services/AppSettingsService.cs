@@ -14,12 +14,17 @@ public sealed class AppSettingsService
 
     public const string DefaultSkin = "sticky-yellow";
     public const double DefaultOpacity = 0.92;
-    public const double MinOpacity = 0.35;
+
+    /// <summary>最低 10%（与设置页 10 档滑块一致）。</summary>
+    public const double MinOpacity = 0.10;
+
     public const double MaxOpacity = 1.0;
 
     /// <summary>整窗不透明度（连文字一起），默认 100%。</summary>
     public const double DefaultWindowOpacity = 1.0;
-    public const double MinWindowOpacity = 0.4;
+
+    /// <summary>最低 10%（与设置页 10 档滑块一致）。</summary>
+    public const double MinWindowOpacity = 0.10;
 
     private readonly ITodoRepository _repository;
 

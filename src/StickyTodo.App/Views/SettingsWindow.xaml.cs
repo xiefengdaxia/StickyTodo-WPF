@@ -49,4 +49,31 @@ public partial class SettingsWindow : Window
     }
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
+
+    /// <summary>
+    /// 关闭时只隐藏、不销毁。
+    /// 之前没拦这一下：窗口被 Close() 后仍是 DI 单例，下次 ShowSettings 再 Show() 会抛
+    /// InvalidOperationException（不能对已关闭的窗口调用 Show），当时也没有全局异常处理，
+    /// 表现就是卡一下然后进程直接退出。
+    /// </summary>
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        if (_allowClose)
+        {
+            base.OnClosing(e);
+            return;
+        }
+
+        e.Cancel = true;
+        Hide();
+    }
+
+    private bool _allowClose;
+
+    /// <summary>真正销毁（退出程序时用）。</summary>
+    public void RequestClose()
+    {
+        _allowClose = true;
+        Close();
+    }
 }

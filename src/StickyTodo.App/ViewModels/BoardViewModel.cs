@@ -228,8 +228,8 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
     public void SetWindowOpacity(double opacity)
     {
         _skin.SetWindowOpacity(opacity);
+        WindowOpacity = _skin.WindowOpacity;
         OnPropertyChanged(nameof(CurrentWindowOpacity));
-        OnPropertyChanged(nameof(WindowOpacity));
     }
 
     /// <summary>皮肤被别的窗口改过之后刷新一下绑定值。</summary>
@@ -238,7 +238,7 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
         OnPropertyChanged(nameof(CurrentSkinKey));
         OnPropertyChanged(nameof(CurrentOpacity));
         OnPropertyChanged(nameof(CurrentWindowOpacity));
-        OnPropertyChanged(nameof(WindowOpacity));
+        WindowOpacity = _skin.WindowOpacity;
     }
 
     // ---------- 倒数日与提醒 ----------

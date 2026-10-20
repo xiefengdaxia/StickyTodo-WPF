@@ -108,6 +108,20 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        // 设置窗口反复开关回归：验证「关掉再打开」不会崩
+        if (e.Args.Contains("--settings-reopen-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunSettingsReopenDemo();
+            return;
+        }
+
+        // 整窗透明度回归：设成不同值后检查 Window.Opacity 是否真的变了
+        if (e.Args.Contains("--window-opacity-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunWindowOpacityDemo(ReadOptionValue(e.Args, "--shot"));
+            return;
+        }
+
         // 锁定白屏回归：锁定后截图 + 检查内容区可见性
         if (e.Args.Contains("--lock-demo", StringComparer.OrdinalIgnoreCase))
         {
@@ -149,6 +163,7 @@ public partial class App : System.Windows.Application
 
         AppPaths.EnsureCreated();
         ConfigureLogging();
+        InstallGlobalExceptionHandlers();
 
         try
         {
@@ -202,6 +217,54 @@ public partial class App : System.Windows.Application
                 "StickyTodo", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(-1);
         }
+    }
+
+    /// <summary>
+    /// 全局异常兜底：UI 线程异常记日志并提示，不让进程直接消失。
+    /// 之前没有这一层，"点两次设置"就足以让整个程序崩溃退出。
+    /// </summary>
+    private void InstallGlobalExceptionHandlers()
+    {
+        DispatcherUnhandledException += (_, args) =>
+        {
+            Log.Error(args.Exception, "UI 线程未处理异常");
+
+            // 标记已处理，程序继续运行；弹窗也做兜底，避免二次异常
+            try
+            {
+                MessageBox.Show(
+                    $"操作失败：{args.Exception.Message}\n\n详细信息已写入日志：{AppPaths.LogDirectory}",
+                    "StickyTodo",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+            catch (Exception)
+            {
+                // 弹窗失败就只记日志
+            }
+
+            args.Handled = true;
+        };
+
+        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+        {
+            if (args.ExceptionObject is Exception ex)
+            {
+                Log.Fatal(ex, "非 UI 线程未处理异常");
+            }
+            else
+            {
+                Log.Fatal("非 UI 线程未处理异常：{Object}", args.ExceptionObject);
+            }
+
+            Log.CloseAndFlush();
+        };
+
+        TaskScheduler.UnobservedTaskException += (_, args) =>
+        {
+            Log.Error(args.Exception, "未观察的任务异常");
+            args.SetObserved();
+        };
     }
 
     private static void ConfigureLogging()
@@ -353,6 +416,139 @@ public partial class App : System.Windows.Application
         catch (Exception ex)
         {
             Log.Fatal(ex, "[skin] 失败");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
+    /// --settings-reopen-demo：复现「打开设置 → 关闭 → 再打开」这条崩溃路径。
+    /// 循环 5 次，每次检查窗口是否还能正常 Show 出来。
+    /// </summary>
+    private async void RunSettingsReopenDemo()
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+        InstallGlobalExceptionHandlers();
+
+        var ok = true;
+
+        try
+        {
+            _host = BuildHost();
+            await _host.StartAsync();
+
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+            _host.Services.GetRequiredService<TodoService>().EnsureDefaultBoard();
+
+            var manager = _host.Services.GetRequiredService<ManagerWindow>();
+            MainWindow = manager;
+            manager.Show();
+
+            for (var round = 1; round <= 5; round++)
+            {
+                ShowSettings();
+                await Task.Delay(400);
+
+                var window = _host.Services.GetRequiredService<SettingsWindow>();
+                var shownOk = window.IsVisible;
+
+                // 模拟点标题栏的 ✕（应只是隐藏，不销毁；之后再 Show 才能成功）
+                window.Close();
+
+                // 等一会再开，模拟用户连续操作
+                await Task.Delay(300);
+
+                Log.Information("[reopen] 第 {Round} 轮：打开成功={Shown}，关闭后 IsVisible={Hidden}",
+                    round, shownOk, window.IsVisible);
+
+                ok &= shownOk;
+            }
+
+            // 最后一轮：正常打开着退出，确认没有残留
+            ShowSettings();
+            await Task.Delay(300);
+            var finalVisible = _host.Services.GetRequiredService<SettingsWindow>().IsVisible;
+            ok &= finalVisible;
+
+            Log.Information("[reopen] 最终仍可打开={Final} 总结果={Result}",
+                finalVisible, ok ? "通过" : "失败");
+        }
+        catch (Exception ex)
+        {
+            ok = false;
+            Log.Fatal(ex, "[reopen] 异常");
+        }
+
+        Log.CloseAndFlush();
+        Shutdown(ok ? 0 : 2);
+    }
+
+    /// <summary>
+    /// --window-opacity-demo：验证「整窗透明度」真的作用到窗口上。
+    /// 依次设 100% / 60% / 40%，读取每个窗口的 Window.Opacity 并截图。
+    /// </summary>
+    private void RunWindowOpacityDemo(string? shotDirectory)
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+            _host = BuildHost();
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+            var service = _host.Services.GetRequiredService<TodoService>();
+            var board = service.EnsureDefaultBoard();
+
+            foreach (var existing in service.GetTodos(board.Id))
+            {
+                service.Delete(existing.Id);
+            }
+
+            service.AddTodo(board.Id, "整窗透明度检查");
+
+            var memoBoard = service.GetBoards().FirstOrDefault(b => b.Kind == BoardKind.Memo);
+            var windows = _host.Services.GetRequiredService<WindowManager>();
+            var settings = _host.Services.GetRequiredService<SettingsViewModel>();
+            var todoWindow = windows.OpenBoard(board);
+            MainWindow = todoWindow;
+
+            var steps = new Queue<(string Name, double Value)>();
+            steps.Enqueue(("op100", 1.0));
+            steps.Enqueue(("op60", 0.60));
+            steps.Enqueue(("op40", 0.40));
+
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(900) };
+            timer.Tick += (_, _) =>
+            {
+                if (steps.Count == 0)
+                {
+                    timer.Stop();
+                    Shutdown(0);
+                    return;
+                }
+
+                var (name, value) = steps.Dequeue();
+
+                // 走界面实际使用的那条路：设置页 ViewModel → SkinService → 窗口
+                settings.WindowOpacity = value * 100;
+
+                var actual = todoWindow.Opacity;
+                Log.Information("[winop] 设置={Target:0.00} 窗口实际 Opacity={Actual:0.00} 一致={Match}",
+                    value, actual, Math.Abs(actual - value) < 0.01);
+
+                if (shotDirectory is not null)
+                {
+                    SaveWindowShots(Path.Combine(shotDirectory, name));
+                }
+            };
+            timer.Start();
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[winop] 失败");
             Log.CloseAndFlush();
             Shutdown(1);
         }
@@ -1461,15 +1657,29 @@ public partial class App : System.Windows.Application
             return;
         }
 
-        var window = _host.Services.GetRequiredService<SettingsWindow>();
-        if (window.IsVisible)
+        try
         {
-            window.Activate();
-            return;
-        }
+            var window = _host.Services.GetRequiredService<SettingsWindow>();
 
-        window.Show();
-        window.Activate();
+            if (window.IsVisible)
+            {
+                if (window.WindowState == WindowState.Minimized)
+                {
+                    window.WindowState = WindowState.Normal;
+                }
+
+                window.Activate();
+                return;
+            }
+
+            window.Show();
+            window.Activate();
+        }
+        catch (Exception ex)
+        {
+            // 窗口状态异常不能让整个程序挂掉
+            Log.Error(ex, "打开设置窗口失败");
+        }
     }
 
     private static string? ReadOptionValue(string[] args, string name)
