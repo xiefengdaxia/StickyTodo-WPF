@@ -44,7 +44,11 @@ public sealed class SkinService
         resources["Brush.Line"] = skin.CreateLineBrush();
         resources["Brush.ChipIdle"] = skin.CreateChipIdleBrush();
         resources["Brush.ChipActive"] = new SolidColorBrush(skin.Accent);
-        resources["Brush.WindowBackdrop"] = Brushes.Transparent;
+        resources["Brush.Surface"] = skin.CreateSurfaceBrush();
+        resources["Brush.SurfaceHover"] = skin.CreateSurfaceHoverBrush();
+        resources["Brush.AccentSoft"] = skin.CreateAccentSoftBrush();
+        resources["Brush.Track"] = skin.CreateTrackBrush();
+        resources["Bool.IsDark"] = skin.IsDark;
     }
 
     /// <summary>切换皮肤并持久化。</summary>

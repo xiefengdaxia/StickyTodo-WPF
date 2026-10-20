@@ -8,11 +8,15 @@
 |---|---|---|
 | ![便签](artifacts/board-default.png) | ![半透明](artifacts/board-translucent.png) | ![暗色](artifacts/board-dark.png) |
 
-便签/随笔看板、日历看板、到点提醒、管理面板：
+| 主窗体（无边框 + 侧栏） | 独立设置页 |
+|---|---|
+| ![主窗体](artifacts/manager.png) | ![设置](artifacts/settings.png) |
 
-| 便签看板（边写边存） | 日历看板（月视图） | 到点提醒 | 看板管理 |
+便签 / 便签看板 / 日历看板 / 到点提醒：
+
+| 待办便签 | 便签看板（边写边存） | 日历看板（月视图） | 到点提醒 |
 |---|---|---|---|
-| ![便签看板](artifacts/board-memo.png) | ![日历](artifacts/calendar.png) | ![提醒](artifacts/reminder.png) | ![管理](artifacts/manager.png) |
+| ![便签](artifacts/board-work.png) | ![便签看板](artifacts/board-memo.png) | ![日历](artifacts/calendar.png) | ![提醒](artifacts/reminder.png) |
 
 带目标日期、提醒、重复规则的待办列表：`artifacts/board-work.png`
 
@@ -41,6 +45,8 @@ $exe = ".\src\StickyTodo.App\bin\Debug\net8.0-windows\StickyTodo.exe"
 & $exe --demo --reminder-demo --shot D:\shots   # 额外造一条到点提醒，验证弹窗链路
 & $exe --recurrence-demo                    # 重复待办端到端验证（建规则→勾选→滚动→日历展开），退出码 0 = 通过
 & $exe --view-demo --shot D:\shots          # 分别在待办视图/已完成视图下截图，验证视图切换
+& $exe --settings-demo --shot D:\shots --tall   # 截设置页（--tall 临时加高，让全部区块入镜）
+& $exe --skin-check                         # 验证换皮肤后便签资源确实同步，退出码 0 = 通过
 & $exe --skin graphite --opacity 0.6 --window-opacity 0.9   # 启动时覆盖外观（也用于截图回归）
 ```
 
@@ -75,8 +81,8 @@ StickyTodo.sln
 │   └─ AppPaths.cs
 ├─ src/StickyTodo.App              WPF 表现层（net8.0-windows）
 │   ├─ App.xaml(.cs)               最小 Host + DI + Serilog + 单实例 + 自检/演示
-│   ├─ Views/                      ManagerWindow / BoardWindow / MemoBoardWindow / CalendarWindow / PromptWindow / ReminderPopup
-│   ├─ ViewModels/                 CommunityToolkit.Mvvm（四类看板各一个）
+│   ├─ Views/                      ManagerWindow / SettingsWindow / BoardWindow / MemoBoardWindow / CalendarWindow / PromptWindow / ReminderPopup
+│   ├─ ViewModels/                 CommunityToolkit.Mvvm（四类看板 + 设置页）
 │   ├─ Services/                   WindowManager / TrayService / ScreenHelper
 │   └─ Converters/
 └─ tests/StickyTodo.Tests          xUnit
@@ -89,11 +95,20 @@ StickyTodo.sln
 ## 3. 当前功能
 
 **外观（贴纸感）**
-- 便签窗口**无边框 + 圆角 + 投影**，标题栏可拖动，边缘 8px 可缩放（自己处理 `WM_NCHITTEST`，因为 `WindowStyle=None` 后系统不再提供）
-- **背景半透明**：只让背景层透明，文字始终不透明清晰；`35% ~ 100%` 十档可调，默认 92%
-- **6 套皮肤**：经典黄 / 薄荷绿 / 天青蓝 / 淡紫 / 樱花粉 / 石墨夜色（暗色皮肤自动切换浅色文字）
-- 标题栏悬浮按钮：📌 置顶（默认开）、🔒 锁定（锁后内容区禁用，防误触）、🎨 皮肤与透明度、⋯ 看板管理、✕ 关闭
-- 便签不在任务栏占位（贴纸风格），入口走托盘和管理面板
+- **所有窗口都没有系统标题栏**：主窗体、设置页、便签窗口、输入框全部自绘标题栏（可拖动，主窗与设置页支持边缘缩放与最大化）
+- 便签窗口**无边框 + 圆角 + 投影**，边缘 8px 可缩放（自己处理 `WM_NCHITTEST`）
+- **8 套皮肤**：经典黄 / 素白 / 薄荷绿 / 天青蓝 / 淡紫 / 樱花粉 / 石墨夜色 / 午夜墨蓝（暗色皮肤自动切浅色文字）
+- **两种透明度分别可调**：背景透明度 35–100%（只让纸变透、文字始终清晰），整窗透明度 40–100%（连文字一起淡）
+- 自绘控件：圆角复选框、细滑块、扁平滚动条、分段切换、卡片式列表
+- 标题栏悬浮按钮：📌 置顶、🔒 锁定、🎨 快速换肤、⋯ 主窗体、✕ 关闭
+- 便签不在任务栏占位（贴纸风格），入口走托盘和主窗体
+
+**设置页（独立窗口）**
+- 8 套配色以**色卡网格**呈现，点一下所有窗口立即生效（不需要重启）
+- 两个透明度滑块，实时预览并即时保存
+- 三个全局快捷键一覧
+- 数据区：会员状态、内容统计（看板/待办/已完成/标签数）、本地存储路径
+- 入口：主窗体左下「设置」、托盘右键菜单「设置」
 
 **看板**
 - 一个看板一个独立窗口，可同时开多个；再从托盘/管理面板打开同一个看板会激活已有窗口
@@ -206,10 +221,13 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 - [x] `--demo` / `--shot` 演示与 UI 回归截图
 
 **M2.5 外观（已完成）**
-- [x] 无边框 + 圆角 + 投影 + 自绘标题栏 + 边缘缩放
+- [x] 便签窗口无边框 + 圆角 + 投影 + 自绘标题栏 + 边缘缩放
 - [x] 背景半透明（10 档，默认 92%），文字始终清晰
 - [x] **整窗透明度**（连文字一起，6 档）可与背景透明度**分别调**
-- [x] 6 套皮肤（含暗色），皮肤画刷走 `DynamicResource`，切换即时全局生效
+- [x] **主窗体与设置页也改成无边框自绘标题栏**，主窗改为「左侧操作栏 + 右侧看板卡片」布局
+- [x] **独立设置页**：色卡网格选皮肤 / 双透明度滑块 / 快捷键一览 / 数据统计与存储路径
+- [x] 皮肤扩到 8 套（新增「素白」「午夜墨蓝」），画刷走 `DynamicResource`，切换即时全局生效
+- [x] 自绘控件统一：圆角复选框、细滑块、扁平滚动条、分段切换、卡片
 - [x] 置顶 / 锁定（按看板记忆，存 `setting` 表）
 - [x] 截图回归带假桌面背景，一眼验证透明度
 

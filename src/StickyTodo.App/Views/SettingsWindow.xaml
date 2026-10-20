@@ -1,0 +1,251 @@
+<Window x:Class="StickyTodo.App.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="设置"
+        Width="520" Height="700"
+        MinWidth="460" MinHeight="560"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="CanResizeWithGrip"
+        WindowStartupLocation="CenterScreen"
+        FontFamily="Microsoft YaHei UI"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Display">
+
+    <Border x:Name="Shell"
+            Margin="12"
+            CornerRadius="14"
+            Background="{DynamicResource Brush.Paper}"
+            BorderBrush="#59FFFFFF"
+            BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="24" ShadowDepth="4" Opacity="0.32" Color="#FF000000" Direction="270" />
+        </Border.Effect>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- 自绘标题栏 -->
+            <Border Grid.Row="0"
+                    Background="{DynamicResource Brush.PaperDeep}"
+                    CornerRadius="13,13,0,0"
+                    Padding="18,14"
+                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid>
+                    <StackPanel>
+                        <TextBlock Text="设置" Style="{StaticResource Text.Display}" />
+                        <TextBlock Text="外观与数据都存在本机，不联网"
+                                   Style="{StaticResource Text.Caption}"
+                                   Margin="0,3,0,0" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                        <Button Style="{StaticResource Button.ChromeClose}"
+                                Content="✕"
+                                FontSize="11"
+                                ToolTip="关闭"
+                                Click="Close_Click" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="18,14,10,14">
+                <StackPanel>
+
+                    <!-- ===== 外观：皮肤 ===== -->
+                    <TextBlock Text="外观" Style="{StaticResource Text.Section}" Margin="2,0,0,8" />
+
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                        <StackPanel>
+                            <TextBlock Text="配色" Style="{StaticResource Text.Title}" FontSize="13" Margin="0,0,0,3" />
+                            <TextBlock Text="选一套喜欢的纸色，所有便签立即生效"
+                                       Style="{StaticResource Text.Caption}"
+                                       Margin="0,0,0,12" />
+
+                            <ItemsControl x:Name="SkinList" ItemsSource="{Binding Skins}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Margin="0,0,8,8"
+                                                Padding="0"
+                                                Background="Transparent"
+                                                BorderThickness="0"
+                                                Cursor="Hand"
+                                                ToolTip="{Binding Name}"
+                                                Click="Skin_Click">
+                                            <Button.Template>
+                                                <ControlTemplate TargetType="Button">
+                                                    <Border x:Name="Root"
+                                                            Width="72"
+                                                            CornerRadius="9"
+                                                            BorderThickness="2"
+                                                            BorderBrush="Transparent"
+                                                            Padding="5">
+                                                        <StackPanel>
+                                                            <Border Height="34"
+                                                                    CornerRadius="6"
+                                                                    Background="{Binding Preview}"
+                                                                    BorderBrush="#33000000"
+                                                                    BorderThickness="1">
+                                                                <TextBlock Text="Aa"
+                                                                           HorizontalAlignment="Center"
+                                                                           VerticalAlignment="Center"
+                                                                           FontSize="13"
+                                                                           FontWeight="SemiBold"
+                                                                           Foreground="{Binding TextPreview}" />
+                                                            </Border>
+                                                            <TextBlock Text="{Binding Name}"
+                                                                       FontSize="10.5"
+                                                                       HorizontalAlignment="Center"
+                                                                       Margin="0,5,0,0"
+                                                                       Foreground="{DynamicResource Brush.InkSoft}" />
+                                                        </StackPanel>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="Root" Property="Background" Value="#26FFFFFF" />
+                                                        </Trigger>
+                                                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                            <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
+                                                            <Setter TargetName="Root" Property="Background" Value="#33B27F0A" />
+                                                        </DataTrigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Button.Template>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ===== 外观：透明度 ===== -->
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,4">
+                                <TextBlock Text="背景透明度" Style="{StaticResource Text.Title}" FontSize="13" />
+                                <TextBlock Text="{Binding BackgroundOpacityText}"
+                                           HorizontalAlignment="Right"
+                                           VerticalAlignment="Center"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource Brush.Accent}" />
+                            </Grid>
+                            <TextBlock Text="只让纸变透，文字始终清晰"
+                                       Style="{StaticResource Text.Caption}"
+                                       Margin="0,0,0,6" />
+                            <Slider Style="{StaticResource Slider.Slim}"
+                                    Minimum="35"
+                                    Maximum="100"
+                                    TickFrequency="5"
+                                    IsSnapToTickEnabled="True"
+                                    Value="{Binding BackgroundOpacity, Mode=TwoWay}" />
+
+                            <Border Height="1" Background="{DynamicResource Brush.Line}" Margin="0,10" />
+
+                            <Grid Margin="0,0,0,4">
+                                <TextBlock Text="整窗透明度" Style="{StaticResource Text.Title}" FontSize="13" />
+                                <TextBlock Text="{Binding WindowOpacityText}"
+                                           HorizontalAlignment="Right"
+                                           VerticalAlignment="Center"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource Brush.Accent}" />
+                            </Grid>
+                            <TextBlock Text="连文字一起变淡，更像贴在屏幕上的便签"
+                                       Style="{StaticResource Text.Caption}"
+                                       Margin="0,0,0,6" />
+                            <Slider Style="{StaticResource Slider.Slim}"
+                                    Minimum="40"
+                                    Maximum="100"
+                                    TickFrequency="5"
+                                    IsSnapToTickEnabled="True"
+                                    Value="{Binding WindowOpacity, Mode=TwoWay}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ===== 快捷键 ===== -->
+                    <TextBlock Text="快捷键" Style="{StaticResource Text.Section}" Margin="2,4,0,8" />
+
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,9">
+                                <TextBlock Text="新建待办" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
+                                <Border HorizontalAlignment="Right" Background="{DynamicResource Brush.AccentSoft}"
+                                        CornerRadius="6" Padding="8,2">
+                                    <TextBlock Text="{Binding ShortcutNewTodo}" FontSize="11"
+                                               Foreground="{DynamicResource Brush.Accent}" />
+                                </Border>
+                            </Grid>
+                            <Grid Margin="0,0,0,9">
+                                <TextBlock Text="显示 / 隐藏全部便签" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
+                                <Border HorizontalAlignment="Right" Background="{DynamicResource Brush.AccentSoft}"
+                                        CornerRadius="6" Padding="8,2">
+                                    <TextBlock Text="{Binding ShortcutToggleBoards}" FontSize="11"
+                                               Foreground="{DynamicResource Brush.Accent}" />
+                                </Border>
+                            </Grid>
+                            <Grid>
+                                <TextBlock Text="锁定 / 解锁当前看板" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
+                                <Border HorizontalAlignment="Right" Background="{DynamicResource Brush.AccentSoft}"
+                                        CornerRadius="6" Padding="8,2">
+                                    <TextBlock Text="{Binding ShortcutLockActive}" FontSize="11"
+                                               Foreground="{DynamicResource Brush.Accent}" />
+                                </Border>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ===== 数据 ===== -->
+                    <TextBlock Text="数据" Style="{StaticResource Text.Section}" Margin="2,4,0,8" />
+
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,9">
+                                <TextBlock Text="会员状态" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
+                                <TextBlock Text="{Binding EntitlementText}"
+                                           HorizontalAlignment="Right"
+                                           FontSize="11.5"
+                                           Foreground="{DynamicResource Brush.Accent}" />
+                            </Grid>
+                            <Grid Margin="0,0,0,9">
+                                <TextBlock Text="内容统计" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
+                                <TextBlock Text="{Binding StatsText}"
+                                           HorizontalAlignment="Right"
+                                           FontSize="11.5"
+                                           Foreground="{DynamicResource Brush.InkSoft}" />
+                            </Grid>
+                            <TextBlock Text="存储位置" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" Margin="0,0,0,4" />
+                            <Border Background="{DynamicResource Brush.AccentSoft}" CornerRadius="7" Padding="9,7">
+                                <TextBlock Text="{Binding DataPathText}"
+                                           FontSize="10.5"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource Brush.InkSoft}" />
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                </StackPanel>
+            </ScrollViewer>
+
+            <Border Grid.Row="2"
+                    BorderBrush="{DynamicResource Brush.Line}"
+                    BorderThickness="0,1,0,0"
+                    Padding="18,10"
+                    Background="{DynamicResource Brush.PaperDeep}"
+                    CornerRadius="0,0,13,13">
+                <TextBlock Text="改动即时保存"
+                           Style="{StaticResource Text.Caption}" />
+            </Border>
+        </Grid>
+    </Border>
+</Window>

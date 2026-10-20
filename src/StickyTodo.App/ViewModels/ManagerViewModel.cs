@@ -24,6 +24,14 @@ public sealed class BoardRowViewModel
 
     public string KindText => BoardKinds.DisplayName(Board.Kind);
 
+    /// <summary>卡片左侧的类型图标。</summary>
+    public string KindGlyph => Board.Kind switch
+    {
+        BoardKind.Memo => "✎",
+        BoardKind.Calendar => "▦",
+        _ => "✓",
+    };
+
     public bool IsMemo => Board.Kind == BoardKind.Memo;
 
     public int Pending { get; }
@@ -63,8 +71,7 @@ public partial class ManagerViewModel : ObservableObject
     public string StorageHint => "全部数据保存在本机 SQLite，程序不发起任何网络请求";
 
     public string FooterHint =>
-        $"全部本地存储，不联网 · 快捷键：{HotKeyService.NewTodoHotKey} 新建待办 / " +
-        $"{HotKeyService.ToggleBoardsHotKey} 显示隐藏便签 / {HotKeyService.LockActiveHotKey} 锁定当前看板";
+        $"全部本地存储 · 快捷键 {HotKeyService.NewTodoHotKey} 新建待办";
 
     [ObservableProperty]
     private string? _errorText;

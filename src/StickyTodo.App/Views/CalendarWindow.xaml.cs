@@ -86,7 +86,7 @@ public partial class CalendarWindow : Window, IStickyWindow
         }
     }
 
-    private async void DeleteEntry_Click(object sender, RoutedEventArgs e)
+    private void DeleteEntry_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement { DataContext: CalendarEntryViewModel entry })
         {

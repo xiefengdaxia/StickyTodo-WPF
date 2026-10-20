@@ -41,7 +41,6 @@
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
                 <Button Content="稍后 10 分钟" Style="{StaticResource Button.Ghost}" Click="Snooze_Click" />
                 <Button Content="知道了" Style="{StaticResource Button.Primary}" Margin="8,0,0,0" Click="Ok_Click" />
-            </StackPanel>
-        </StackPanel>
+            </StackPanel>        </StackPanel>
     </Border>
 </Window>

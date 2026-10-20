@@ -52,6 +52,20 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        // 设置页回归：打开设置窗口截图，验证皮肤色卡与滑块渲染
+        if (e.Args.Contains("--settings-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunSettingsDemo(ReadOptionValue(e.Args, "--shot"), e.Args.Contains("--tall", StringComparer.OrdinalIgnoreCase));
+            return;
+        }
+
+        // 皮肤联动检查：设置页换皮肤后，便签窗口的资源确实跟着变
+        if (e.Args.Contains("--skin-check", StringComparer.OrdinalIgnoreCase))
+        {
+            RunSkinCheck();
+            return;
+        }
+
         _mutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var isFirstInstance);
         if (!isFirstInstance)
         {
@@ -157,6 +171,8 @@ public partial class App : System.Windows.Application
                 services.AddSingleton<HotKeyService>();
                 services.AddSingleton<ManagerViewModel>();
                 services.AddSingleton<ManagerWindow>();
+                services.AddSingleton<SettingsViewModel>();
+                services.AddSingleton<SettingsWindow>();
             })
             .Build();
     }
@@ -215,6 +231,119 @@ public partial class App : System.Windows.Application
         command.Parameters.AddWithValue("@doneAt", doneAt.ToUnixTimeSeconds());
         command.Parameters.AddWithValue("@id", todoId);
         command.ExecuteNonQuery();
+    }
+
+    /// <summary>
+    /// --skin-check：验证「设置页换皮肤 → 便签窗口真的变」。
+    /// 依次切换两套皮肤并读取便签窗口实际用到的画刷颜色，退出码 0 表示同步生效。
+    /// </summary>
+    private void RunSkinCheck()
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+            _host = BuildHost();
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+            var service = _host.Services.GetRequiredService<TodoService>();
+            var board = service.EnsureDefaultBoard();
+            if (!service.GetTodos(board.Id).Any())
+            {
+                service.AddTodo(board.Id, "皮肤切换检查");
+            }
+
+            var windows = _host.Services.GetRequiredService<WindowManager>();
+            var skinService = _host.Services.GetRequiredService<SkinService>();
+            var window = windows.OpenBoard(board);
+
+            var results = new List<string>();
+            var ok = true;
+
+            foreach (var key in new[] { "graphite", "sticky-yellow" })
+            {
+                skinService.SetSkin(key);
+                windows.ApplySkin();
+
+                var expected = NoteSkins.Resolve(key);
+                var actual = ((SolidColorBrush)System.Windows.Application.Current.Resources["Brush.Ink"]).Color;
+                var match = actual == expected.Ink;
+                ok &= match;
+
+                results.Add($"皮肤={key} 期望墨色={expected.Ink} 实际={actual} 一致={match}");
+            }
+
+            Log.Information("[skin] {Results}", string.Join(" | ", results));
+            Log.Information("[skin] 便签窗口类型={Type} 标题={Title}", window.GetType().Name, window.Title);
+
+            Log.CloseAndFlush();
+            Shutdown(ok ? 0 : 2);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[skin] 失败");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
+    /// --settings-demo：打开设置页截图，验证皮肤色卡、滑块、快捷键与数据区渲染。
+    /// </summary>
+    private void RunSettingsDemo(string? shotDirectory, bool tall)
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+            _host = BuildHost();
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+            _host.Services.GetRequiredService<TodoService>().EnsureDefaultBoard();
+
+            var settings = _host.Services.GetRequiredService<SettingsWindow>();
+            MainWindow = settings;
+
+            // 截图模式下临时加高，让「快捷键 / 数据」也进入一屏（仅影响本次进程）
+            if (tall)
+            {
+                settings.Height = 1060;
+                settings.Width = 540;
+            }
+
+            settings.Show();
+
+            // --skin 覆盖：验证「设置页选皮肤 → 便签窗口真的变」
+            var skinOverride = ReadOptionValue(Environment.GetCommandLineArgs(), "--skin");
+            if (skinOverride is not null)
+            {
+                var skinService = _host.Services.GetRequiredService<SkinService>();
+                skinService.SetSkin(skinOverride);
+                _host.Services.GetRequiredService<WindowManager>().ApplySkin();
+            }
+
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(900) };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                if (shotDirectory is not null)
+                {
+                    var count = SaveWindowShots(shotDirectory);
+                    Log.Information("[settings] 已输出 {Count} 张截图到 {Dir}", count, shotDirectory);
+                }
+
+                Shutdown(0);
+            };
+            timer.Start();
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[settings] 失败");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
     }
 
     /// <summary>
@@ -556,6 +685,25 @@ public partial class App : System.Windows.Application
             new Point(width, height * 0.42));
 
         return visual;
+    }
+
+    /// <summary>打开（或激活）设置窗口。托盘菜单和主窗体左侧入口都走这里。</summary>
+    public void ShowSettings()
+    {
+        if (_host is null)
+        {
+            return;
+        }
+
+        var window = _host.Services.GetRequiredService<SettingsWindow>();
+        if (window.IsVisible)
+        {
+            window.Activate();
+            return;
+        }
+
+        window.Show();
+        window.Activate();
     }
 
     private static string? ReadOptionValue(string[] args, string name)

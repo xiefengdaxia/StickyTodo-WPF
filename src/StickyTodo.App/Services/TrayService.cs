@@ -41,6 +41,10 @@ public sealed class TrayService : IDisposable
         manager.Click += (_, _) => ShowManager();
         menu.Items.Add(manager);
 
+        var settings = new WinForms.ToolStripMenuItem("设置");
+        settings.Click += (_, _) => (System.Windows.Application.Current as App)?.ShowSettings();
+        menu.Items.Add(settings);
+
         _boardsMenu = new WinForms.ToolStripMenuItem("看板");
         menu.Items.Add(_boardsMenu);
 

@@ -7,7 +7,10 @@ using StickyTodo.Core.Entities;
 
 namespace StickyTodo.App.Views;
 
-/// <summary>看板管理面板：列表 + 新建/重命名/删除/打开。</summary>
+/// <summary>
+/// 主窗体：无边框，左侧操作区 + 右侧看板卡片列表。
+/// 点 X 收进托盘，退出走左侧「退出」按钮或托盘菜单。
+/// </summary>
 public partial class ManagerWindow : Window
 {
     private readonly ManagerViewModel _viewModel;
@@ -31,6 +34,80 @@ public partial class ManagerWindow : Window
     }
 
     private Board? SelectedBoard => _viewModel.SelectedBoard?.Board;
+
+    // ---------------- 标题栏按钮 ----------------
+
+    private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is DependencyObject source && IsInteractive(source))
+        {
+            return;
+        }
+
+        if (e.ClickCount == 2)
+        {
+            ToggleMaximize();
+            return;
+        }
+
+        if (e.ButtonState == MouseButtonState.Pressed)
+        {
+            try
+            {
+                DragMove();
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+    }
+
+    /// <summary>点到按钮/列表项上时不要把拖动抢走。</summary>
+    private static bool IsInteractive(DependencyObject source)
+    {
+        var current = source;
+        while (current is not null)
+        {
+            if (current is System.Windows.Controls.Primitives.ButtonBase or System.Windows.Controls.ListBoxItem)
+            {
+                return true;
+            }
+
+            current = current is System.Windows.Media.Visual or System.Windows.Media.Media3D.Visual3D
+                ? System.Windows.Media.VisualTreeHelper.GetParent(current)
+                : LogicalTreeHelper.GetParent(current);
+        }
+
+        return false;
+    }
+
+    private void ToggleMaximize()
+    {
+        WindowState = WindowState == WindowState.Maximized
+            ? WindowState.Normal
+            : WindowState.Maximized;
+
+        Shell.Margin = WindowState == WindowState.Maximized ? new Thickness(0) : new Thickness(12);
+        Shell.CornerRadius = WindowState == WindowState.Maximized ? new CornerRadius(0) : new CornerRadius(14);
+    }
+
+    private void Minimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+
+    private void Maximize_Click(object sender, RoutedEventArgs e) => ToggleMaximize();
+
+    private void Hide_Click(object sender, RoutedEventArgs e) => Hide();
+
+    private static void ExitApp()
+    {
+        System.Windows.Application.Current?.Shutdown();
+    }
+
+    private void Exit_Click(object sender, RoutedEventArgs e) => ExitApp();
+
+    private void OpenSettings_Click(object sender, RoutedEventArgs e) =>
+        (System.Windows.Application.Current as App)?.ShowSettings();
+
+    // ---------------- 看板操作 ----------------
 
     private async void CreateTodo_Click(object sender, RoutedEventArgs e) =>
         await CreateBoardAsync(BoardKind.Todo);
@@ -63,10 +140,50 @@ public partial class ManagerWindow : Window
         }
     }
 
+    private async void DeleteRow_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: BoardRowViewModel row })
+        {
+            return;
+        }
+
+        await DeleteBoardAsync(row.Board);
+    }
+
+    private async void Delete_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedBoard is not { } board)
+        {
+            Warn("先选中一个看板。");
+            return;
+        }
+
+        await DeleteBoardAsync(board);
+    }
+
+    private async Task DeleteBoardAsync(Board board)
+    {
+        var confirm = MessageBox.Show(
+            $"删除看板「{board.Name}」？\n其中的内容会一并删除，且不可恢复。",
+            "确认删除",
+            MessageBoxButton.OKCancel,
+            MessageBoxImage.Warning);
+
+        if (confirm != MessageBoxResult.OK)
+        {
+            return;
+        }
+
+        var succeeded = await _viewModel.DeleteBoardAsync(board);
+        if (succeeded)
+        {
+            _windows.CloseBoard(board.Id);
+        }
+    }
+
     private async void Rename_Click(object sender, RoutedEventArgs e)
     {
-        var board = SelectedBoard;
-        if (board is null)
+        if (SelectedBoard is not { } board)
         {
             Warn("先选中一个看板。");
             return;
@@ -86,40 +203,10 @@ public partial class ManagerWindow : Window
         }
     }
 
-    private async void Delete_Click(object sender, RoutedEventArgs e)
-    {
-        var board = SelectedBoard;
-        if (board is null)
-        {
-            Warn("先选中一个看板。");
-            return;
-        }
-
-        var confirm = MessageBox.Show(
-            $"删除看板「{board.Name}」？\n其中的待办会一并删除，且不可恢复。",
-            "确认删除",
-            MessageBoxButton.OKCancel,
-            MessageBoxImage.Warning);
-
-        if (confirm != MessageBoxResult.OK)
-        {
-            return;
-        }
-
-        var succeeded = await _viewModel.DeleteBoardAsync(board);
-        if (succeeded)
-        {
-            _windows.CloseBoard(board.Id);
-        }
-    }
-
-    private void BoardList_MouseDoubleClick(object sender, MouseButtonEventArgs e) => OpenSelected();
-
-    private void OpenSelected()
+    private void BoardList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (SelectedBoard is not { } board)
         {
-            Warn("先选中一个看板。");
             return;
         }
 
@@ -129,7 +216,9 @@ public partial class ManagerWindow : Window
     private static void Warn(string message) =>
         MessageBox.Show(message, "StickyTodo", MessageBoxButton.OK, MessageBoxImage.Information);
 
-    /// <summary>点 X 收进托盘；退出走托盘菜单。</summary>
+    // ---------------- 生命周期 ----------------
+
+    /// <summary>点 X 收进托盘；退出走左侧按钮或托盘菜单。</summary>
     protected override void OnClosing(CancelEventArgs e)
     {
         if (!_allowClose)

@@ -57,6 +57,20 @@ public partial class PromptWindow : Window
 
     private void Cancel_Click(object sender, RoutedEventArgs e) => DialogResult = false;
 
+    private void TitleBar_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (e.ButtonState == System.Windows.Input.MouseButtonState.Pressed)
+        {
+            try
+            {
+                DragMove();
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+    }
+
     private void ShowError(string message)
     {
         ErrorText.Text = message;

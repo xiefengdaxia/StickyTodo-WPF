@@ -32,7 +32,7 @@ public sealed record NoteSkin(
     /// <summary>标题栏压暗/提亮一层，让标题区和内容区有分界。</summary>
     public Brush CreateHeaderOverlay(double opacity)
     {
-        var alpha = (byte)Math.Round(Math.Clamp(opacity, 0.05, 1.0) * (IsDark ? 255 : 255) * (IsDark ? 0.16 : 0.10));
+        var alpha = (byte)Math.Round(Math.Clamp(opacity, 0.05, 1.0) * (IsDark ? 0.16 : 0.10) * 255);
         var brush = new SolidColorBrush(WithAlpha(Ink, alpha));
         brush.Freeze();
         return brush;
@@ -40,14 +40,60 @@ public sealed record NoteSkin(
 
     public Brush CreateLineBrush()
     {
-        var brush = new SolidColorBrush(WithAlpha(Ink, 0x26));
+        var brush = new SolidColorBrush(WithAlpha(Ink, 0x24));
+        brush.Freeze();
+        return brush;
+    }
+
+    /// <summary>卡片底色：比纸面亮一层，形成层次而不抢眼。</summary>
+    public Brush CreateSurfaceBrush()
+    {
+        var brush = new SolidColorBrush(IsDark
+            ? Color.FromArgb(0x22, 0xFF, 0xFF, 0xFF)
+            : Color.FromArgb(0xB8, 0xFF, 0xFF, 0xFF));
+        brush.Freeze();
+        return brush;
+    }
+
+    /// <summary>卡片悬停底色。</summary>
+    public Brush CreateSurfaceHoverBrush()
+    {
+        var brush = new SolidColorBrush(IsDark
+            ? Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF)
+            : Color.FromArgb(0xE0, 0xFF, 0xFF, 0xFF));
+        brush.Freeze();
+        return brush;
+    }
+
+    /// <summary>主色的淡底，用于图标方块、徽标。</summary>
+    public Brush CreateAccentSoftBrush()
+    {
+        var brush = new SolidColorBrush(WithAlpha(Accent, IsDark ? (byte)0x3D : (byte)0x26));
         brush.Freeze();
         return brush;
     }
 
     public Brush CreateChipIdleBrush()
     {
-        var brush = new SolidColorBrush(IsDark ? Color.FromArgb(0x30, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x66, 0xFF, 0xFF, 0xFF));
+        var brush = new SolidColorBrush(IsDark
+            ? Color.FromArgb(0x2E, 0xFF, 0xFF, 0xFF)
+            : Color.FromArgb(0x66, 0xFF, 0xFF, 0xFF));
+        brush.Freeze();
+        return brush;
+    }
+
+    /// <summary>滑块的底轨颜色。</summary>
+    public Brush CreateTrackBrush()
+    {
+        var brush = new SolidColorBrush(WithAlpha(Ink, 0x1F));
+        brush.Freeze();
+        return brush;
+    }
+
+    /// <summary>色卡预览用：不受全局透明度影响。</summary>
+    public Brush CreateSwatchBrush()
+    {
+        var brush = new LinearGradientBrush(BackgroundTop, BackgroundBottom, new Point(0, 0), new Point(0.4, 1));
         brush.Freeze();
         return brush;
     }
@@ -89,15 +135,27 @@ public static class NoteSkins
         Color.FromRgb(0x42, 0x22, 0x2F), Color.FromRgb(0x88, 0x61, 0x70),
         Color.FromRgb(0xC2, 0x18, 0x5B), false);
 
+    public static readonly NoteSkin Paper = new(
+        "paper", "素白",
+        Color.FromRgb(0xFA, 0xFA, 0xF7), Color.FromRgb(0xEB, 0xEA, 0xE4),
+        Color.FromRgb(0x24, 0x24, 0x22), Color.FromRgb(0x6E, 0x6E, 0x68),
+        Color.FromRgb(0x2F, 0x6F, 0x4F), false);
+
     public static readonly NoteSkin Graphite = new(
         "graphite", "石墨夜色",
         Color.FromRgb(0x3C, 0x41, 0x47), Color.FromRgb(0x22, 0x25, 0x29),
-        Color.FromRgb(0xEE, 0xEE, 0xEE), Color.FromRgb(0xA6, 0xAD, 0xB4),
+        Color.FromRgb(0xF0, 0xF1, 0xF3), Color.FromRgb(0x9E, 0xA5, 0xAD),
         Color.FromRgb(0x7E, 0xC8, 0xE3), true);
+
+    public static readonly NoteSkin Midnight = new(
+        "midnight", "午夜墨蓝",
+        Color.FromRgb(0x1F, 0x2A, 0x3C), Color.FromRgb(0x14, 0x1C, 0x2A),
+        Color.FromRgb(0xE8, 0xEE, 0xF7), Color.FromRgb(0x8E, 0x9C, 0xB4),
+        Color.FromRgb(0x8A, 0xB4, 0xF8), true);
 
     public static readonly IReadOnlyList<NoteSkin> All =
     [
-        ClassicYellow, Mint, Sky, Violet, Rose, Graphite
+        ClassicYellow, Paper, Mint, Sky, Violet, Rose, Graphite, Midnight
     ];
 
     public static NoteSkin Resolve(string? key) =>

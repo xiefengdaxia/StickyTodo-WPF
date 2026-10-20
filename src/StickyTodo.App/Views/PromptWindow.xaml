@@ -2,25 +2,54 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="输入"
-        Width="360"
+        Width="380"
         SizeToContent="Height"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
-        Background="{StaticResource Brush.Paper}"
         FontFamily="Microsoft YaHei UI"
         UseLayoutRounding="True">
-    <StackPanel Margin="18">
-        <TextBlock x:Name="LabelText" Margin="0,0,0,8" Foreground="{StaticResource Brush.Ink}" />
-        <TextBox x:Name="Input" Style="{StaticResource TextBox.Flat}" />
-        <TextBlock x:Name="ErrorText"
-                   Margin="0,8,0,0"
-                   FontSize="11"
-                   Foreground="#FFC0392B"
-                   Visibility="Collapsed" />
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
-            <Button Content="取消" Style="{StaticResource Button.Ghost}" Click="Cancel_Click" />
-            <Button Content="确定" Style="{StaticResource Button.Primary}" Margin="8,0,0,0" Click="Ok_Click" IsDefault="True" />
+    <Border Margin="12"
+            CornerRadius="12"
+            Background="{DynamicResource Brush.Paper}"
+            BorderBrush="#59FFFFFF"
+            BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="22" ShadowDepth="3" Opacity="0.34" Color="#FF000000" Direction="270" />
+        </Border.Effect>
+
+        <StackPanel Margin="18,16,18,16">
+            <Grid MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <TextBlock x:Name="LabelText"
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource Brush.Ink}"
+                           VerticalAlignment="Center" />
+                <Button HorizontalAlignment="Right"
+                        Style="{StaticResource Button.Chrome}"
+                        Content="✕"
+                        FontSize="10"
+                        Click="Cancel_Click" />
+            </Grid>
+
+            <TextBox x:Name="Input"
+                     Style="{StaticResource TextBox.Flat}"
+                     Margin="0,12,0,0" />
+
+            <TextBlock x:Name="ErrorText"
+                       Margin="2,8,0,0"
+                       FontSize="11"
+                       Foreground="#FFC0392B"
+                       Visibility="Collapsed" />
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+                <Button Content="取消" Style="{StaticResource Button.Ghost}" Click="Cancel_Click" />
+                <Button Content="确定" Style="{StaticResource Button.Primary}" Margin="8,0,0,0"
+                        Click="Ok_Click" IsDefault="True" />
+            </StackPanel>
         </StackPanel>
-    </StackPanel>
+    </Border>
 </Window>
