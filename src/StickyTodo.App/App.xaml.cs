@@ -73,6 +73,13 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        // 行内编辑回归：验证改标题、草稿行新增、空标题拦截
+        if (e.Args.Contains("--inline-edit-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunInlineEditDemo(ReadOptionValue(e.Args, "--shot"));
+            return;
+        }
+
         _mutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var isFirstInstance);
         if (!isFirstInstance)
         {
@@ -290,6 +297,99 @@ public partial class App : System.Windows.Application
         catch (Exception ex)
         {
             Log.Fatal(ex, "[skin] 失败");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
+    /// --inline-edit-demo：不开界面，直接验证行内编辑的完整链路：
+    /// 改标题落库 / 空标题被拦 / 草稿行新增 / 新增后顺序正确。
+    /// </summary>
+    private void RunInlineEditDemo(string? shotDirectory)
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+            _host = BuildHost();
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+            var service = _host.Services.GetRequiredService<TodoService>();
+            var board = service.EnsureDefaultBoard();
+
+            // 清空后造固定数据，保证重复运行结论稳定
+            foreach (var existing in service.GetTodos(board.Id))
+            {
+                service.Delete(existing.Id);
+            }
+
+            service.AddTodo(board.Id, "第一条");
+            service.AddTodo(board.Id, "第二条");
+            var first = service.GetTodos(board.Id)[0];
+
+            // 1) 改标题
+            service.UpdateTitle(first.Id, "  第一条（改过）  ");
+            var renamed = service.GetTodos(board.Id).First(t => t.Id == first.Id);
+            Log.Information("[inline] 改标题：新={Title}", renamed.Title);
+
+            // 2) 空标题应被拦
+            var emptyBlocked = false;
+            try
+            {
+                service.UpdateTitle(first.Id, "   ");
+            }
+            catch (ArgumentException)
+            {
+                emptyBlocked = true;
+            }
+
+            Log.Information("[inline] 空标题被拦={Blocked}", emptyBlocked);
+
+            // 3) 新增（模拟草稿行提交）
+            service.AddTodo(board.Id, "草稿行新增的");
+            var titles = service.GetTodos(board.Id).Select(t => t.Title).ToArray();
+            Log.Information("[inline] 新增后列表={Titles}", string.Join(" | ", titles));
+
+            var ok = renamed.Title == "第一条（改过）"
+                     && emptyBlocked
+                     && titles.Length == 3
+                     && titles[^1] == "草稿行新增的";
+
+            // 4) 界面截图：让第一行进入编辑态，看聚焦样式
+            if (shotDirectory is not null)
+            {
+                var windows = _host.Services.GetRequiredService<WindowManager>();
+                var window = (BoardWindow)windows.OpenBoard(board);
+
+                var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1000) };
+                timer.Tick += (_, _) =>
+                {
+                    timer.Stop();
+                    window.FocusFirstRowTitle();
+
+                    var shot = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(600) };
+                    shot.Tick += (_, _) =>
+                    {
+                        shot.Stop();
+                        SaveWindowShots(shotDirectory);
+                        Log.Information("[inline] 已截图（第一行处于编辑态）");
+                        Log.CloseAndFlush();
+                        Shutdown(ok ? 0 : 2);
+                    };
+                    shot.Start();
+                };
+                timer.Start();
+                return;
+            }
+
+            Log.CloseAndFlush();
+            Shutdown(ok ? 0 : 2);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[inline] 失败");
             Log.CloseAndFlush();
             Shutdown(1);
         }

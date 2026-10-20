@@ -141,7 +141,6 @@
             <Grid Grid.Row="1" Grid.RowSpan="4" IsEnabled="{Binding IsLocked, Converter={StaticResource InverseBool}}">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
@@ -187,31 +186,15 @@
                             Click="AddTag_Click" />
                 </Grid>
 
-                <!-- 快速添加 -->
-                <Grid Grid.Row="1" Margin="12,8,12,6">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBox x:Name="InputBox"
-                             Grid.Column="0"
-                             Style="{StaticResource TextBox.Flat}"
-                             Text="{Binding NewTitle, UpdateSourceTrigger=PropertyChanged}"
-                             ToolTip="{Binding NewTodoPlaceholder}"
-                             IsEnabled="{Binding IsTodoView}">
-                        <TextBox.InputBindings>
-                            <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
-                        </TextBox.InputBindings>
-                    </TextBox>
-                    <Button Grid.Column="1" Margin="7,0,0,0"
-                            Style="{StaticResource Button.Primary}"
-                            Command="{Binding AddCommand}"
-                            Content="添加" />
-                </Grid>
+                <!-- 待办列表（表格行内编辑 + 可拖拽排序） -->
+                <Grid Grid.Row="1" Margin="0,8,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-                <!-- 待办列表（可拖拽排序） -->
-                <Grid Grid.Row="2">
                     <ListBox x:Name="TodoList"
+                             Grid.Row="0"
                              ItemsSource="{Binding Rows}"
                              Background="Transparent"
                              BorderThickness="0"
@@ -232,8 +215,8 @@
                                     <Setter.Value>
                                         <ControlTemplate TargetType="ListBoxItem">
                                             <Border x:Name="Row"
-                                                    Padding="12,7"
-                                                    Margin="4,0"
+                                                    Padding="12,5"
+                                                    Margin="6,0"
                                                     CornerRadius="7"
                                                     BorderBrush="{DynamicResource Brush.Line}"
                                                     BorderThickness="0,0,0,1"
@@ -242,7 +225,11 @@
                                             </Border>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter TargetName="Row" Property="Background" Value="#33FFFFFF" />
+                                                    <Setter TargetName="Row" Property="Background" Value="#26FFFFFF" />
+                                                </Trigger>
+                                                <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                                    <Setter TargetName="Row" Property="Background" Value="#2EB27F0A" />
+                                                    <Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
                                                 </Trigger>
                                             </ControlTemplate.Triggers>
                                         </ControlTemplate>
@@ -259,30 +246,53 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
 
-                                    <CheckBox Grid.Column="0"
-                                              Margin="0,0,9,0"
-                                              VerticalAlignment="Center"
+                                    <!-- 复选框与标题首行对齐，而不是被下面的徽标挤到中间 -->
+                                    <CheckBox Grid.Row="0"
+                                              Grid.Column="0"
+                                              Margin="0,2,8,0"
+                                              VerticalAlignment="Top"
                                               IsChecked="{Binding IsDone, Mode=OneWay}"
                                               Command="{Binding DataContext.ToggleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                               CommandParameter="{Binding}" />
 
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding Title}" FontSize="13.5" TextWrapping="Wrap">
-                                            <TextBlock.Style>
-                                                <Style TargetType="TextBlock">
-                                                    <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
+                                    <StackPanel Grid.Row="0" Grid.Column="1" VerticalAlignment="Center">
+                                        <!-- 标题：行内直接编辑，回车/失焦提交 -->
+                                        <TextBox Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}"
+                                                 GotKeyboardFocus="RowTitle_GotFocus"
+                                                 LostKeyboardFocus="RowTitle_LostFocus"
+                                                 PreviewKeyDown="RowTitle_PreviewKeyDown">
+                                            <TextBox.Style>
+                                                <Style TargetType="TextBox" BasedOn="{StaticResource TextBox.Inline}">
                                                     <Style.Triggers>
                                                         <DataTrigger Binding="{Binding IsDone}" Value="True">
                                                             <Setter Property="TextDecorations" Value="Strikethrough" />
-                                                            <Setter Property="Opacity" Value="0.5" />
+                                                            <Setter Property="Opacity" Value="0.55" />
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
-                                            </TextBlock.Style>
-                                        </TextBlock>
+                                            </TextBox.Style>
+                                        </TextBox>
+                                    </StackPanel>
 
-                                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                    <Button Grid.Row="0" Grid.Column="2"
+                                            Content="✕"
+                                            FontSize="11"
+                                            VerticalAlignment="Top"
+                                            Margin="6,1,0,0"
+                                            Style="{StaticResource Button.Link}"
+                                            ToolTip="删除（右键可挂标签）"
+                                            Command="{Binding DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding}" />
+
+                                    <!-- 第二行：元信息徽标（与标题左边缘对齐） -->
+                                    <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
+                                                Orientation="Horizontal" Margin="0,1,0,0">
                                             <Border Margin="0,0,5,0"
                                                     Padding="5,1"
                                                     CornerRadius="6"
@@ -329,31 +339,32 @@
                                                     <TextBlock Text="{Binding RecurrenceText}" FontSize="10" Foreground="#FF2E7D32" />
                                                 </StackPanel>
                                             </Border>
+
+                                            <TextBlock Text="{Binding EditError}"
+                                                       FontSize="10"
+                                                       Margin="6,0,0,0"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="#FFC0392B"
+                                                       Visibility="{Binding EditError, Converter={StaticResource NullToCollapsed}}" />
                                         </StackPanel>
 
-                                        <TextBlock Text="{Binding TagText}"
+                                        <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2"
+                                                   Text="{Binding TagText}"
                                                    FontSize="10"
-                                                   Margin="0,2,0,0"
+                                                   Margin="0,1,0,0"
                                                    Foreground="{DynamicResource Brush.Accent}"
                                                    Visibility="{Binding HasTags, Converter={StaticResource BoolToVis}}" />
-                                    </StackPanel>
-
-                                    <Button Grid.Column="2"
-                                            Content="✕"
-                                            FontSize="11"
-                                            VerticalAlignment="Center"
-                                            Style="{StaticResource Button.Link}"
-                                            ToolTip="删除（右键可挂标签）"
-                                            Command="{Binding DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                            CommandParameter="{Binding}" />
                                 </Grid>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
 
-                    <TextBlock Text="{Binding EmptyHint}"
+                    <!-- 空列表提示（草稿行永远在下面，所以提示上移一点） -->
+                    <TextBlock Grid.Row="0"
+                               Text="{Binding EmptyHint}"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
+                               Margin="0,-20,0,0"
                                Foreground="{DynamicResource Brush.InkSoft}"
                                IsHitTestVisible="False">
                         <TextBlock.Style>
@@ -367,10 +378,69 @@
                             </Style>
                         </TextBlock.Style>
                     </TextBlock>
+
+                    <!-- 末尾的「草稿行」：像表格最后一行空行，输入回车即新增 -->
+                    <Border Grid.Row="1"
+                            Margin="6,0,6,2"
+                            Padding="12,4"
+                            CornerRadius="7"
+                            Background="#1AFFFFFF"
+                            BorderBrush="{DynamicResource Brush.Line}"
+                            BorderThickness="1"
+                            MouseLeftButtonDown="DraftRow_Click">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0"
+                                       Text="＋"
+                                       FontSize="12"
+                                       Margin="0,0,10,0"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource Brush.InkSoft}" />
+
+                            <TextBox x:Name="DraftBox"
+                                     Grid.Column="1"
+                                     Style="{StaticResource TextBox.Inline}"
+                                     IsEnabled="{Binding CanAdd}"
+                                     GotKeyboardFocus="DraftBox_GotFocus"
+                                     LostKeyboardFocus="DraftBox_LostFocus"
+                                     PreviewKeyDown="DraftBox_PreviewKeyDown">
+                                <TextBox.Text>
+                                    <Binding Path="DraftTitle" UpdateSourceTrigger="PropertyChanged" />
+                                </TextBox.Text>
+                            </TextBox>
+
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding DraftPlaceholder}"
+                                       FontSize="13"
+                                       Margin="2,0,0,0"
+                                       VerticalAlignment="Center"
+                                       IsHitTestVisible="False"
+                                       Foreground="{DynamicResource Brush.InkSoft}"
+                                       Opacity="0.7">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DraftTitle}" Value="">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsDraftFocused}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                    </Border>
                 </Grid>
 
                 <!-- 底部：状态 + TODO/Done 视图切换 -->
-                <Border Grid.Row="3"
+                <Border Grid.Row="2"
                         BorderBrush="{DynamicResource Brush.Line}"
                         BorderThickness="0,1,0,0"
                         Padding="10,6"

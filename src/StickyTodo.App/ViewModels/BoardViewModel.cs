@@ -42,13 +42,20 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
     private string _boardName;
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(AddCommand))]
-    private string _newTitle = string.Empty;
-
-    [ObservableProperty]
     private string _statusText = string.Empty;
     [ObservableProperty]
     private string? _errorText;
+
+    /// <summary>
+    /// 表格末尾那行「空白行」的文本。在这里回车/失焦即新增一条，
+    /// 因此不再需要单独的输入框和「添加」按钮。
+    /// </summary>
+    [ObservableProperty]
+    private string _draftTitle = string.Empty;
+
+    /// <summary>草稿行是否获得焦点（用于渲染更明显的提示）。</summary>
+    [ObservableProperty]
+    private bool _isDraftFocused;
 
     /// <summary>当前视图：待办 / 已完成。</summary>
     [ObservableProperty]
@@ -57,7 +64,8 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
     [NotifyPropertyChangedFor(nameof(TodoViewText))]
     [NotifyPropertyChangedFor(nameof(DoneViewText))]
     [NotifyPropertyChangedFor(nameof(EmptyHint))]
-    [NotifyPropertyChangedFor(nameof(NewTodoPlaceholder))]
+    [NotifyPropertyChangedFor(nameof(CanAdd))]
+    [NotifyPropertyChangedFor(nameof(DraftPlaceholder))]
     private TodoViewMode _viewMode = TodoViewMode.Todo;
 
     public bool IsTodoView => ViewMode == TodoViewMode.Todo;
@@ -73,8 +81,101 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
 
     public string EmptyHint => TodoViewFilter.EmptyHint(ViewMode);
 
-    /// <summary>新增输入框的占位提示（在已完成视图里提示切回待办）。</summary>
-    public string NewTodoPlaceholder => IsDoneView ? "切到待办视图才能新增" : "输入后按回车添加";
+    /// <summary>草稿行是否可用（只有待办视图 + 未锁定时能新增）。</summary>
+    public bool CanAdd => IsTodoView && !IsLocked;
+
+    public void SetLocked(bool locked)
+    {
+        IsLocked = locked;
+        OnPropertyChanged(nameof(CanAdd));
+        OnPropertyChanged(nameof(DraftPlaceholder));
+    }
+
+    public void SetTopmost(bool topmost) => IsTopmost = topmost;
+
+    public string DraftPlaceholder => CanAdd
+        ? "在这里写一条，回车即添加"
+        : IsDoneView
+            ? "已完成的视图不能新增"
+            : "看板已锁定";
+
+    /// <summary>提交某一行改过的标题。返回 false 表示没改成（空标题等）。</summary>
+    public async Task<bool> CommitTitleAsync(TodoRowViewModel row)
+    {
+        var newTitle = row.Title?.Trim() ?? string.Empty;
+        if (string.Equals(newTitle, row.Item.Title, StringComparison.Ordinal))
+        {
+            row.Title = row.Item.Title;
+            row.EditError = null;
+            return true;
+        }
+
+        row.EditError = null;
+        row.IsEditing = false;
+
+        if (string.IsNullOrEmpty(newTitle))
+        {
+            row.EditError = "内容不能为空";
+            row.Title = row.Item.Title;
+            return false;
+        }
+
+        try
+        {
+            ErrorText = null;
+            await Task.Run(() => _service.UpdateTitle(row.Id, newTitle));
+
+            // 原地更新，避免整表重建导致焦点丢失
+            row.Item.Title = newTitle;
+            row.Title = newTitle;
+            var index = _all.FindIndex(t => t.Id == row.Id);
+            if (index >= 0)
+            {
+                _all[index].Title = newTitle;
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            row.EditError = ex.Message;
+            row.Title = row.Item.Title;
+            return false;
+        }
+    }
+
+    /// <summary>提交末尾的草稿行：有内容就新增一条，然后清空草稿继续等下一次输入。</summary>
+    public async Task<bool> CommitDraftAsync()
+    {
+        var title = DraftTitle?.Trim() ?? string.Empty;
+        if (string.IsNullOrEmpty(title))
+        {
+            return false;
+        }
+
+        if (!CanAdd)
+        {
+            ErrorText = DraftPlaceholder;
+            DraftTitle = string.Empty;
+            return false;
+        }
+
+        try
+        {
+            ErrorText = null;
+            var created = await Task.Run(() => _service.AddTodo(BoardId, title));
+            DraftTitle = string.Empty;
+            await LoadAsync();
+
+            // 新增后把光标留在草稿行，方便连续录入
+            return created is not null;
+        }
+        catch (Exception ex)
+        {
+            ErrorText = ex.Message;
+            return false;
+        }
+    }
 
     /// <summary>窗口置顶（便签默认置顶）。</summary>
     [ObservableProperty]
@@ -313,7 +414,8 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
     partial void OnViewModeChanged(TodoViewMode value)
     {
         OnPropertyChanged(nameof(EmptyHint));
-        AddCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(CanAdd));
+        OnPropertyChanged(nameof(DraftPlaceholder));
         RebuildRows();
     }
 
@@ -342,37 +444,6 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
 
         RebuildRows();
         await Task.CompletedTask;
-    }
-
-    private bool CanAdd() => !string.IsNullOrWhiteSpace(NewTitle) && IsTodoView;
-
-    [RelayCommand(CanExecute = nameof(CanAdd))]
-    private async Task AddAsync()
-    {
-        var title = NewTitle?.Trim();
-        if (string.IsNullOrEmpty(title))
-        {
-            return;
-        }
-
-        try
-        {
-            ErrorText = null;
-            await Task.Run(() => _service.AddTodo(BoardId, title));
-
-            // 在已完成视图里新增（理论上按钮已禁用），保险起见切回待办，别让用户找不到
-            if (IsDoneView)
-            {
-                ViewMode = TodoViewMode.Todo;
-            }
-
-            NewTitle = string.Empty;
-            await LoadAsync();
-        }
-        catch (Exception ex)
-        {
-            ErrorText = ex.Message;
-        }
     }
 
     [RelayCommand]

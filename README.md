@@ -26,9 +26,9 @@
 
 TODO / Done 视图切换：
 
-| 待办视图（未完成） | Done 视图（含完成日期） |
-|---|---|
-| ![待办视图](artifacts/board-todo-view.png) | ![Done视图](artifacts/board-done-view.png) |
+| 待办视图（未完成） | Done 视图（含完成日期） | 行内编辑（点标题直接改） |
+|---|---|---|
+| ![待办视图](artifacts/board-todo-view.png) | ![Done视图](artifacts/board-done-view.png) | ![行内编辑](artifacts/board-inline-edit.png) |
 
 ---
 
@@ -53,6 +53,8 @@ $exe = ".\src\StickyTodo.App\bin\Debug\net8.0-windows\StickyTodo.exe"
 & $exe --skin-check                         # 验证换皮肤后便签资源确实同步，退出码 0 = 通过
 & $exe --menu-demo --shot D:\shots          # 展开右键菜单/子菜单/外观菜单并截图（截图走弹出层，不在窗口里）
 & $exe --menu-demo --shot D:\shots --skin graphite   # 深色皮肤下的菜单配色
+& $exe --inline-edit-demo                   # 行内编辑端到端验证（改标题/空标题拦截/草稿行新增），退出码 0 = 通过
+& $exe --inline-edit-demo --shot D:\shots   # 同上，并截一张「第一行处于编辑态」的图
 & $exe --skin graphite --opacity 0.6 --window-opacity 0.9   # 启动时覆盖外观（也用于截图回归）
 ```
 
@@ -131,8 +133,12 @@ StickyTodo.sln
 - **拖日程到别的日期格 = 改期**（保留原时刻，只换日期）
 - 数据来自**所有看板**的待办，重复待办会按规则展开成多次显示
 
-**待办**
-- 回车快速添加、勾选完成（划线灰显）、悬停删除
+**待办（表格行内编辑）**
+- **没有「添加」按钮**：列表末尾常驻一行草稿行「＋ 在这里写一条，回车即添加」，输入后回车即可连续录入
+- **每一行都能直接改**：点标题即可编辑，回车提交并跳到下一行，Tab/点别处也会自动提交，Esc 撤销
+  - 空标题会被拦下、恢复原值并在行内提示「内容不能为空」
+  - 聚焦时该行高亮 + 输入框琥珀描边，不会误改别的行
+- 勾选完成（划线灰显）、悬停删除
 - **TODO / Done 视图切换**：底部分段按钮（`待办 N` / `已完成 N`）一键切换
   - 待办视图只看未完成，沿用你手动拖拽的顺序
   - Done 视图只看已完成，**按完成时间倒序**（最近完成的在最上面），每行显示完成时间标签（今天 14:41 / 昨天 09:05 / 10月18日 20:11 / 2025年12月30日 08:00）
@@ -258,6 +264,7 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 
 **已完成（补充）**
 - [x] TODO / Done 视图切换 + Done 视图显示完成日期 + 按完成时间倒序
+- [x] **待办改为表格行内编辑**：去掉「添加」按钮与输入框，末尾常驻草稿行，每行标题可直接改（回车下移 / Esc 撤销 / 空标题拦截）
 
 **M4 外延**
 - [ ] ICS 订阅与导入导出

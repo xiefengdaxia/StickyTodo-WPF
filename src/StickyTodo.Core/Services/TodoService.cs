@@ -88,6 +88,16 @@ public sealed class TodoService
 
     public void Delete(string id) => _repository.DeleteTodo(id);
 
+    /// <summary>改标题（行内编辑用）。清空由调用方决定是删除还是忽略。</summary>
+    public void UpdateTitle(string id, string title)
+    {
+        var clean = Require(title, "待办内容");
+        var item = _repository.GetTodo(id) ?? throw new InvalidOperationException($"待办不存在：{id}");
+        item.Title = clean;
+        item.UpdatedAt = DateTimeOffset.Now;
+        _repository.UpdateTodo(item);
+    }
+
     public void UpdateNote(string id, string? note)
     {
         var item = _repository.GetTodo(id) ?? throw new InvalidOperationException($"待办不存在：{id}");

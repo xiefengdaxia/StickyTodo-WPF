@@ -107,6 +107,175 @@ public partial class BoardWindow : Window, IStickyWindow
         RefreshViewTabs();
     }
 
+    // ---------------- 表格行内编辑 ----------------
+
+    /// <summary>行标题获得焦点：进入编辑态，全选便于整体替换。</summary>
+    private void RowTitle_GotFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (sender is TextBox { DataContext: TodoRowViewModel row } box)
+        {
+            row.IsEditing = true;
+
+            // 若确实要连续录入，按 Enter 会跳到下一行，不要打断
+            if (box.SelectionLength == 0 && box.Text.Length > 0 && e.KeyboardDevice.Modifiers == ModifierKeys.None)
+            {
+                box.SelectAll();
+            }
+        }
+    }
+
+    /// <summary>行标题失焦：提交修改。</summary>
+    private async void RowTitle_LostFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (sender is TextBox { DataContext: TodoRowViewModel row })
+        {
+            await _viewModel.CommitTitleAsync(row);
+        }
+    }
+
+    /// <summary>行标题按键：回车提交并下移；Esc 撤销。</summary>
+    private async void RowTitle_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (sender is not TextBox { DataContext: TodoRowViewModel row } box)
+        {
+            return;
+        }
+
+        switch (e.Key)
+        {
+            case Key.Enter:
+                e.Handled = true;
+                await _viewModel.CommitTitleAsync(row);
+                FocusNextRowOrDraft(row);
+                break;
+
+            case Key.Escape:
+                e.Handled = true;
+                row.Title = row.Item.Title;
+                row.EditError = null;
+                break;
+        }
+    }
+
+    /// <summary>按顺序把焦点移到下一行的标题框，最后一行则落到草稿行。</summary>
+    private void FocusNextRowOrDraft(TodoRowViewModel current)
+    {
+        var index = _viewModel.Rows.IndexOf(current);
+        var next = index >= 0 && index + 1 < _viewModel.Rows.Count ? _viewModel.Rows[index + 1] : null;
+
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (TryFindRowTitle(next) is { } box)
+            {
+                box.Focus();
+                box.SelectAll();
+            }
+            else
+            {
+                DraftBox.Focus();
+            }
+        }, DispatcherPriority.Input);
+    }
+
+    private TextBox? TryFindRowTitle(TodoRowViewModel? row)
+    {
+        if (row is null)
+        {
+            return null;
+        }
+
+        TodoList.UpdateLayout();
+        if (TodoList.ItemContainerGenerator.ContainerFromItem(row) is not ListBoxItem container)
+        {
+            return null;
+        }
+
+        return FindDescendant<TextBox>(container);
+    }
+
+    private static T? FindDescendant<T>(DependencyObject? current) where T : DependencyObject
+    {
+        if (current is null)
+        {
+            return null;
+        }
+
+        var count = VisualTreeHelper.GetChildrenCount(current);
+        for (var i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(current, i);
+            if (child is T match)
+            {
+                return match;
+            }
+
+            if (FindDescendant<T>(child) is { } nested)
+            {
+                return nested;
+            }
+        }
+
+        return null;
+    }
+
+    private void DraftRow_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is DependencyObject source && IsInsideButton(source))
+        {
+            return;
+        }
+
+        DraftBox.Focus();
+        e.Handled = true;
+    }
+
+    private static bool IsInsideButton(DependencyObject source)
+    {
+        var current = source;
+        while (current is not null)
+        {
+            if (current is System.Windows.Controls.Primitives.ButtonBase or CheckBox)
+            {
+                return true;
+            }
+
+            current = current is Visual or System.Windows.Media.Media3D.Visual3D
+                ? VisualTreeHelper.GetParent(current)
+                : LogicalTreeHelper.GetParent(current);
+        }
+
+        return false;
+    }
+
+    private void DraftBox_GotFocus(object sender, KeyboardFocusChangedEventArgs e) =>
+        _viewModel.IsDraftFocused = true;
+
+    private async void DraftBox_LostFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        _viewModel.IsDraftFocused = false;
+        await _viewModel.CommitDraftAsync();
+    }
+
+    /// <summary>草稿行按键：回车新增并保持焦点；Esc 清空。</summary>
+    private async void DraftBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case Key.Enter:
+                e.Handled = true;
+                await _viewModel.CommitDraftAsync();
+
+                // 新增后把焦点留在草稿行，方便连续录入
+                Dispatcher.BeginInvoke(() => DraftBox.Focus(), DispatcherPriority.Input);
+                break;
+
+            case Key.Escape:
+                e.Handled = true;
+                _viewModel.DraftTitle = string.Empty;
+                break;
+        }
+    }
+
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ClickCount == 2)
@@ -146,12 +315,12 @@ public partial class BoardWindow : Window, IStickyWindow
         e.Handled = true;
     }
 
-    /// <summary>全局快捷键 Ctrl+Alt+N：打开后把光标放到新增输入框。</summary>
+    /// <summary>全局快捷键 Ctrl+Alt+N：打开后把光标放到末尾的草稿行。</summary>
     public void FocusNewTodo()
     {
         ShowAndActivate();
-        InputBox.Focus();
-        InputBox.SelectAll();
+        DraftBox.Focus();
+        DraftBox.SelectAll();
     }
 
     public void ShowAndActivate()
@@ -225,13 +394,29 @@ public partial class BoardWindow : Window, IStickyWindow
 
     private ContextMenu? _lastAppearanceMenu;
 
+    /// <summary>给回归脚本用：把焦点放到第一行的标题编辑框。</summary>
+    public void FocusFirstRowTitle()
+    {
+        if (_viewModel.Rows.Count == 0)
+        {
+            return;
+        }
+
+        TodoList.UpdateLayout();
+        if (TryFindRowTitle(_viewModel.Rows[0]) is { } box)
+        {
+            box.Focus();
+            box.SelectAll();
+        }
+    }
+
     /// <summary>当前列表里显示的行（给回归脚本读，验证视图切换真的换了内容）。</summary>
     public IReadOnlyList<string> CurrentRowSnapshot() =>
         _viewModel.Rows.Select(r => r.Title).ToList();
 
     /// <summary>输入区状态（给回归脚本读，验证已完成视图下不能新增）。</summary>
     public (bool InputEnabled, bool AddEnabled) CurrentInputState() =>
-        (InputBox.IsEnabled, _viewModel.AddCommand.CanExecute(null));
+        (DraftBox.IsEnabled, _viewModel.CanAdd);
 
     /// <summary>切换视图（回归脚本用）。</summary>
     public void SwitchView(TodoViewMode mode)

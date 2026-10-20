@@ -1,3 +1,4 @@
+using CommunityToolkit.Mvvm.ComponentModel;
 using StickyTodo.Core.Entities;
 using StickyTodo.Core.Recurrence;
 using StickyTodo.Core.Services;
@@ -5,13 +6,18 @@ using DoneDateLabel = StickyTodo.Core.Services.DoneDateText;
 
 namespace StickyTodo.App.ViewModels;
 
-/// <summary>列表里的一行。轻量包装，避免把领域对象直接暴露给界面绑定。</summary>
-public sealed class TodoRowViewModel
+/// <summary>
+/// 列表里的一行。轻量包装，避免把领域对象直接暴露给界面绑定。
+/// 标题是「可直接编辑」的：绑定到表格里的 TextBox，失焦/回车时提交。
+/// </summary>
+public partial class TodoRowViewModel : ObservableObject
 {
     public TodoRowViewModel(TodoItem item, string tagText, DateTimeOffset now)
     {
         Item = item;
         TagText = tagText;
+
+        _title = item.Title;
 
         CountdownText = DueDateText.Describe(item.DueAt, now);
         IsOverdue = DueDateText.IsOverdue(item.DueAt, now);
@@ -36,7 +42,20 @@ public sealed class TodoRowViewModel
 
     public string Id => Item.Id;
 
-    public string Title => Item.Title;
+    /// <summary>
+    /// 行内可编辑的标题。和 <see cref="TodoItem.Title"/> 分开是因为：
+    /// 用户正在输入时不应该立刻落库，也不应该影响行上的其它显示逻辑。
+    /// </summary>
+    [ObservableProperty]
+    private string _title;
+
+    /// <summary>是否处于编辑态（获得焦点时显示更明显的边框）。</summary>
+    [ObservableProperty]
+    private bool _isEditing;
+
+    /// <summary>保存失败时的提示（比如标题为空），显示在行尾。</summary>
+    [ObservableProperty]
+    private string? _editError;
 
     public bool IsDone => Item.IsDone;
 
