@@ -469,6 +469,158 @@
             </Style.Triggers>
         </Style>
 
+        <!-- ==================== 右键菜单 ==================== -->
+
+        <Style x:Key="Menu.CheckMark" TargetType="Path">
+            <Setter Property="Data" Value="M 0,3.6 L 2.6,6.2 L 7.2,1" />
+            <Setter Property="Stroke" Value="{DynamicResource Brush.Accent}" />
+            <Setter Property="StrokeThickness" Value="1.9" />
+            <Setter Property="StrokeStartLineCap" Value="Round" />
+            <Setter Property="StrokeEndLineCap" Value="Round" />
+            <Setter Property="StrokeLineJoin" Value="Round" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Visibility" Value="Collapsed" />
+        </Style>
+
+        <!-- 弹出层外壳：圆角 + 投影 + 主题底色，父子菜单共用 -->
+        <Style x:Key="Menu.PopupBorder" TargetType="Border">
+            <Setter Property="Margin" Value="6" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Background" Value="{DynamicResource Brush.Paper}" />
+            <Setter Property="BorderBrush" Value="#40FFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="5" />
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect BlurRadius="18" ShadowDepth="3" Opacity="0.26" Color="#FF000000" Direction="270" />
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ContextMenu">
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="HasDropShadow" Value="True" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Style="{StaticResource Menu.PopupBorder}">
+                            <StackPanel IsItemsHost="True"
+                                        KeyboardNavigation.DirectionalNavigation="Cycle" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="MenuItem">
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Grid>
+                            <Border x:Name="Root" CornerRadius="7" Background="Transparent">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="22" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- 勾选标记：画在独立的 12x10 画布里，避免不同字形宽度导致偏移 -->
+                                    <Viewbox Grid.Column="0"
+                                             Width="11"
+                                             Height="11"
+                                             HorizontalAlignment="Center"
+                                             VerticalAlignment="Center">
+                                        <Path x:Name="CheckMark"
+                                              Style="{StaticResource Menu.CheckMark}" />
+                                    </Viewbox>
+
+                                    <ContentPresenter x:Name="HeaderHost"
+                                                      Grid.Column="1"
+                                                      ContentSource="Header"
+                                                      RecognizesAccessKey="True"
+                                                      Margin="0,7,14,7"
+                                                      VerticalAlignment="Center" />
+
+                                    <TextBlock x:Name="GestureText"
+                                               Grid.Column="2"
+                                               Text="{TemplateBinding InputGestureText}"
+                                               FontSize="10.5"
+                                               Foreground="{DynamicResource Brush.InkSoft}"
+                                               VerticalAlignment="Center"
+                                               Margin="10,0,6,0"
+                                               Visibility="Collapsed" />
+
+                                    <Path x:Name="Arrow"
+                                          Grid.Column="3"
+                                          Data="M 0.5,0.5 L 4,4 L 0.5,7.5"
+                                          Stroke="{DynamicResource Brush.InkSoft}"
+                                          StrokeThickness="1.4"
+                                          StrokeStartLineCap="Round"
+                                          StrokeEndLineCap="Round"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,9,0"
+                                          Visibility="Collapsed" />
+                                </Grid>
+                            </Border>
+
+                            <Popup x:Name="PART_Popup"
+                                   AllowsTransparency="True"
+                                   Placement="Right"
+                                   HorizontalOffset="-4"
+                                   VerticalOffset="-6"
+                                   IsOpen="{TemplateBinding IsSubmenuOpen}"
+                                   Focusable="False"
+                                   PopupAnimation="Fade">
+                                <Border Style="{StaticResource Menu.PopupBorder}">
+                                    <StackPanel IsItemsHost="True"
+                                                KeyboardNavigation.DirectionalNavigation="Cycle" />
+                                </Border>
+                            </Popup>
+                        </Grid>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Role" Value="SubmenuHeader">
+                                <Setter TargetName="Arrow" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="CheckMark" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="{DynamicResource Brush.AccentSoft}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{DynamicResource Brush.InkSoft}" />
+                                <Setter Property="Opacity" Value="0.55" />
+                            </Trigger>
+                            <Trigger Property="InputGestureText" Value="">
+                                <Setter TargetName="GestureText" Property="Visibility" Value="Collapsed" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="Separator">
+            <Setter Property="Height" Value="1" />
+            <Setter Property="Margin" Value="10,5" />
+            <Setter Property="Background" Value="{DynamicResource Brush.Line}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Separator">
+                        <Border Height="1" Background="{TemplateBinding Background}" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- ==================== 卡片 ==================== -->
 
         <Style x:Key="Card" TargetType="Border">

@@ -171,6 +171,60 @@ public partial class BoardWindow : Window, IStickyWindow
 
     public void RefreshAppearance() => _viewModel.RefreshAppearance();
 
+    /// <summary>给回归脚本用：在第一条待办上弹出自绘右键菜单。</summary>
+    public void ShowTodoContextMenuForFirstRow()
+    {
+        if (_viewModel.Rows.Count == 0)
+        {
+            return;
+        }
+
+        // 走和真实右键一模一样的构造逻辑，只是把数据源换成第一条
+        BuildTodoContextMenu(_viewModel.Rows[0], out var menu);
+        TodoList.ContextMenu = menu;
+        menu.PlacementTarget = TodoList;
+        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Center;
+        menu.IsOpen = true;
+    }
+
+    /// <summary>给回归脚本用：展开菜单里的第一个子菜单（「标签」）。</summary>
+    public void OpenFirstSubmenu()
+    {
+        var menu = TodoList.ContextMenu;
+        var submenu = menu?.Items.OfType<MenuItem>().FirstOrDefault(m => m.HasItems);
+        if (submenu is null)
+        {
+            Serilog.Log.Warning("[menu] 未找到带子项的菜单项，menu={Menu} items={Count}",
+                menu is not null, menu?.Items.Count ?? -1);
+            return;
+        }
+
+        submenu.IsSubmenuOpen = true;
+        Serilog.Log.Information("[menu] 子菜单「{Header}」 IsSubmenuOpen={Open} 子项数={Count}",
+            submenu.Header, submenu.IsSubmenuOpen, submenu.Items.Count);
+    }
+
+    /// <summary>给回归脚本用：收起待办的右键菜单。</summary>
+    public void CloseTodoContextMenu()
+    {
+        if (TodoList.ContextMenu is { } menu)
+        {
+            menu.IsOpen = false;
+            TodoList.ContextMenu = null;
+        }
+    }
+
+    /// <summary>给回归脚本用：弹出「🎨 外观」菜单，验证另一套菜单的配色。</summary>
+    public void ShowAppearanceMenuForTest()
+    {
+        _lastAppearanceMenu = AppearanceMenu.Build(_viewModel, _windows);
+        _lastAppearanceMenu.PlacementTarget = TodoList;
+        _lastAppearanceMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Center;
+        _lastAppearanceMenu.IsOpen = true;
+    }
+
+    private ContextMenu? _lastAppearanceMenu;
+
     /// <summary>当前列表里显示的行（给回归脚本读，验证视图切换真的换了内容）。</summary>
     public IReadOnlyList<string> CurrentRowSnapshot() =>
         _viewModel.Rows.Select(r => r.Title).ToList();
@@ -447,7 +501,16 @@ public partial class BoardWindow : Window, IStickyWindow
             return;
         }
 
-        var menu = new ContextMenu();
+        BuildTodoContextMenu(row, out var menu);
+        TodoList.ContextMenu = menu;
+    }
+
+    /// <summary>
+    /// 构造待办的右键菜单。抽出来是为了让回归脚本能复用同一套逻辑生成菜单并截图。
+    /// </summary>
+    private void BuildTodoContextMenu(TodoRowViewModel row, out ContextMenu menu)
+    {
+        menu = new ContextMenu();
 
         var toggle = new MenuItem { Header = row.IsDone ? "标记为未完成" : "标记为已完成" };
         toggle.Click += async (_, _) => await _viewModel.ToggleAsync(row);
@@ -550,8 +613,6 @@ public partial class BoardWindow : Window, IStickyWindow
         var remove = new MenuItem { Header = "删除待办" };
         remove.Click += async (_, _) => await _viewModel.DeleteAsync(row);
         menu.Items.Add(remove);
-
-        TodoList.ContextMenu = menu;
     }
 
     private static DateTimeOffset NextWeekend(DateTimeOffset today)

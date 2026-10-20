@@ -8,6 +8,15 @@ internal static class AppearanceMenu
 {
     public static void Show(FrameworkElement target, IAppearanceHost host, WindowManager windows)
     {
+        var menu = Build(host, windows);
+        target.ContextMenu = menu;
+        menu.PlacementTarget = target;
+        menu.IsOpen = true;
+    }
+
+    /// <summary>只构造菜单，不弹出（给回归脚本用）。</summary>
+    internal static ContextMenu Build(IAppearanceHost host, WindowManager windows)
+    {
         var menu = new ContextMenu();
 
         var skinMenu = new MenuItem { Header = "皮肤" };
@@ -77,7 +86,6 @@ internal static class AppearanceMenu
             IsEnabled = false,
         });
 
-        menu.PlacementTarget = target;
-        menu.IsOpen = true;
+        return menu;
     }
 }

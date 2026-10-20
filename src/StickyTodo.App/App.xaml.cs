@@ -66,6 +66,13 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        // 右键菜单回归：展开菜单并截图，验证自绘样式
+        if (e.Args.Contains("--menu-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunMenuDemo(ReadOptionValue(e.Args, "--shot"));
+            return;
+        }
+
         _mutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var isFirstInstance);
         if (!isFirstInstance)
         {
@@ -287,6 +294,145 @@ public partial class App : System.Windows.Application
             Shutdown(1);
         }
     }
+
+    /// <summary>
+    /// --menu-demo：把待办的右键菜单真正展开并截图，验证自绘菜单样式（圆角、勾选、子菜单箭头）。
+    /// </summary>
+    private void RunMenuDemo(string? shotDirectory)
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+            _host = BuildHost();
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+            var service = _host.Services.GetRequiredService<TodoService>();
+            var board = service.EnsureDefaultBoard();
+
+            // --skin 覆盖（验证深色皮肤下菜单配色也跟随）
+            var skinOverride = ReadOptionValue(Environment.GetCommandLineArgs(), "--skin");
+            if (skinOverride is not null)
+            {
+                var skinService = _host.Services.GetRequiredService<SkinService>();
+                skinService.SetSkin(skinOverride);
+                _host.Services.GetRequiredService<WindowManager>().ApplySkin();
+            }
+
+            if (!service.GetTodos(board.Id).Any())
+            {
+                var todo = service.AddTodo(board.Id, "右键这条待办看看菜单");
+                service.SetDueAt(todo.Id, DateTimeOffset.Now.Date.AddDays(2));
+                service.SetRecurrence(todo.Id, "FREQ=WEEKLY;BYDAY=FR");
+                service.AddTodo(board.Id, "另一条待办");
+                if (!service.GetTags().Any())
+                {
+                    var tag = service.CreateTag("重要");
+                    service.SetTodoTags(todo.Id, [tag.Id]);
+                }
+            }
+
+            var windows = _host.Services.GetRequiredService<WindowManager>();
+            var window = (BoardWindow)windows.OpenBoard(board);
+
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1200) };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                window.ShowTodoContextMenuForFirstRow();
+
+                var shot = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
+                shot.Tick += (_, _) =>
+                {
+                    shot.Stop();
+                    if (shotDirectory is not null)
+                    {
+                        SavePopupShots(shotDirectory);
+                    }
+
+                    // 再展开「标签」子菜单，验证父子菜单样式一致
+                    window.OpenFirstSubmenu();
+                    var shot2 = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
+                    shot2.Tick += (_, _) =>
+                    {
+                        shot2.Stop();
+                        if (shotDirectory is not null)
+                        {
+                            SavePopupShots(Path.Combine(shotDirectory, "submenu"));
+                        }
+
+                        // 关掉待办菜单，再弹「外观」菜单，验证另一套菜单的配色
+                        window.CloseTodoContextMenu();
+                        window.ShowAppearanceMenuForTest();
+
+                        var shot3 = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
+                        shot3.Tick += (_, _) =>
+                        {
+                            shot3.Stop();
+                            if (shotDirectory is not null)
+                            {
+                                SavePopupShots(Path.Combine(shotDirectory, "appearance"));
+                            }
+
+                            Log.Information("[menu] 待办菜单 / 子菜单 / 外观菜单均已渲染，弹出层数量={Count}",
+                                CountOpenPopups());
+                            Shutdown(0);
+                            Shutdown(0);
+                        };
+                        shot3.Start();
+                    };
+                    shot2.Start();
+                };
+                shot.Start();
+            };
+            timer.Start();
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[menu] 失败");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>截当前所有打开着的弹出层（ContextMenu 是独立 Popup，不在 Window 的视觉树里）。</summary>
+    private void SavePopupShots(string directory)
+    {
+        Directory.CreateDirectory(directory);
+        var index = 0;
+
+        foreach (PresentationSource source in PresentationSource.CurrentSources)
+        {
+            if (source.RootVisual is not FrameworkElement root || root.ActualWidth < 1 || root.ActualHeight < 1)
+            {
+                continue;
+            }
+
+            const double scale = 2d;
+            var width = (int)Math.Ceiling(root.ActualWidth * scale);
+            var height = (int)Math.Ceiling(root.ActualHeight * scale);
+
+            var target = new RenderTargetBitmap(width, height, 96 * scale, 96 * scale, PixelFormats.Pbgra32);
+            target.Render(CreateBackdropVisual(width, height));
+            target.Render(root);
+
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(target));
+
+            var file = Path.Combine(directory, $"popup-{index:D2}.png");
+            using var stream = File.Create(file);
+            encoder.Save(stream);
+            index++;
+        }
+
+        Log.Information("[menu] 已输出 {Count} 张弹出层截图", index);
+    }
+
+    private static int CountOpenPopups() =>
+        PresentationSource.CurrentSources
+            .OfType<System.Windows.Interop.HwndSource>()
+            .Count(s => s.RootVisual is FrameworkElement { IsVisible: true });
 
     /// <summary>
     /// --settings-demo：打开设置页截图，验证皮肤色卡、滑块、快捷键与数据区渲染。

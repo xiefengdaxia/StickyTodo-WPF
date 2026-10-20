@@ -12,6 +12,10 @@
 |---|---|
 | ![主窗体](artifacts/manager.png) | ![设置](artifacts/settings.png) |
 
+| 待办右键菜单 | 子菜单（含勾选） | 外观菜单 | 深色皮肤下的菜单 |
+|---|---|---|---|
+| ![菜单](artifacts/menu-todo.png) | ![子菜单](artifacts/menu-submenu.png) | ![外观](artifacts/menu-appearance.png) | ![深色菜单](artifacts/menu-dark.png) |
+
 便签 / 便签看板 / 日历看板 / 到点提醒：
 
 | 待办便签 | 便签看板（边写边存） | 日历看板（月视图） | 到点提醒 |
@@ -47,6 +51,8 @@ $exe = ".\src\StickyTodo.App\bin\Debug\net8.0-windows\StickyTodo.exe"
 & $exe --view-demo --shot D:\shots          # 分别在待办视图/已完成视图下截图，验证视图切换
 & $exe --settings-demo --shot D:\shots --tall   # 截设置页（--tall 临时加高，让全部区块入镜）
 & $exe --skin-check                         # 验证换皮肤后便签资源确实同步，退出码 0 = 通过
+& $exe --menu-demo --shot D:\shots          # 展开右键菜单/子菜单/外观菜单并截图（截图走弹出层，不在窗口里）
+& $exe --menu-demo --shot D:\shots --skin graphite   # 深色皮肤下的菜单配色
 & $exe --skin graphite --opacity 0.6 --window-opacity 0.9   # 启动时覆盖外观（也用于截图回归）
 ```
 
@@ -99,7 +105,7 @@ StickyTodo.sln
 - 便签窗口**无边框 + 圆角 + 投影**，边缘 8px 可缩放（自己处理 `WM_NCHITTEST`）
 - **8 套皮肤**：经典黄 / 素白 / 薄荷绿 / 天青蓝 / 淡紫 / 樱花粉 / 石墨夜色 / 午夜墨蓝（暗色皮肤自动切浅色文字）
 - **两种透明度分别可调**：背景透明度 35–100%（只让纸变透、文字始终清晰），整窗透明度 40–100%（连文字一起淡）
-- 自绘控件：圆角复选框、细滑块、扁平滚动条、分段切换、卡片式列表
+- 自绘控件：圆角复选框、细滑块、扁平滚动条、分段切换、卡片、**右键菜单**（含子菜单箭头、勾选标记、分隔线，颜色跟随皮肤）
 - 标题栏悬浮按钮：📌 置顶、🔒 锁定、🎨 快速换肤、⋯ 主窗体、✕ 关闭
 - 便签不在任务栏占位（贴纸风格），入口走托盘和主窗体
 
@@ -228,6 +234,7 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 - [x] **独立设置页**：色卡网格选皮肤 / 双透明度滑块 / 快捷键一览 / 数据统计与存储路径
 - [x] 皮肤扩到 8 套（新增「素白」「午夜墨蓝」），画刷走 `DynamicResource`，切换即时全局生效
 - [x] 自绘控件统一：圆角复选框、细滑块、扁平滚动条、分段切换、卡片
+- [x] **右键菜单自绘**：圆角弹层 + 子菜单箭头 + 勾选标记 + 分隔线，颜色跟随皮肤（含深色）
 - [x] 置顶 / 锁定（按看板记忆，存 `setting` 表）
 - [x] 截图回归带假桌面背景，一眼验证透明度
 
