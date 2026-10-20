@@ -6,20 +6,25 @@
         Height="580" Width="820"
         MinHeight="460" MinWidth="680"
         WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
         ResizeMode="CanResize"
         WindowStartupLocation="CenterScreen"
-        Background="{DynamicResource Brush.Paper}"
         FontFamily="Microsoft YaHei UI"
         UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Display">
 
     <Border x:Name="Shell"
-            Margin="0"
-            CornerRadius="0"
-            Background="{DynamicResource Brush.Paper}"
-            BorderBrush="{DynamicResource Brush.Line}"
-            BorderThickness="0"
+            Margin="12"
+            CornerRadius="14"
+            Background="{DynamicResource Brush.PaperOpaque}"
+            BorderBrush="#59FFFFFF"
+            BorderThickness="1"
             MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="24" ShadowDepth="4" Opacity="0.30" Color="#FF000000" Direction="270" />
+        </Border.Effect>
+
         <Grid AllowDrop="False">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="210" />
@@ -29,7 +34,7 @@
             <!-- ============ 左侧：品牌 + 操作 ============ -->
             <Border Grid.Column="0"
                     Background="{DynamicResource Brush.PaperDeep}"
-                    CornerRadius="0"
+                    CornerRadius="13,0,0,13"
                     Padding="16,18,14,14">
                 <Grid>
                     <Grid.RowDefinitions>

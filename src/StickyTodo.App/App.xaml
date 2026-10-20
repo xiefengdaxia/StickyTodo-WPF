@@ -13,7 +13,11 @@
             <GradientStop Color="#EBFBE18A" Offset="1" />
         </LinearGradientBrush>
         <SolidColorBrush x:Key="Brush.PaperDeep" Color="#1A3B382A" />
-        <SolidColorBrush x:Key="Brush.Ink" Color="#FF3B382A" />
+        <!-- 不透明纸色：主窗体/设置页用（有圆角但不能透出桌面） -->
+        <LinearGradientBrush x:Key="Brush.PaperOpaque" StartPoint="0,0" EndPoint="0.15,1">
+            <GradientStop Color="#FFF4B8" Offset="0" />
+            <GradientStop Color="#FBE18A" Offset="1" />
+        </LinearGradientBrush>        <SolidColorBrush x:Key="Brush.Ink" Color="#FF3B382A" />
         <SolidColorBrush x:Key="Brush.InkSoft" Color="#FF7C745E" />
         <SolidColorBrush x:Key="Brush.Accent" Color="#FFB27F0A" />
         <SolidColorBrush x:Key="Brush.Line" Color="#243B382A" />

@@ -151,8 +151,82 @@ public partial class ManagerWindow : Window
             ? WindowState.Normal
             : WindowState.Maximized;
 
-        Shell.Margin = WindowState == WindowState.Maximized ? new Thickness(0) : new Thickness(12);
-        Shell.CornerRadius = WindowState == WindowState.Maximized ? new CornerRadius(0) : new CornerRadius(14);
+        ApplyChromeForState();
+    }
+
+    /// <summary>最大化时去掉圆角/外圈留白，否则四角会露出桌面。</summary>
+    private void ApplyChromeForState()
+    {
+        var maximized = WindowState == WindowState.Maximized;
+
+        // 首次调用时把设计里的投影存下来，还原时要用同一个实例
+        _shellEffect ??= Shell.Effect;
+
+        Shell.Margin = maximized ? new Thickness(0) : new Thickness(12);
+        Shell.CornerRadius = maximized ? new CornerRadius(0) : new CornerRadius(14);
+        Shell.Effect = maximized ? null : _shellEffect;
+    }
+
+    private System.Windows.Media.Effects.Effect? _shellEffect;
+
+    // ---------------- 无边框窗口的边缘缩放 ----------------
+
+    private const double ResizeBorder = 8d;
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        if (PresentationSource.FromVisual(this) is System.Windows.Interop.HwndSource source)
+        {
+            source.AddHook(WndProc);
+        }
+    }
+
+    private nint WndProc(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)
+    {
+        if (msg != 0x0084 || WindowState == WindowState.Maximized || ResizeMode == ResizeMode.NoResize)
+        {
+            return nint.Zero;
+        }
+
+        long raw = lParam.ToInt64();
+        var point = new NativePoint
+        {
+            X = (int)(short)(raw & 0xFFFF),
+            Y = (int)(short)((raw >> 16) & 0xFFFF),
+        };
+
+        if (!NativeMethods.ScreenToClient(hwnd, ref point))
+        {
+            return nint.Zero;
+        }
+
+        var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(this);
+        var x = point.X / dpi.DpiScaleX;
+        var y = point.Y / dpi.DpiScaleY;
+
+        var onLeft = x <= ResizeBorder;
+        var onRight = x >= ActualWidth - ResizeBorder;
+        var onTop = y <= ResizeBorder;
+        var onBottom = y >= ActualHeight - ResizeBorder;
+
+        var hit = onTop && onLeft ? 13
+            : onTop && onRight ? 14
+            : onBottom && onLeft ? 16
+            : onBottom && onRight ? 17
+            : onLeft ? 10
+            : onRight ? 11
+            : onTop ? 12
+            : onBottom ? 15
+            : 0;
+
+        if (hit == 0)
+        {
+            return nint.Zero;
+        }
+
+        handled = true;
+        return new nint(hit);
     }
 
     private void Minimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;

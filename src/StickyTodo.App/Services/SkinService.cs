@@ -38,6 +38,8 @@ public sealed class SkinService
 
         resources["Brush.Paper"] = skin.CreateBackground(alpha);
         resources["Brush.PaperDeep"] = skin.CreateHeaderOverlay(alpha);
+        // 主窗体与设置页要"有圆角但完全不透明"，单独一份不透明纸色
+        resources["Brush.PaperOpaque"] = skin.CreateBackground(1.0);
         resources["Brush.Ink"] = new SolidColorBrush(skin.Ink);
         resources["Brush.InkSoft"] = new SolidColorBrush(skin.InkSoft);
         resources["Brush.Accent"] = new SolidColorBrush(skin.Accent);

@@ -6,19 +6,23 @@
         Width="520" Height="700"
         MinWidth="460" MinHeight="560"
         WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
         ResizeMode="CanResize"
         WindowStartupLocation="CenterScreen"
-        Background="{DynamicResource Brush.Paper}"
         FontFamily="Microsoft YaHei UI"
         UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Display">
 
     <Border x:Name="Shell"
-            Margin="0"
-            CornerRadius="0"
-            Background="{DynamicResource Brush.Paper}"
-            BorderBrush="{DynamicResource Brush.Line}"
-            BorderThickness="0">
+            Margin="12"
+            CornerRadius="14"
+            Background="{DynamicResource Brush.PaperOpaque}"
+            BorderBrush="#59FFFFFF"
+            BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="24" ShadowDepth="4" Opacity="0.30" Color="#FF000000" Direction="270" />
+        </Border.Effect>
 
         <Grid>
             <Grid.RowDefinitions>
@@ -30,7 +34,7 @@
             <!-- 自绘标题栏 -->
             <Border Grid.Row="0"
                     Background="{DynamicResource Brush.PaperDeep}"
-                    CornerRadius="0"
+                    CornerRadius="13,13,0,0"
                     Padding="18,14"
                     MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <Grid>
@@ -243,7 +247,7 @@
                     BorderThickness="0,1,0,0"
                     Padding="18,10"
                     Background="{DynamicResource Brush.PaperDeep}"
-                    CornerRadius="0">
+                    CornerRadius="0,0,13,13">
                 <TextBlock Text="改动即时保存"
                            Style="{StaticResource Text.Caption}" />
             </Border>
