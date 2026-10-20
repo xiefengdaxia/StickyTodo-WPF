@@ -76,4 +76,52 @@ public sealed class AppSettingsServiceTests : DatabaseTestBase
         Assert.Equal("rose", settings.Skin);
         Assert.Equal("rose", Repository.GetSettings()[AppSettingsService.SkinKey]);
     }
+
+    [Fact]
+    public void Opacity_SupportsSinglePercentSteps()
+    {
+        var settings = CreateService();
+
+        // 1% 的粒度必须真的存得下、读得回（不能被四舍五入到 5%）
+        foreach (var percent in new[] { 51, 52, 53, 67, 83, 99 })
+        {
+            settings.Opacity = percent / 100d;
+            Assert.Equal(percent / 100d, settings.Opacity, 3);
+        }
+    }
+
+    [Fact]
+    public void WindowOpacity_SupportsSinglePercentSteps()
+    {
+        var settings = CreateService();
+
+        foreach (var percent in new[] { 41, 56, 78, 94, 99 })
+        {
+            settings.WindowOpacity = percent / 100d;
+            Assert.Equal(percent / 100d, settings.WindowOpacity, 3);
+        }
+    }
+
+    [Theory]
+    [InlineData(0.35, 0.35)]
+    [InlineData(0.36, 0.36)]
+    [InlineData(0.99, 0.99)]
+    [InlineData(1.0, 1.0)]
+    public void Opacity_BoundariesArePreserved(double input, double expected)
+    {
+        var settings = CreateService();
+        settings.Opacity = input;
+        Assert.Equal(expected, settings.Opacity, 3);
+    }
+
+    [Fact]
+    public void Opacity_FullIsStoredAsOne()
+    {
+        var settings = CreateService();
+        settings.Opacity = 1.0;
+
+        // 100% 必须存成 "1"，而不是 0.999 之类的近似值——
+        // 否则 NoteSkin 会走到带 alpha 的分支，看起来仍然半透明
+        Assert.Equal("1", Repository.GetSettings()[AppSettingsService.OpacityKey]);
+    }
 }

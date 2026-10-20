@@ -554,6 +554,35 @@ public partial class BoardWindow : Window, IStickyWindow
     public string TagTextOfFirstRowFromDb() =>
         _viewModel.TagTextOfRowFromDb(0);
 
+    /// <summary>给回归脚本用：切换锁定状态。</summary>
+    public void SwitchLockForTest() => _viewModel.ToggleLock();
+
+    /// <summary>给回归脚本读：描述内容区的可见性/尺寸，用来诊断「锁定后白屏」。</summary>
+    public string DescribeContentVisibility()
+    {
+        var content = FindDescendant<Grid>(this, null);
+        var list = TodoList;
+
+        var parts = new List<string>
+        {
+            $"窗口={ActualWidth:0}x{ActualHeight:0}",
+            $"列表项={_viewModel.Rows.Count}",
+            $"列表={list.ActualWidth:0}x{list.ActualHeight:0}",
+            $"列表可见={list.IsVisible}",
+            $"列表启用={list.IsEnabled}",
+        };
+
+        if (content is not null)
+        {
+            parts.Add($"内容区={content.ActualWidth:0}x{content.ActualHeight:0}");
+            parts.Add($"内容区可见={content.IsVisible}");
+            parts.Add($"内容区启用={content.IsEnabled}");
+        }
+
+        parts.Add($"草稿行启用={DraftBox.IsEnabled}");
+        return string.Join(" ", parts);
+    }
+
     /// <summary>给回归脚本用：模拟鼠标悬停在第 N 行（让 ✓ / ✕ / ↺ 显示出来）。</summary>
     public void ForceRowHover(int index)
     {

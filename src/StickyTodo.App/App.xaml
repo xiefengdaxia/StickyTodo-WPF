@@ -525,6 +525,27 @@
             </Setter>
         </Style>
 
+        <!-- ==================== 列表 ==================== -->
+
+        <!-- 透明底的 ListBox：默认模板在 IsEnabled=false 时会画出系统白底，盖住便签纸 -->
+        <Style x:Key="ListBox.Flat" TargetType="ListBox">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBox">
+                        <ScrollViewer Focusable="False"
+                                      Padding="0"
+                                      Background="Transparent"
+                                      CanContentScroll="{TemplateBinding ScrollViewer.CanContentScroll}">
+                            <ItemsPresenter />
+                        </ScrollViewer>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- ==================== 滚动条 ==================== -->
 
         <Style x:Key="ScrollBar.Thumb" TargetType="Thumb">

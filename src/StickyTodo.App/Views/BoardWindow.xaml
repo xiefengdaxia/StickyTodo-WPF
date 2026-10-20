@@ -204,6 +204,8 @@
                              AllowDrop="True"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              HorizontalContentAlignment="Stretch"
+                             VerticalContentAlignment="Stretch"
+                             Style="{StaticResource ListBox.Flat}"
                              PreviewMouseLeftButtonDown="TodoList_PreviewMouseLeftButtonDown"
                              DragOver="TodoList_DragOver"
                              Drop="TodoList_Drop"
@@ -249,42 +251,130 @@
                             <DataTemplate>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
+                                        <!-- 拖动把手 -->
                                         <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
+                                        <!-- 内容：标题 + 徽标 + 标签，全部左对齐 -->
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
+                                        <!-- 悬停操作按钮（最右侧，固定宽度，避免悬停时文字跳动） -->
+                                        <ColumnDefinition Width="64" />
                                     </Grid.ColumnDefinitions>
                                     <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
 
                                     <!-- 拖动把手：按住这里拖可调整顺序 / 拖到标签胶囊上改标签 -->
-                                    <Border Grid.Row="0" Grid.Column="0"
+                                    <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="0"
                                             x:Name="DragHandle"
                                             Width="18"
                                             Margin="0,0,0,0"
                                             Padding="0,1,0,0"
-                                            VerticalAlignment="Top"
+                                            VerticalAlignment="Center"
                                             Background="Transparent"
                                             Cursor="SizeAll"
                                             ToolTip="拖动可调整顺序；拖到上方的标签上可改标签"
                                             PreviewMouseLeftButtonDown="DragHandle_PreviewMouseLeftButtonDown"
                                             PreviewMouseMove="DragHandle_PreviewMouseMove">
-                                        <StackPanel VerticalAlignment="Top" Margin="0,4,0,0" HorizontalAlignment="Center">
+                                        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                                             <Ellipse Width="2.5" Height="2.5" Fill="{DynamicResource Brush.InkSoft}" Opacity="0.45" />
                                             <Ellipse Width="2.5" Height="2.5" Fill="{DynamicResource Brush.InkSoft}" Opacity="0.45" Margin="0,2" />
                                             <Ellipse Width="2.5" Height="2.5" Fill="{DynamicResource Brush.InkSoft}" Opacity="0.45" />
                                         </StackPanel>
                                     </Border>
 
-                                    <!-- 悬停操作区：平时不可见，鼠标移入本行才出现。
-                                         待办：✓ 标记已办 + ✕ 删除；已完成：↺ 撤回为待办 -->
-                                    <StackPanel Grid.Row="0" Grid.Column="1"
+                                    <!-- 标题：行内直接编辑，回车/失焦提交 -->
+                                    <TextBox Grid.Row="0" Grid.Column="1"
+                                             Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}"
+                                             GotKeyboardFocus="RowTitle_GotFocus"
+                                             LostKeyboardFocus="RowTitle_LostFocus"
+                                             PreviewKeyDown="RowTitle_PreviewKeyDown"
+                                             VerticalAlignment="Center">
+                                        <TextBox.Style>
+                                            <Style TargetType="TextBox" BasedOn="{StaticResource TextBox.Inline}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsDone}" Value="True">
+                                                        <Setter Property="TextDecorations" Value="Strikethrough" />
+                                                        <Setter Property="Opacity" Value="0.55" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBox.Style>
+                                    </TextBox>
+
+                                    <!-- 第二行：元信息徽标 + 标签名（与标题文字左边缘对齐） -->
+                                    <WrapPanel Grid.Row="1" Grid.Column="1"
+                                               Margin="-5,2,6,0"
+                                               Orientation="Horizontal"
+                                               VerticalAlignment="Center">
+                                        <Border Margin="0,0,5,0"
+                                                Padding="5,1"
+                                                CornerRadius="6"
+                                                Background="#332E7D32"
+                                                Visibility="{Binding HasDoneAt, Converter={StaticResource BoolToVis}}">
+                                            <TextBlock Text="{Binding DoneAtText}" FontSize="10" Foreground="#FF2E7D32" />
+                                        </Border>
+
+                                        <Border Margin="0,0,5,0"
+                                                Padding="5,1"
+                                                CornerRadius="6"
+                                                Background="#33C0392B"
+                                                Visibility="{Binding HasCountdown, Converter={StaticResource BoolToVis}}">
+                                            <TextBlock Text="{Binding CountdownText}" FontSize="10" VerticalAlignment="Center">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsOverdue}" Value="True">
+                                                                <Setter Property="Foreground" Value="#FFC0392B" />
+                                                                <Setter Property="FontWeight" Value="SemiBold" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Border>
+
+                                        <TextBlock Text="{Binding RemindText}"
+                                                   FontSize="10"
+                                                   Margin="0,0,5,0"
+                                                   VerticalAlignment="Center"
+                                                   Opacity="0.8"
+                                                   Foreground="{DynamicResource Brush.InkSoft}"
+                                                   Visibility="{Binding HasReminder, Converter={StaticResource BoolToVis}}" />
+
+                                        <Border Margin="0,0,5,0"
+                                                Padding="5,1"
+                                                CornerRadius="6"
+                                                Background="#332E7D32"
+                                                VerticalAlignment="Center"
+                                                Visibility="{Binding IsRecurring, Converter={StaticResource BoolToVis}}">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="🔁 " FontSize="9" VerticalAlignment="Center" />
+                                                <TextBlock Text="{Binding RecurrenceText}" FontSize="10"
+                                                           VerticalAlignment="Center" Foreground="#FF2E7D32" />
+                                            </StackPanel>
+                                        </Border>
+
+                                        <TextBlock Text="{Binding TagText}"
+                                                   FontSize="10"
+                                                   Margin="0,0,5,0"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource Brush.Accent}"
+                                                   Visibility="{Binding HasTags, Converter={StaticResource BoolToVis}}" />
+
+                                        <TextBlock Text="{Binding EditError}"
+                                                   FontSize="10"
+                                                   Margin="0,0,5,0"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="#FFC0392B"
+                                                   Visibility="{Binding EditError, Converter={StaticResource NullToCollapsed}}" />
+                                    </WrapPanel>
+
+                                    <!-- 悬停操作区（最右侧）：平时不可见，鼠标移入本行才出现 -->
+                                    <StackPanel Grid.Row="0" Grid.RowSpan="2" Grid.Column="2"
                                                 Orientation="Horizontal"
-                                                Margin="0,0,6,0"
-                                                VerticalAlignment="Top">
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Center">
                                         <StackPanel.Style>
                                             <Style TargetType="StackPanel">
                                                 <Setter Property="Opacity" Value="0" />
@@ -327,90 +417,6 @@
                                                 ToolTip="删除这条待办"
                                                 Click="RowDelete_Click" />
                                     </StackPanel>
-
-                                    <StackPanel Grid.Row="0" Grid.Column="2" VerticalAlignment="Center">
-                                        <!-- 标题：行内直接编辑，回车/失焦提交 -->
-                                        <TextBox Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}"
-                                                 GotKeyboardFocus="RowTitle_GotFocus"
-                                                 LostKeyboardFocus="RowTitle_LostFocus"
-                                                 PreviewKeyDown="RowTitle_PreviewKeyDown">
-                                            <TextBox.Style>
-                                                <Style TargetType="TextBox" BasedOn="{StaticResource TextBox.Inline}">
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding IsDone}" Value="True">
-                                                            <Setter Property="TextDecorations" Value="Strikethrough" />
-                                                            <Setter Property="Opacity" Value="0.55" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </TextBox.Style>
-                                        </TextBox>
-                                    </StackPanel>
-
-                                    <!-- 第二行：元信息徽标（与标题左边缘对齐） -->
-                                    <StackPanel Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2"
-                                                Orientation="Horizontal" Margin="0,1,0,0">
-                                            <Border Margin="0,0,5,0"
-                                                    Padding="5,1"
-                                                    CornerRadius="6"
-                                                    Background="#332E7D32"
-                                                    Visibility="{Binding HasDoneAt, Converter={StaticResource BoolToVis}}">
-                                                <TextBlock Text="{Binding DoneAtText}" FontSize="10" Foreground="#FF2E7D32" />
-                                            </Border>
-
-                                            <Border Margin="0,0,5,0"
-                                                    Padding="5,1"
-                                                    CornerRadius="6"
-                                                    Background="#33C0392B"
-                                                    Visibility="{Binding HasCountdown, Converter={StaticResource BoolToVis}}">
-                                                <TextBlock Text="{Binding CountdownText}" FontSize="10">
-                                                    <TextBlock.Style>
-                                                        <Style TargetType="TextBlock">
-                                                            <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}" />
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding IsOverdue}" Value="True">
-                                                                    <Setter Property="Foreground" Value="#FFC0392B" />
-                                                                    <Setter Property="FontWeight" Value="SemiBold" />
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </TextBlock.Style>
-                                                </TextBlock>
-                                            </Border>
-
-                                            <TextBlock Text="{Binding RemindText}"
-                                                       FontSize="10"
-                                                       VerticalAlignment="Center"
-                                                       Opacity="0.8"
-                                                       Foreground="{DynamicResource Brush.InkSoft}"
-                                                       Visibility="{Binding HasReminder, Converter={StaticResource BoolToVis}}" />
-
-                                            <Border Margin="5,0,0,0"
-                                                    Padding="5,1"
-                                                    CornerRadius="6"
-                                                    Background="#332E7D32"
-                                                    VerticalAlignment="Center"
-                                                    Visibility="{Binding IsRecurring, Converter={StaticResource BoolToVis}}">
-                                                <StackPanel Orientation="Horizontal">
-                                                    <TextBlock Text="🔁 " FontSize="9" />
-                                                    <TextBlock Text="{Binding RecurrenceText}" FontSize="10" Foreground="#FF2E7D32" />
-                                                </StackPanel>
-                                            </Border>
-
-                                            <TextBlock Text="{Binding EditError}"
-                                                       FontSize="10"
-                                                       Margin="6,0,0,0"
-                                                       VerticalAlignment="Center"
-                                                       Foreground="#FFC0392B"
-                                                       Visibility="{Binding EditError, Converter={StaticResource NullToCollapsed}}" />
-                                        </StackPanel>
-
-                                        <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3"
-                                                   Text="{Binding TagText}"
-                                                   FontSize="10"
-                                                   Margin="0,1,0,0"
-                                                   Foreground="{DynamicResource Brush.Accent}"
-                                                   Visibility="{Binding HasTags, Converter={StaticResource BoolToVis}}" />
                                 </Grid>
                             </DataTemplate>
                         </ListBox.ItemTemplate>

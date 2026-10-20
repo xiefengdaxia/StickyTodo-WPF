@@ -108,6 +108,13 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        // 锁定白屏回归：锁定后截图 + 检查内容区可见性
+        if (e.Args.Contains("--lock-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunLockDemo(ReadOptionValue(e.Args, "--shot"));
+            return;
+        }
+
         // 悬停操作回归：让 ✓/✕/↺ 显示出来并截图
         if (e.Args.Contains("--hover-demo", StringComparer.OrdinalIgnoreCase))
         {
@@ -346,6 +353,74 @@ public partial class App : System.Windows.Application
         catch (Exception ex)
         {
             Log.Fatal(ex, "[skin] 失败");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
+    /// --lock-demo：锁定看板后截图并检查内容区，用来复现「锁定后白屏」。
+    /// </summary>
+    private void RunLockDemo(string? shotDirectory)
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+            _host = BuildHost();
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+            var service = _host.Services.GetRequiredService<TodoService>();
+            var board = service.EnsureDefaultBoard();
+
+            foreach (var existing in service.GetTodos(board.Id))
+            {
+                service.Delete(existing.Id);
+            }
+
+            service.AddTodo(board.Id, "锁定后这条还应该看得见");
+            service.AddTodo(board.Id, "第二条待办");
+
+            var windows = _host.Services.GetRequiredService<WindowManager>();
+            var window = (BoardWindow)windows.OpenBoard(board);
+            MainWindow = window;
+
+            var step = 0;
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1100) };
+            timer.Tick += (_, _) =>
+            {
+                step++;
+                if (step == 1)
+                {
+                    if (shotDirectory is not null)
+                    {
+                        SaveWindowShots(Path.Combine(shotDirectory, "unlocked"));
+                    }
+
+                    Log.Information("[lock] 锁定前截图完成");
+                    window.SwitchLockForTest();
+                }
+                else
+                {
+                    timer.Stop();
+                    var info = window.DescribeContentVisibility();
+                    Log.Information("[lock] 锁定后：{Info}", info);
+
+                    if (shotDirectory is not null)
+                    {
+                        SaveWindowShots(Path.Combine(shotDirectory, "locked"));
+                    }
+
+                    Log.Information("[lock] 锁定后截图完成");
+                    Shutdown(0);
+                }
+            };
+            timer.Start();
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[lock] 失败");
             Log.CloseAndFlush();
             Shutdown(1);
         }
