@@ -19,6 +19,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly TodoService _todos;
     private readonly IEntitlementService _entitlement;
     private readonly WindowManager _windows;
+    private readonly AutoStartService _autoStart;
 
     private bool _suppressSync;
 
@@ -27,15 +28,18 @@ public partial class SettingsViewModel : ObservableObject
         AppSettingsService settings,
         TodoService todos,
         IEntitlementService entitlement,
-        WindowManager windows)
+        WindowManager windows,
+        AutoStartService autoStart)
     {
         _skin = skin;
         _settings = settings;
         _todos = todos;
         _entitlement = entitlement;
         _windows = windows;
+        _autoStart = autoStart;
 
         BuildSkinOptions();
+        LoadStartupSettings();
 
         _suppressSync = true;
         _backgroundOpacity = Math.Round(_skin.Opacity * 100);
@@ -76,6 +80,75 @@ public partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private string _statsText = string.Empty;
+
+    /// <summary>开机自启。改这个会立即写注册表。</summary>
+    [ObservableProperty]
+    private bool _launchAtStartup;
+
+    /// <summary>启动时恢复上次打开的看板。</summary>
+    [ObservableProperty]
+    private bool _restoreSession = true;
+
+    private bool _suppressStartupSync;
+
+    /// <summary>把存的值读进 UI（构造后调用一次）。</summary>
+    private void LoadStartupSettings()
+    {
+        _suppressStartupSync = true;
+        try
+        {
+            // 以注册表实际状态为准：用户可能在别处删过启动项
+            LaunchAtStartup = _autoStart.IsEnabled();
+            RestoreSession = _settings.RestoreSession;
+            _settings.AutoStart = LaunchAtStartup;
+        }
+        finally
+        {
+            _suppressStartupSync = false;
+        }
+    }
+
+    partial void OnLaunchAtStartupChanged(bool value)
+    {
+        if (_suppressStartupSync)
+        {
+            return;
+        }
+
+        _settings.AutoStart = value;
+
+        if (_autoStart.SetEnabled(value, out var error))
+        {
+            ErrorText = null;
+            StatusText = value ? "已设为开机启动" : "已取消开机启动";
+        }
+        else
+        {
+            ErrorText = $"设置开机启动失败：{error}";
+
+            // 写失败就把开关拨回去，避免显示与实际不符
+            _suppressStartupSync = true;
+            LaunchAtStartup = _autoStart.IsEnabled();
+            _suppressStartupSync = false;
+        }
+    }
+
+    partial void OnRestoreSessionChanged(bool value)
+    {
+        if (_suppressStartupSync)
+        {
+            return;
+        }
+
+        _settings.RestoreSession = value;
+        StatusText = value ? "启动时会恢复上次的看板" : "启动时不再恢复看板";
+    }
+
+    [ObservableProperty]
+    private string? _statusText;
+
+    [ObservableProperty]
+    private string? _errorText;
 
     private void BuildSkinOptions()
     {

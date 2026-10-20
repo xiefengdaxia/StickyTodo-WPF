@@ -30,6 +30,19 @@ public sealed class WindowManager
 
     private string? _activeBoardId;
 
+    /// <summary>恢复上次会话期间不要反复写盘。</summary>
+    private bool _suspendSessionSave;
+
+    /// <summary>程序正在退出：此时关窗口不应把会话记录清空。</summary>
+    private bool _shuttingDown;
+
+    /// <summary>
+    /// 会话记录：本次运行中"曾经打开过"的看板，按打开顺序。
+    /// 用户主动关掉某个看板时移除它；程序退出导致的一连串关窗则原样保留。
+    /// 用这个集合而不是直接看 _windows，是因为退出时 WPF 会把窗口逐个关掉。
+    /// </summary>
+    private readonly List<string> _sessionBoards = new();
+
     public WindowManager(TodoService todoService, AppSettingsService settings, SkinService skinService)
     {
         _todoService = todoService;
@@ -53,7 +66,6 @@ public sealed class WindowManager
             Activate(existing);
             return existing;
         }
-
         Window window = board.Kind switch
         {
             BoardKind.Memo => new MemoBoardWindow(
@@ -68,13 +80,105 @@ public sealed class WindowManager
         {
             _windows.Remove(board.Id);
             BoardsChanged?.Invoke(this, EventArgs.Empty);
+
+            // 用户主动关掉这个看板：从会话记录里移除。
+            // 程序退出时 WPF 会连续关窗，这种情况由 OnExit 里的 _shuttingDown 兜住；
+            // 但 Shutdown 过程中这个标志还来不及置位，所以这里再判一次"是不是真的要退出"。
+            if (!_shuttingDown)
+            {
+                _sessionBoards.Remove(board.Id);
+                PersistSession();
+            }
         };
         window.Activated += (_, _) => _activeBoardId = board.Id;
 
         window.Show();
         _activeBoardId = board.Id;
+
+        if (!_sessionBoards.Contains(board.Id))
+        {
+            _sessionBoards.Add(board.Id);
+        }
+
         BoardsChanged?.Invoke(this, EventArgs.Empty);
+        PersistSession();
         return window;
+    }
+
+    /// <summary>把会话记录写进设置，下次启动据此恢复。</summary>
+    public void PersistSession()
+    {
+        if (_suspendSessionSave)
+        {
+            return;
+        }
+
+        try
+        {
+            _settings.OpenBoards = _sessionBoards.ToList();
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Debug(ex, "保存会话状态失败");
+        }
+    }
+
+    /// <summary>
+    /// 恢复上次会话：把上次开着、且仍然存在的看板重新打开。
+    /// 位置与大小由各窗口自己从 <see cref="Board.Window"/> 读回，所以这里只负责"开哪些"。
+    /// 返回恢复出来的窗口数。
+    /// </summary>
+    public int RestoreSession()
+    {
+        var ids = _settings.OpenBoards;
+        Serilog.Log.Information("[session] RestoreSession 读到 {Count} 个 id：{Ids}",
+            ids.Count, ids.Count == 0 ? "(空)" : string.Join(",", ids));
+
+        if (ids.Count == 0 || !_settings.RestoreSession)
+        {
+            return 0;
+        }
+
+        _suspendSessionSave = true;
+        var restored = 0;
+
+        try
+        {
+            var boards = _todoService.GetBoards().ToDictionary(b => b.Id);
+
+            foreach (var id in ids)
+            {
+                if (!boards.TryGetValue(id, out var board))
+                {
+                    // 看板已被删除，跳过
+                    continue;
+                }
+
+                try
+                {
+                    OpenBoard(board);
+                    restored++;
+                }
+                catch (Exception ex)
+                {
+                    Serilog.Log.Warning(ex, "恢复看板窗口失败：{Board}", board.Name);
+                }
+            }
+        }
+        finally
+        {
+            _suspendSessionSave = false;
+
+            // 恢复完成后把 _sessionBoards 同步成实际打开的那些，再统一落盘
+            _sessionBoards.Clear();
+            _sessionBoards.AddRange(_windows.Keys);
+            PersistSession();
+        }
+
+        Serilog.Log.Information("[session] 上次开着 {Wanted} 个看板，实际恢复 {Restored} 个",
+            ids.Count, restored);
+
+        return restored;
     }
 
     public void CloseBoard(string boardId)
@@ -87,9 +191,30 @@ public sealed class WindowManager
 
     public void CloseAll()
     {
+        // 退出程序时把"当时开着哪些"留在记录里，下次启动才能恢复
+        _shuttingDown = true;
+        Serilog.Log.Debug("[session] CloseAll：置位 shuttingDown，窗口数={Count}", _windows.Count);
+
         foreach (var window in _windows.Values.ToList())
         {
             window.Close();
+        }
+    }
+
+    /// <summary>标记即将退出：之后的关窗不再覆盖会话记录。</summary>
+    public void BeginShutdown()
+    {
+        _shuttingDown = true;
+
+        // 退出前把当前开着的看板固化下来，之后关窗一律不再改它
+        try
+        {
+            _settings.OpenBoards = _windows.Keys.ToList();
+            Serilog.Log.Information("[session] 退出前固化会话：{Count} 个看板", _windows.Count);
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Debug(ex, "固化会话失败");
         }
     }
 

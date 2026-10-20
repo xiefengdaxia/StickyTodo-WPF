@@ -108,6 +108,20 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        // 会话恢复回归：打开若干看板 → 重启 → 验证窗口数量与位置都回来了
+        if (e.Args.Contains("--session-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunSessionDemo(e.Args.Contains("--phase2", StringComparer.OrdinalIgnoreCase), ReadOptionValue(e.Args, "--shot"));
+            return;
+        }
+
+        // 开机自启回归：写注册表 → 读回 → 清理
+        if (e.Args.Contains("--autostart-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunAutoStartDemo();
+            return;
+        }
+
         // 设置窗口反复开关回归：验证「关掉再打开」不会崩
         if (e.Args.Contains("--settings-reopen-demo", StringComparer.OrdinalIgnoreCase))
         {
@@ -202,6 +216,19 @@ public partial class App : System.Windows.Application
             StartReminderPump(tray);
             AttachHotKeys(manager);
 
+            // 开机自启：注册表与用户设置对齐（换了安装路径时自动更新）
+            SyncAutoStart();
+
+            // 恢复上次会话：重新打开上次开着的便签/日历看板（位置大小由各窗口自己恢复）
+            if (!isDemo)
+            {
+                var restored = _host.Services.GetRequiredService<WindowManager>().RestoreSession();
+                if (restored > 0)
+                {
+                    Log.Information("已恢复上次会话的 {Count} 个看板窗口", restored);
+                }
+            }
+
             if (isDemo)
             {
                 RunDemo(shotDirectory, e.Args.Contains("--reminder-demo", StringComparer.OrdinalIgnoreCase));
@@ -216,6 +243,21 @@ public partial class App : System.Windows.Application
             MessageBox.Show($"启动失败：{ex.Message}\n\n日志位置：{AppPaths.LogDirectory}",
                 "StickyTodo", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(-1);
+        }
+    }
+
+    /// <summary>按用户设置同步开机自启的注册表项。</summary>
+    private void SyncAutoStart()
+    {
+        try
+        {
+            var settings = _host!.Services.GetRequiredService<AppSettingsService>();
+            var autoStart = _host.Services.GetRequiredService<AutoStartService>();
+            autoStart.Sync(settings.AutoStart);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "同步开机自启设置失败");
         }
     }
 
@@ -302,6 +344,7 @@ public partial class App : System.Windows.Application
                 services.AddSingleton<TrayService>();
                 services.AddSingleton<ReminderPump>();
                 services.AddSingleton<HotKeyService>();
+                services.AddSingleton<AutoStartService>();
                 services.AddSingleton<ManagerViewModel>();
                 services.AddSingleton<ManagerWindow>();
                 services.AddSingleton<SettingsViewModel>();
@@ -419,6 +462,177 @@ public partial class App : System.Windows.Application
             Log.CloseAndFlush();
             Shutdown(1);
         }
+    }
+
+    /// <summary>
+    /// --session-demo：两阶段验证"重启后恢复上次打开的看板"。
+    ///   阶段 1（默认）：打开 3 个看板并把窗口移到固定位置，写入会话；
+    ///   阶段 2（--phase2）：模拟重启——重新建 Host，只调 RestoreSession，验证窗口数与位置。
+    /// 两阶段共用同一个数据目录，所以等于真的"关掉再开"。
+    /// </summary>
+    private async void RunSessionDemo(bool phase2, string? shotDirectory)
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+        InstallGlobalExceptionHandlers();
+
+        try
+        {
+            _host = BuildHost();
+            await _host.StartAsync();
+
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+            var service = _host.Services.GetRequiredService<TodoService>();
+            service.EnsureDefaultBoard();
+
+            var windows = _host.Services.GetRequiredService<WindowManager>();
+            var settings = _host.Services.GetRequiredService<AppSettingsService>();
+
+            if (!phase2)
+            {
+                // ---- 阶段 1：摆好 3 个窗口，记下预期 ----
+                foreach (var existing in service.GetTodos(service.GetBoards()[0].Id))
+                {
+                    service.Delete(existing.Id);
+                }
+
+                var boards = service.GetBoards().ToList();
+                if (boards.Count < 3)
+                {
+                    service.CreateBoard("会话测试便签", BoardKind.Memo);
+                    service.CreateBoard("会话测试日历", BoardKind.Calendar);
+                    boards = service.GetBoards().ToList();
+                }
+
+                var opened = new List<(string Id, double Left, double Top)>();
+                double x = 60;
+                foreach (var board in boards.Take(3))
+                {
+                    var w = windows.OpenBoard(board);
+                    w.Left = x;
+                    w.Top = 120;
+                    await Task.Delay(350);
+                    opened.Add((board.Id, w.Left, w.Top));
+                    x += 380;
+                }
+
+                await Task.Delay(600); // 等防抖保存落盘
+                windows.PersistSession();
+
+                // 用全新 repository 实例读一遍（模拟下个进程），确认真的持久化了
+                var fresh = new SqliteTodoRepository(AppPaths.DatabasePath);
+                fresh.Initialize();
+                var freshSettings = new AppSettingsService(fresh);
+                var fromDisk = freshSettings.OpenBoards;
+                var rawValue = fresh.GetSettings().TryGetValue(AppSettingsService.OpenBoardsKey, out var v) ? v : "(键不存在)";
+
+                Log.Information("[session] 阶段1：打开 {Count} 个窗口，位置={Pos}",
+                    opened.Count,
+                    string.Join("; ", opened.Select(o => $"{o.Left:0},{o.Top:0}")));
+                Log.Information("[session] 阶段1：新连接裸值={Raw} 解析结果={Parsed}",
+                    string.IsNullOrEmpty(rawValue) ? "(空串)" : rawValue,
+                    fromDisk.Count == 0 ? "(空)" : string.Join(",", fromDisk));
+
+                // 不在这里 CloseAndFlush：OnExit 还要关窗，提前关日志会把后续写入丢掉
+                windows.BeginShutdown();
+                Shutdown(0);
+                return;
+            }
+
+            // ---- 阶段 2：模拟重启后恢复 ----
+            var wanted = settings.OpenBoards;
+            Serilog.Log.Information("[session] 阶段2：注入的 settings 读到 {Count} 个；直连库读到 {Raw}",
+                wanted.Count,
+                string.Join(",", new AppSettingsService(new SqliteTodoRepository(AppPaths.DatabasePath)).OpenBoards));
+            var restored = windows.RestoreSession();
+            await Task.Delay(700);
+
+            var actual = windows.OpenWindowCount;
+            var positions = new List<string>();
+            foreach (var board in service.GetBoards().Where(b => windows.IsBoardOpen(b.Id)))
+            {
+                positions.Add($"{board.Name}@{board.Window?.Left:0},{board.Window?.Top:0}");
+            }
+
+            Log.Information("[session] 阶段2：会话记录={Wanted} 恢复窗口数={Actual} 位置={Pos}",
+                string.Join(",", wanted), actual, string.Join("; ", positions));
+
+            if (shotDirectory is not null)
+            {
+                SaveWindowShots(shotDirectory);
+            }
+
+            var ok = restored == wanted.Count && actual == wanted.Count && wanted.Count > 0;
+            Log.Information("[session] 总结果={Result}", ok ? "通过" : "失败");
+
+            Log.CloseAndFlush();
+            Shutdown(ok ? 0 : 2);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[session] 异常");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
+    /// --autostart-demo：验证开机自启确实写进注册表，并能读回、能删除。
+    /// 结束时恢复原始状态，不留垃圾。
+    /// </summary>
+    private void RunAutoStartDemo()
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        var ok = true;
+
+        try
+        {
+            var autoStart = new AutoStartService();
+
+            var originalCommand = autoStart.CurrentCommand();
+            var originalEnabled = autoStart.IsEnabled();
+            Log.Information("[autostart] 初始状态：已启用={Enabled} 命令={Cmd}",
+                originalEnabled, originalCommand ?? "(无)");
+
+            // 开
+            var setOk = autoStart.SetEnabled(true, out var err);
+            var enabled = autoStart.IsEnabled();
+            var command = autoStart.CurrentCommand();
+            var exePath = AutoStartService.ExecutablePath();
+
+            Log.Information("[autostart] 开启：成功={Ok} 错误={Err} 注册表已存在={Enabled} 命令={Cmd}",
+                setOk, err ?? "(无)", enabled, command ?? "(无)");
+            Log.Information("[autostart] 当前 exe 路径={Exe}", exePath);
+
+            ok &= setOk && enabled && command is not null && command.Contains("StickyTodo", StringComparison.OrdinalIgnoreCase);
+
+            // 关
+            var offOk = autoStart.SetEnabled(false, out var err2);
+            var disabled = autoStart.IsEnabled();
+            Log.Information("[autostart] 关闭：成功={Ok} 错误={Err} 注册表已清除={Cleared}",
+                offOk, err2 ?? "(无)", !disabled);
+
+            ok &= offOk && !disabled;
+
+            // 还原用户原本的设置
+            if (originalEnabled)
+            {
+                autoStart.SetEnabled(true, out _);
+            }
+
+            Log.Information("[autostart] 总结果={Result}", ok ? "通过" : "失败");
+        }
+        catch (Exception ex)
+        {
+            ok = false;
+            Log.Fatal(ex, "[autostart] 异常");
+        }
+
+        Log.CloseAndFlush();
+        Shutdown(ok ? 0 : 2);
     }
 
     /// <summary>
@@ -1737,6 +1951,17 @@ public partial class App : System.Windows.Application
 
     protected override async void OnExit(ExitEventArgs e)
     {
+        // 必须在最前面：WPF 会在 Shutdown 过程中逐个关闭窗口，
+        // 那时若还允许写会话，会把记录清成空列表，下次启动就恢复不了。
+        try
+        {
+            _host?.Services.GetService<WindowManager>()?.BeginShutdown();
+        }
+        catch (Exception)
+        {
+            // 退出路径上不抛
+        }
+
         try
         {
             if (_host is not null)

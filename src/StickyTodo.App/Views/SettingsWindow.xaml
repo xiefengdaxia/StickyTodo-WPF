@@ -147,9 +147,9 @@
                             <Slider Style="{StaticResource Slider.Slim}"
                                     Minimum="10"
                                     Maximum="100"
-                                    TickFrequency="10"
-                                    SmallChange="10"
-                                    LargeChange="10"
+                                    TickFrequency="1"
+                                    SmallChange="1"
+                                    LargeChange="5"
                                     IsSnapToTickEnabled="True"
                                     Value="{Binding BackgroundOpacity, Mode=TwoWay}" />
 
@@ -170,11 +170,36 @@
                             <Slider Style="{StaticResource Slider.Slim}"
                                     Minimum="10"
                                     Maximum="100"
-                                    TickFrequency="10"
-                                    SmallChange="10"
-                                    LargeChange="10"
+                                    TickFrequency="1"
+                                    SmallChange="1"
+                                    LargeChange="5"
                                     IsSnapToTickEnabled="True"
                                     Value="{Binding WindowOpacity, Mode=TwoWay}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ===== 启动 ===== -->
+                    <TextBlock Text="启动" Style="{StaticResource Text.Section}" Margin="2,4,0,8" />
+
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                        <StackPanel>
+                            <CheckBox Style="{StaticResource CheckBox.Labeled}"
+                                      Content="开机自动启动"
+                                      FontSize="12.5"
+                                      IsChecked="{Binding LaunchAtStartup, Mode=TwoWay}" />
+                            <TextBlock Text="勾选后写入当前用户的启动项，不需要管理员权限"
+                                       Style="{StaticResource Text.Caption}"
+                                       Margin="24,5,0,0" />
+
+                            <Border Height="1" Background="{DynamicResource Brush.Line}" Margin="0,11" />
+
+                            <CheckBox Style="{StaticResource CheckBox.Labeled}"
+                                      Content="启动时恢复上次打开的看板"
+                                      FontSize="12.5"
+                                      IsChecked="{Binding RestoreSession, Mode=TwoWay}" />
+                            <TextBlock Text="会重新打开上次关闭前的便签/日历窗口，并回到原来的位置和大小"
+                                       Style="{StaticResource Text.Caption}"
+                                       Margin="24,5,0,0" />
                         </StackPanel>
                     </Border>
 

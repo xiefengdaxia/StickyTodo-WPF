@@ -37,6 +37,15 @@ public sealed class AppSettingsService
 
     public static string BoardLockedKey(string boardId) => $"board.{boardId}.locked";
 
+    /// <summary>开机自启（HKCU Run 项）。</summary>
+    public const string AutoStartKey = "startup.autoStart";
+
+    /// <summary>上次打开着的看板 id 列表（逗号分隔）。</summary>
+    public const string OpenBoardsKey = "session.openBoards";
+
+    /// <summary>启动时是否恢复上次会话。</summary>
+    public const string RestoreSessionKey = "session.restore";
+
     /// <summary>背景色方案。</summary>
     public string Skin
     {
@@ -90,6 +99,36 @@ public sealed class AppSettingsService
 
     public void SetBoardLocked(string boardId, bool value) =>
         _repository.SetSetting(BoardLockedKey(boardId), value ? "1" : "0");
+
+    /// <summary>是否开机自启（这里只存"用户期望值"，注册表由 App 层同步）。</summary>
+    public bool AutoStart
+    {
+        get => GetBool(AutoStartKey, false);
+        set => _repository.SetSetting(AutoStartKey, value ? "1" : "0");
+    }
+
+    /// <summary>启动时是否恢复上次打开的看板，默认开。</summary>
+    public bool RestoreSession
+    {
+        get => GetBool(RestoreSessionKey, true);
+        set => _repository.SetSetting(RestoreSessionKey, value ? "1" : "0");
+    }
+
+    /// <summary>上次开着哪些看板。用逗号拼接，看板数量很少，不需要建表。</summary>
+    public IReadOnlyList<string> OpenBoards
+    {
+        get
+        {
+            var raw = GetString(OpenBoardsKey, null);
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return [];
+            }
+
+            return raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        }
+        set => _repository.SetSetting(OpenBoardsKey, string.Join(",", value));
+    }
 
     public static double ClampOpacity(double value)
     {

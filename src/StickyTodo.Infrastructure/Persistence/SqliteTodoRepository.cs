@@ -604,8 +604,11 @@ public sealed class SqliteTodoRepository : ITodoRepository
     public void SetSetting(string key, string value)
     {
         using var connection = Open();
+
+        // 用 INSERT OR REPLACE 而不是 UPSERT（ON CONFLICT DO UPDATE）：
+        // 后者在部分 SQLite 原生库版本上静默不生效，表现为"写入成功但读不到"。
         connection.Execute(
-            "INSERT INTO setting (key, value) VALUES (@key, @value) ON CONFLICT(key) DO UPDATE SET value = excluded.value;",
+            "INSERT OR REPLACE INTO setting (key, value) VALUES (@key, @value);",
             new { key, value });
     }
 

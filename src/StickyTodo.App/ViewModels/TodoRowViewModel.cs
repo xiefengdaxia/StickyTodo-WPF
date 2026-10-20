@@ -87,4 +87,10 @@ public partial class TodoRowViewModel : ObservableObject
     public string DoneAtText { get; }
 
     public bool HasDoneAt { get; }
+
+    /// <summary>
+    /// 是否有第二行的元信息（完成时间 / 倒数日 / 提醒 / 重复）。
+    /// 没有的话第二行整行折叠，行高就能压到最小。
+    /// </summary>
+    public bool HasMeta => HasDoneAt || HasCountdown || HasReminder || IsRecurring;
 }
