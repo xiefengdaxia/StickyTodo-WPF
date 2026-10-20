@@ -57,6 +57,10 @@ public partial class TodoRowViewModel : ObservableObject
     [ObservableProperty]
     private string? _editError;
 
+    /// <summary>拖拽时是不是当前的插入目标（画一条插入线）。</summary>
+    [ObservableProperty]
+    private bool _isDragTarget;
+
     public bool IsDone => Item.IsDone;
 
     public string TagText { get; }

@@ -50,7 +50,6 @@ public partial class BoardWindow : Window, IStickyWindow
     private TodoRowViewModel? _dragCandidate;
     private bool _dragArmed;
     private TodoRowViewModel? _contextRow;
-
     public BoardWindow(BoardViewModel viewModel, WindowManager windows)
     {
         InitializeComponent();
@@ -72,6 +71,9 @@ public partial class BoardWindow : Window, IStickyWindow
             RefreshViewTabs();
         };
 
+        // 点窗口里任何"非可编辑"的区域都要退出编辑态（含标签栏、空白区、标题栏）
+        PreviewMouseLeftButtonDown += BoardWindow_PreviewMouseLeftButtonDown;
+
         StateChanged += (_, _) =>
         {
             _isFullScreen = WindowState == WindowState.Maximized;
@@ -83,6 +85,60 @@ public partial class BoardWindow : Window, IStickyWindow
                 NoteRoot.Margin = new Thickness(0);
             }
         };
+    }
+
+    /// <summary>
+    /// 点到哪里算"离开编辑"：只要不是落在文本框、复选框、按钮上，就提交并清焦点。
+    /// </summary>
+    private async void BoardWindow_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        var source = e.OriginalSource as DependencyObject;
+        if (IsEditableOrInteractive(source))
+        {
+            return;
+        }
+
+        await CommitEditingRowsAsync();
+    }
+
+    private static bool IsEditableOrInteractive(DependencyObject? source)
+    {
+        var current = source;
+        while (current is not null)
+        {
+            switch (current)
+            {
+                case System.Windows.Controls.Primitives.TextBoxBase:
+                case System.Windows.Controls.Primitives.ToggleButton:
+                case System.Windows.Controls.Primitives.ButtonBase:
+                case System.Windows.Controls.Primitives.ScrollBar:
+                    return true;
+            }
+
+            current = current is Visual or System.Windows.Media.Media3D.Visual3D
+                ? VisualTreeHelper.GetParent(current)
+                : LogicalTreeHelper.GetParent(current);
+        }
+
+        return false;
+    }
+
+    /// <summary>提交所有正在编辑的行，并清掉焦点（草稿行也退出聚焦态）。</summary>
+    private async Task CommitEditingRowsAsync()
+    {
+        var editing = _viewModel.Rows.Where(r => r.IsEditing).ToList();
+        if (editing.Count == 0 && !_viewModel.IsDraftFocused)
+        {
+            return;
+        }
+
+        foreach (var row in editing)
+        {
+            await _viewModel.CommitTitleAsync(row);
+        }
+
+        _viewModel.IsDraftFocused = false;
+        Keyboard.ClearFocus();
     }
 
     // ---------------- 标题栏拖动 / 关闭 ----------------
@@ -266,7 +322,7 @@ public partial class BoardWindow : Window, IStickyWindow
                 await _viewModel.CommitDraftAsync();
 
                 // 新增后把焦点留在草稿行，方便连续录入
-                Dispatcher.BeginInvoke(() => DraftBox.Focus(), DispatcherPriority.Input);
+                _ = Dispatcher.BeginInvoke(() => DraftBox.Focus(), DispatcherPriority.Input);
                 break;
 
             case Key.Escape:
@@ -408,6 +464,90 @@ public partial class BoardWindow : Window, IStickyWindow
             box.Focus();
             box.SelectAll();
         }
+    }
+
+    /// <summary>给回归脚本读：第 N 行的屏幕中心（用于真实鼠标拖拽验证）。</summary>
+    public (double X, double Y) RowScreenPoint(int index)
+    {
+        TodoList.UpdateLayout();
+        if (index < 0 || index >= _viewModel.Rows.Count)
+        {
+            return (double.NaN, double.NaN);
+        }
+
+        if (TodoList.ItemContainerGenerator.ContainerFromItem(_viewModel.Rows[index]) is not ListBoxItem container)
+        {
+            return (double.NaN, double.NaN);
+        }
+
+        var origin = container.PointToScreen(new Point(container.ActualWidth / 2, container.ActualHeight / 2));
+        var dpi = VisualTreeHelper.GetDpi(this);
+        return (origin.X / dpi.DpiScaleX, origin.Y / dpi.DpiScaleY);
+    }
+
+    /// <summary>给回归脚本读：当前是否还有行处于编辑态。</summary>
+    public int EditingRowCount() => _viewModel.Rows.Count(r => r.IsEditing);
+
+    /// <summary>给回归脚本用：把第一行置为编辑态（模拟用户点进输入框）。</summary>
+    public void BeginEditFirstRow()
+    {
+        if (_viewModel.Rows.Count == 0)
+        {
+            return;
+        }
+
+        _viewModel.Rows[0].IsEditing = true;
+    }
+
+    /// <summary>给回归脚本用：模拟点击窗口中一块"空白处"，应触发退出编辑。</summary>
+    public async Task SimulateBlankAreaClickAsync()
+    {
+        await CommitEditingRowsAsync();
+    }
+
+    /// <summary>给回归脚本读：第一条待办拖动把手在屏幕上的位置（用于真实鼠标拖拽验证）。</summary>
+    public (double X, double Y) FirstDragHandlePoint()
+    {
+        TodoList.UpdateLayout();
+        if (_viewModel.Rows.Count == 0 || TodoList.ItemContainerGenerator.ContainerFromItem(_viewModel.Rows[0]) is not ListBoxItem container)
+        {
+            return (double.NaN, double.NaN);
+        }
+
+        var handle = FindDescendant<FrameworkElement>(container, "DragHandle");
+        if (handle is null)
+        {
+            return (double.NaN, double.NaN);
+        }
+
+        var origin = handle.PointToScreen(new Point(handle.ActualWidth / 2, handle.ActualHeight / 2));
+        var dpi = VisualTreeHelper.GetDpi(this);
+        return (origin.X / dpi.DpiScaleX, origin.Y / dpi.DpiScaleY);
+    }
+
+    private static T? FindDescendant<T>(DependencyObject? current, string? name = null) where T : FrameworkElement
+    {
+        if (current is null)
+        {
+            return null;
+        }
+
+        var count = VisualTreeHelper.GetChildrenCount(current);
+        for (var i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(current, i);
+            if (child is T match && (name is null || match.Name == name))
+            {
+                return match;
+            }
+
+            if (FindDescendant<T>(child, name) is { } nested)
+            {
+                return nested;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>当前列表里显示的行（给回归脚本读，验证视图切换真的换了内容）。</summary>
@@ -598,11 +738,56 @@ public partial class BoardWindow : Window, IStickyWindow
 
     // ---------------- 标签 ----------------
 
-    private async void Chip_Click(object sender, RoutedEventArgs e)
+    private void Chip_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { DataContext: TagChipViewModel chip })
         {
-            await _viewModel.SelectChipAsync(chip);
+            _ = _viewModel.SelectChipAsync(chip);
+        }
+    }
+
+    /// <summary>把待办拖到标签胶囊上：拖过时高亮，松手即改标签。</summary>
+    private void Chip_DragOver(object sender, DragEventArgs e)
+    {
+        if (sender is not Button { DataContext: TagChipViewModel chip })
+        {
+            return;
+        }
+
+        var canDrop = chip.IsRealTag && e.Data.GetDataPresent(typeof(TodoRowViewModel));
+        e.Effects = canDrop ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private async void Chip_Drop(object sender, DragEventArgs e)
+    {
+        if (sender is not Button { DataContext: TagChipViewModel chip })
+        {
+            return;
+        }
+
+        if (e.Data.GetData(typeof(TodoRowViewModel)) is not TodoRowViewModel row)
+        {
+            return;
+        }
+
+        e.Handled = true;
+
+        if (chip.IsAll)
+        {
+            await _viewModel.ClearTagsAsync(row);
+            return;
+        }
+
+        if (chip.IsNoTag)
+        {
+            await _viewModel.ClearTagsAsync(row);
+            return;
+        }
+
+        if (chip.TagId is { } tagId)
+        {
+            await _viewModel.AddTagAsync(row, tagId);
         }
     }
 
@@ -891,25 +1076,27 @@ public partial class BoardWindow : Window, IStickyWindow
         return item;
     }
 
-    // ---------------- 拖拽排序 ----------------
+    // ---------------- 拖拽排序 / 拖到标签改标签 ----------------
 
-    private void TodoList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    /// <summary>拖动把手按下：只在这里武装拖拽，避免和行内编辑抢鼠标。</summary>
+    private void DragHandle_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        var source = e.OriginalSource as DependencyObject;
-
-        // 点在复选框/按钮上时不启动拖拽，避免抢掉点击
-        if (FindAncestor<CheckBox>(source) is not null || FindAncestor<Button>(source) is not null)
+        var row = (sender as FrameworkElement)?.DataContext as TodoRowViewModel;
+        if (row is null || _viewModel.IsLocked)
         {
             _dragArmed = false;
             return;
         }
 
-        _dragCandidate = FindAncestor<ListBoxItem>(source)?.DataContext as TodoRowViewModel;
+        _dragCandidate = row;
         _dragStart = e.GetPosition(TodoList);
-        _dragArmed = _dragCandidate is not null;
+        _dragArmed = true;
+
+        // 不要在把手上触发别的选择/编辑行为
+        e.Handled = true;
     }
 
-    private void TodoList_MouseMove(object sender, MouseEventArgs e)
+    private void DragHandle_PreviewMouseMove(object sender, MouseEventArgs e)
     {
         if (!_dragArmed || _dragCandidate is null || e.LeftButton != MouseButtonState.Pressed)
         {
@@ -917,13 +1104,24 @@ public partial class BoardWindow : Window, IStickyWindow
         }
 
         var position = e.GetPosition(TodoList);
-        if (Math.Abs(position.X - _dragStart.X) < 6 && Math.Abs(position.Y - _dragStart.Y) < 6)
+        if (Math.Abs(position.X - _dragStart.X) < 4 && Math.Abs(position.Y - _dragStart.Y) < 4)
         {
             return;
         }
 
         _dragArmed = false;
-        DragDrop.DoDragDrop(TodoList, _dragCandidate, DragDropEffects.Move);
+        DragDrop.DoDragDrop((DependencyObject)sender, _dragCandidate, DragDropEffects.Move);
+    }
+
+    private void TodoList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _dragArmed = false;
+    }
+
+    /// <summary>点空白处：提交正在编辑的行，并把焦点从输入框挪走。</summary>
+    private async void CommitAllRowsAndClearFocus()
+    {
+        await CommitEditingRowsAsync();
     }
 
     private void TodoList_DragOver(object sender, DragEventArgs e)
@@ -931,11 +1129,32 @@ public partial class BoardWindow : Window, IStickyWindow
         e.Effects = e.Data.GetDataPresent(typeof(TodoRowViewModel))
             ? DragDropEffects.Move
             : DragDropEffects.None;
+
+        // 悬停到某一行时给它画一条"插入线"
+        var target = FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject)?.DataContext as TodoRowViewModel;
+        foreach (var row in _viewModel.Rows)
+        {
+            row.IsDragTarget = ReferenceEquals(row, target);
+        }
+
         e.Handled = true;
+    }
+
+    private void TodoList_DragLeave(object sender, DragEventArgs e)
+    {
+        foreach (var row in _viewModel.Rows)
+        {
+            row.IsDragTarget = false;
+        }
     }
 
     private async void TodoList_Drop(object sender, DragEventArgs e)
     {
+        foreach (var row in _viewModel.Rows)
+        {
+            row.IsDragTarget = false;
+        }
+
         if (e.Data.GetData(typeof(TodoRowViewModel)) is not TodoRowViewModel moving)
         {
             return;

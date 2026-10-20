@@ -80,6 +80,34 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        // 交互回归：拖拽排序 / 拖到标签 / 清空标签
+        if (e.Args.Contains("--interaction-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunInteractionDemo();
+            return;
+        }
+
+        // UI 探针：打印拖动把手与行的屏幕坐标
+        if (e.Args.Contains("--ui-probe", StringComparer.OrdinalIgnoreCase))
+        {
+            RunUiProbe(null);
+            return;
+        }
+
+        // UI 探针（保持窗口开着，供外部真实鼠标拖拽）
+        if (e.Args.Contains("--ui-probe-hot", StringComparer.OrdinalIgnoreCase))
+        {
+            RunUiProbe("hot");
+            return;
+        }
+
+        // 主窗体右键菜单回归：展开卡片菜单并截图
+        if (e.Args.Contains("--manager-menu-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunManagerMenuDemo(ReadOptionValue(e.Args, "--shot"));
+            return;
+        }
+
         _mutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var isFirstInstance);
         if (!isFirstInstance)
         {
@@ -297,6 +325,190 @@ public partial class App : System.Windows.Application
         catch (Exception ex)
         {
             Log.Fatal(ex, "[skin] 失败");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
+    /// --manager-menu-demo：在主窗体第一张看板卡片上弹右键菜单并截图，
+    /// 验证「重命名 / 删除」确实存在且是自绘样式。
+    /// </summary>
+    private void RunManagerMenuDemo(string? shotDirectory)
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+            _host = BuildHost();
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+            var service = _host.Services.GetRequiredService<TodoService>();
+            service.EnsureDefaultBoard();
+            if (service.GetBoards().Count < 2)
+            {
+                service.CreateBoard("第二个看板");
+            }
+
+            var manager = _host.Services.GetRequiredService<ManagerWindow>();
+            MainWindow = manager;
+            manager.Show();
+
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1200) };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                var items = manager.ShowFirstRowContextMenu();
+                Log.Information("[manager-menu] 菜单项={Items}", string.Join(" | ", items));
+
+                var shot = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
+                shot.Tick += (_, _) =>
+                {
+                    shot.Stop();
+                    if (shotDirectory is not null)
+                    {
+                        SavePopupShots(shotDirectory);
+                    }
+
+                    var hasRename = items.Any(i => i.Contains("重命名"));
+                    var hasDelete = items.Any(i => i == "删除");
+                    Shutdown(hasRename && hasDelete ? 0 : 2);
+                };
+                shot.Start();
+            };
+            timer.Start();
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[manager-menu] 失败");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>--ui-probe：打印拖动把手的屏幕坐标，供外部脚本做真实鼠标拖拽。</summary>
+    private void RunUiProbe(string? shotDirectory)
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+            _host = BuildHost();
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+            var service = _host.Services.GetRequiredService<TodoService>();
+            var board = service.EnsureDefaultBoard();
+
+            foreach (var existing in service.GetTodos(board.Id))
+            {
+                service.Delete(existing.Id);
+            }
+
+            service.AddTodo(board.Id, "第一行");
+            service.AddTodo(board.Id, "第二行");
+            service.AddTodo(board.Id, "第三行");
+
+            var windows = _host.Services.GetRequiredService<WindowManager>();
+            var window = (BoardWindow)windows.OpenBoard(board);
+            MainWindow = window;
+
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1200) };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                var p1 = window.FirstDragHandlePoint();
+                var p3 = window.RowScreenPoint(2);
+
+                Log.Information("[probe] dragHandle=({X:0},{Y:0}) row3=({R3X:0},{R3Y:0}) 顺序={Order}",
+                    p1.X, p1.Y, p3.X, p3.Y, string.Join(",", window.CurrentRowSnapshot()));
+
+                // --ui-probe 一次性打印后退出；--ui-probe-hot 保持窗口开着等待外部拖拽
+                if (shotDirectory is null)
+                {
+                    Log.CloseAndFlush();
+                    Shutdown(0);
+                }
+            };
+            timer.Start();
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[probe] 失败");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
+    /// --interaction-demo：验证本轮修的交互（拖拽排序、拖到标签改标签、点空白退出编辑）。
+    /// 直接调 ViewModel/Service 层，绕开鼠标模拟，但走的都是界面实际调用的同一批方法。
+    /// </summary>
+    private async void RunInteractionDemo()
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+            _host = BuildHost();
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+            var service = _host.Services.GetRequiredService<TodoService>();
+            var board = service.EnsureDefaultBoard();
+
+            foreach (var existing in service.GetTodos(board.Id))
+            {
+                service.Delete(existing.Id);
+            }
+
+            var a = service.AddTodo(board.Id, "A");
+            service.AddTodo(board.Id, "B");
+            service.AddTodo(board.Id, "C");
+
+            var tag = service.GetTags().FirstOrDefault() ?? service.CreateTag("重要");
+
+            // 1) 拖拽排序：把 C 拖到 A 前面
+            var before = service.GetTodos(board.Id).Select(t => t.Title).ToArray();
+            var c = service.GetTodos(board.Id).First(t => t.Title == "C");
+            service.MoveBefore(board.Id, c.Id, a.Id);
+            var afterMove = service.GetTodos(board.Id).Select(t => t.Title).ToArray();
+            Log.Information("[interaction] 排序前={Before} 排序后={After}", string.Join(",", before), string.Join(",", afterMove));
+
+            // 2) 拖到标签：把 A 打上标签
+            service.SetTodoTags(a.Id, [tag.Id]);
+            var map = service.GetTodoTagMap(board.Id);
+            var tagged = map.TryGetValue(a.Id, out var ids) && ids.Contains(tag.Id);
+            Log.Information("[interaction] A 打了标签「{Tag}」={Tagged}", tag.Name, tagged);
+
+            // 3) 拖到「全部/未分类」：清空标签
+            service.SetTodoTags(a.Id, []);
+            var cleared = !service.GetTodoTagMap(board.Id).TryGetValue(a.Id, out var left) || left.Count == 0;
+            Log.Information("[interaction] 清空标签={Cleared}", cleared);
+
+            // 4) 点空白处退出编辑态（界面层）
+            var windows = _host.Services.GetRequiredService<WindowManager>();
+            var window = (BoardWindow)windows.OpenBoard(board);
+            var editOk = await Dispatcher.InvokeAsync(async () =>
+            {
+                await Task.Delay(300);
+                window.BeginEditFirstRow();
+                var before = window.EditingRowCount();
+                await window.SimulateBlankAreaClickAsync();
+                var after = window.EditingRowCount();
+                Log.Information("[interaction] 点空白退出编辑：编辑中 {Before} -> {After}", before, after);
+                return before == 1 && after == 0;
+            }).Task.Unwrap();
+
+            var ok = afterMove.SequenceEqual(["C", "A", "B"]) && tagged && cleared && editOk;
+
+            Log.CloseAndFlush();
+            Shutdown(ok ? 0 : 2);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[interaction] 失败");
             Log.CloseAndFlush();
             Shutdown(1);
         }

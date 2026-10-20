@@ -102,6 +102,9 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
     /// <summary>提交某一行改过的标题。返回 false 表示没改成（空标题等）。</summary>
     public async Task<bool> CommitTitleAsync(TodoRowViewModel row)
     {
+        // 无论标题有没有变化，离开编辑态时都要复位标记
+        row.IsEditing = false;
+
         var newTitle = row.Title?.Trim() ?? string.Empty;
         if (string.Equals(newTitle, row.Item.Title, StringComparison.Ordinal))
         {
@@ -111,7 +114,6 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
         }
 
         row.EditError = null;
-        row.IsEditing = false;
 
         if (string.IsNullOrEmpty(newTitle))
         {
@@ -508,6 +510,8 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
             ErrorText = null;
             await Task.Run(() => _service.MoveBefore(BoardId, movingId, targetId));
             await LoadAsync();
+            Serilog.Log.Information("[drag] 拖拽完成：{Order}",
+                string.Join(",", Rows.Select(r => r.Title)));
         }
         catch (Exception ex)
         {
@@ -572,6 +576,43 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
             }
 
             await Task.Run(() => _service.SetTodoTags(row.Id, ids));
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorText = ex.Message;
+        }
+    }
+
+    /// <summary>拖到标签胶囊上：给这条待办加上该标签（已有则不重复）。</summary>
+    public async Task AddTagAsync(TodoRowViewModel row, string tagId)
+    {
+        try
+        {
+            ErrorText = null;
+            var ids = _tagMap.TryGetValue(row.Id, out var current) ? current.ToList() : [];
+            if (ids.Contains(tagId))
+            {
+                return;
+            }
+
+            ids.Add(tagId);
+            await Task.Run(() => _service.SetTodoTags(row.Id, ids));
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorText = ex.Message;
+        }
+    }
+
+    /// <summary>拖到「全部」或「未分类」上：清空这条待办的所有标签。</summary>
+    public async Task ClearTagsAsync(TodoRowViewModel row)
+    {
+        try
+        {
+            ErrorText = null;
+            await Task.Run(() => _service.SetTodoTags(row.Id, Array.Empty<string>()));
             await LoadAsync();
         }
         catch (Exception ex)

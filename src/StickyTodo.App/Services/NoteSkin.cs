@@ -16,10 +16,23 @@ public sealed record NoteSkin(
     Color Accent,
     bool IsDark)
 {
-    /// <summary>背景渐变；<paramref name="opacity"/> 只作用在背景上，文字始终不透明。</summary>
+    /// <summary>
+    /// 背景渐变。<paramref name="opacity"/> 只作用在背景上，文字始终不透明。
+    /// 100% 时返回不带 alpha 的纯色画刷——否则即使 alpha=255 也仍会被 WPF 当作半透明图层，
+    /// 叠上窗口自身的 AllowsTransparency 后看起来还是有"透"的感觉。
+    /// </summary>
     public Brush CreateBackground(double opacity)
     {
-        var alpha = (byte)Math.Round(Math.Clamp(opacity, 0.05, 1.0) * 255);
+        var clamped = Math.Clamp(opacity, 0.05, 1.0);
+
+        if (clamped >= 0.999)
+        {
+            var opaque = new LinearGradientBrush(BackgroundTop, BackgroundBottom, new Point(0, 0), new Point(0.15, 1));
+            opaque.Freeze();
+            return opaque;
+        }
+
+        var alpha = (byte)Math.Round(clamped * 255);
         var brush = new LinearGradientBrush(
             WithAlpha(BackgroundTop, alpha),
             WithAlpha(BackgroundBottom, alpha),

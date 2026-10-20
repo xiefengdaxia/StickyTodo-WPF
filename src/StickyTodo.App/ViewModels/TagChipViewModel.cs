@@ -28,6 +28,14 @@ public partial class TagChipViewModel : ObservableObject
 
     public bool IsRealTag => TagId is not null && TagId != NoTagId;
 
+    /// <summary>悬停提示：说清楚拖上去会发生什么。</summary>
+    public string ChipToolTip => TagId switch
+    {
+        null => "显示全部待办；把待办拖到这里可清空它的标签",
+        NoTagId => "只看没有标签的待办；把待办拖到这里可清空它的标签",
+        _ => $"只看「{Name}」；把待办拖到这里可打上这个标签",
+    };
+
     [ObservableProperty]
     private bool _isSelected;
 

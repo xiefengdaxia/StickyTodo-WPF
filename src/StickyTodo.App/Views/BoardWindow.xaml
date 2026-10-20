@@ -162,7 +162,11 @@
                             <DataTemplate>
                                 <Button Style="{StaticResource Chip}"
                                         Click="Chip_Click"
-                                        MouseRightButtonUp="Chip_RightButtonUp">
+                                        MouseRightButtonUp="Chip_RightButtonUp"
+                                        AllowDrop="True"
+                                        DragOver="Chip_DragOver"
+                                        Drop="Chip_Drop"
+                                        ToolTip="{Binding ChipToolTip}">
                                     <StackPanel Orientation="Horizontal">
                                         <Ellipse Width="7" Height="7"
                                                  Margin="0,0,5,0"
@@ -202,9 +206,9 @@
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              HorizontalContentAlignment="Stretch"
                              PreviewMouseLeftButtonDown="TodoList_PreviewMouseLeftButtonDown"
-                             MouseMove="TodoList_MouseMove"
                              DragOver="TodoList_DragOver"
                              Drop="TodoList_Drop"
+                             DragLeave="TodoList_DragLeave"
                              PreviewMouseRightButtonDown="TodoList_PreviewMouseRightButtonDown"
                              ContextMenuOpening="TodoList_ContextMenuOpening">
                         <ListBox.ItemContainerStyle>
@@ -215,7 +219,7 @@
                                     <Setter.Value>
                                         <ControlTemplate TargetType="ListBoxItem">
                                             <Border x:Name="Row"
-                                                    Padding="12,5"
+                                                    Padding="6,5,12,5"
                                                     Margin="6,0"
                                                     CornerRadius="7"
                                                     BorderBrush="{DynamicResource Brush.Line}"
@@ -231,6 +235,10 @@
                                                     <Setter TargetName="Row" Property="Background" Value="#2EB27F0A" />
                                                     <Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
                                                 </Trigger>
+                                                <DataTrigger Binding="{Binding IsDragTarget}" Value="True">
+                                                    <Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
+                                                    <Setter TargetName="Row" Property="BorderThickness" Value="0,2,0,0" />
+                                                </DataTrigger>
                                             </ControlTemplate.Triggers>
                                         </ControlTemplate>
                                     </Setter.Value>
@@ -243,6 +251,7 @@
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
@@ -252,16 +261,35 @@
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
 
-                                    <!-- 复选框与标题首行对齐，而不是被下面的徽标挤到中间 -->
-                                    <CheckBox Grid.Row="0"
-                                              Grid.Column="0"
-                                              Margin="0,2,8,0"
+                                    <!-- 拖动把手：按住这里拖可调整顺序 / 拖到标签胶囊上改标签 -->
+                                    <Border Grid.Row="0" Grid.Column="0"
+                                            x:Name="DragHandle"
+                                            Width="18"
+                                            Margin="0,0,0,0"
+                                            Padding="0,1,0,0"
+                                            VerticalAlignment="Top"
+                                            Background="Transparent"
+                                            Cursor="SizeAll"
+                                            ToolTip="拖动可调整顺序；拖到上方的标签上可改标签"
+                                            PreviewMouseLeftButtonDown="DragHandle_PreviewMouseLeftButtonDown"
+                                            PreviewMouseMove="DragHandle_PreviewMouseMove">
+                                        <StackPanel VerticalAlignment="Top" Margin="0,4,0,0" HorizontalAlignment="Center">
+                                            <Ellipse Width="2.5" Height="2.5" Fill="{DynamicResource Brush.InkSoft}" Opacity="0.45" />
+                                            <Ellipse Width="2.5" Height="2.5" Fill="{DynamicResource Brush.InkSoft}" Opacity="0.45" Margin="0,2" />
+                                            <Ellipse Width="2.5" Height="2.5" Fill="{DynamicResource Brush.InkSoft}" Opacity="0.45" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- 复选框：与标题首行对齐 -->
+                                    <CheckBox Grid.Row="0" Grid.Column="1"
+                                              Style="{StaticResource CheckBox.Round}"
+                                              Margin="0,1,8,0"
                                               VerticalAlignment="Top"
                                               IsChecked="{Binding IsDone, Mode=OneWay}"
                                               Command="{Binding DataContext.ToggleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                               CommandParameter="{Binding}" />
 
-                                    <StackPanel Grid.Row="0" Grid.Column="1" VerticalAlignment="Center">
+                                    <StackPanel Grid.Row="0" Grid.Column="2" VerticalAlignment="Center">
                                         <!-- 标题：行内直接编辑，回车/失焦提交 -->
                                         <TextBox Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}"
                                                  GotKeyboardFocus="RowTitle_GotFocus"
@@ -280,7 +308,7 @@
                                         </TextBox>
                                     </StackPanel>
 
-                                    <Button Grid.Row="0" Grid.Column="2"
+                                    <Button Grid.Row="0" Grid.Column="3"
                                             Content="✕"
                                             FontSize="11"
                                             VerticalAlignment="Top"
@@ -291,7 +319,7 @@
                                             CommandParameter="{Binding}" />
 
                                     <!-- 第二行：元信息徽标（与标题左边缘对齐） -->
-                                    <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
+                                    <StackPanel Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2"
                                                 Orientation="Horizontal" Margin="0,1,0,0">
                                             <Border Margin="0,0,5,0"
                                                     Padding="5,1"
@@ -348,7 +376,7 @@
                                                        Visibility="{Binding EditError, Converter={StaticResource NullToCollapsed}}" />
                                         </StackPanel>
 
-                                        <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2"
+                                        <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3"
                                                    Text="{Binding TagText}"
                                                    FontSize="10"
                                                    Margin="0,1,0,0"

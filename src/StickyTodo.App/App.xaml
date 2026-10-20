@@ -321,28 +321,32 @@
             <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="CheckBox">
                         <StackPanel Orientation="Horizontal" Background="Transparent">
                             <Border x:Name="Box"
-                                    Width="16" Height="16"
-                                    CornerRadius="5"
-                                    BorderThickness="1.5"
+                                    Width="17" Height="17"
+                                    CornerRadius="3.5"
+                                    BorderThickness="1.6"
                                     BorderBrush="{DynamicResource Brush.InkSoft}"
-                                    Background="Transparent"
-                                    VerticalAlignment="Center">
+                                    Background="#26FFFFFF"
+                                    VerticalAlignment="Center"
+                                    SnapsToDevicePixels="True">
                                 <Path x:Name="Tick"
-                                      Data="M 2,6.2 L 5.4,9.6 L 11,3.4"
+                                      Data="M 3,8 L 6.6,11.6 L 13,4.2"
                                       Stroke="White"
-                                      StrokeThickness="2"
+                                      StrokeThickness="2.2"
                                       StrokeStartLineCap="Round"
                                       StrokeEndLineCap="Round"
                                       StrokeLineJoin="Round"
-                                      Visibility="Collapsed" />
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      Visibility="Hidden" />
                             </Border>
                             <ContentPresenter x:Name="Content"
-                                              Margin="7,0,0,0"
+                                              Margin="8,0,0,0"
                                               VerticalAlignment="Center"
                                               Visibility="Collapsed" />
                         </StackPanel>
@@ -354,7 +358,15 @@
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
+                                <Setter TargetName="Box" Property="Background" Value="#4DFFFFFF" />
                             </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsMouseOver" Value="True" />
+                                    <Condition Property="IsChecked" Value="True" />
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="Box" Property="Background" Value="{DynamicResource Brush.Accent}" />
+                            </MultiTrigger>
                             <Trigger Property="Content" Value="{x:Null}">
                                 <Setter TargetName="Content" Property="Visibility" Value="Collapsed" />
                             </Trigger>

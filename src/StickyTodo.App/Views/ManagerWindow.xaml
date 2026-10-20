@@ -18,12 +18,13 @@
             CornerRadius="14"
             Background="{DynamicResource Brush.Paper}"
             BorderBrush="#59FFFFFF"
-            BorderThickness="1">
+            BorderThickness="1"
+            MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
         <Border.Effect>
             <DropShadowEffect BlurRadius="26" ShadowDepth="5" Opacity="0.34" Color="#FF000000" Direction="270" />
         </Border.Effect>
 
-        <Grid>
+        <Grid AllowDrop="False">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="210" />
                 <ColumnDefinition Width="*" />
@@ -134,8 +135,18 @@
                          Background="Transparent"
                          BorderThickness="0"
                          MouseDoubleClick="BoardList_MouseDoubleClick"
+                         PreviewMouseRightButtonDown="BoardList_PreviewMouseRightButtonDown"
+                         ContextMenuOpening="BoardList_ContextMenuOpening"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          HorizontalContentAlignment="Stretch">
+                    <ListBox.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="打开" Click="RowMenuOpen_Click" />
+                            <Separator />
+                            <MenuItem Header="重命名…" Click="RowMenuRename_Click" />
+                            <MenuItem Header="删除" Click="RowMenuDelete_Click" />
+                        </ContextMenu>
+                    </ListBox.ContextMenu>
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
                             <Setter Property="Padding" Value="0" />
