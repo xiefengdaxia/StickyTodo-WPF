@@ -1,0 +1,112 @@
+<Window x:Class="StickyTodo.App.Views.ManagerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="StickyTodo · 看板管理"
+        Height="520" Width="440"
+        MinHeight="380" MinWidth="380"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource Brush.Paper}"
+        FontFamily="Microsoft YaHei UI"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Display">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="{StaticResource Brush.PaperDeep}" Padding="18,14">
+            <Grid>
+                <StackPanel>
+                    <TextBlock Text="StickyTodo" Style="{StaticResource Text.Title}" />
+                    <TextBlock Text="本机便签 · 一个看板一个窗口"
+                               Style="{StaticResource Text.Caption}"
+                               Margin="0,3,0,0" />
+                </StackPanel>
+                <Border HorizontalAlignment="Right" VerticalAlignment="Center"
+                        Background="#26B8860B" CornerRadius="9" Padding="9,4">
+                    <TextBlock Text="{Binding EntitlementBadge}" FontSize="11" Foreground="#FF8A6508" />
+                </Border>
+            </Grid>
+        </Border>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="18,14,18,8">
+            <Button Content="新建看板" Style="{StaticResource Button.Primary}" Click="Create_Click" />
+            <Button Content="重命名" Style="{StaticResource Button.Ghost}" Margin="8,0,0,0" Click="Rename_Click" />
+            <Button Content="删除" Style="{StaticResource Button.Ghost}" Margin="8,0,0,0" Click="Delete_Click" />
+        </StackPanel>
+
+        <ListBox x:Name="BoardList"
+                 Grid.Row="2"
+                 Margin="0,4,0,0"
+                 ItemsSource="{Binding Boards}"
+                 SelectedItem="{Binding SelectedBoard, Mode=TwoWay}"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 MouseDoubleClick="BoardList_MouseDoubleClick"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 HorizontalContentAlignment="Stretch">
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="Padding" Value="0" />
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ListBoxItem">
+                                <Border x:Name="Row"
+                                        Padding="18,10"
+                                        BorderBrush="{StaticResource Brush.Line}"
+                                        BorderThickness="0,0,0,1"
+                                        Background="Transparent">
+                                    <ContentPresenter />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Row" Property="Background" Value="#14B8860B" />
+                                    </Trigger>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter TargetName="Row" Property="Background" Value="#26B8860B" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </ListBox.ItemContainerStyle>
+
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="{Binding Name}" FontSize="14" Foreground="{StaticResource Brush.Ink}" />
+                            <TextBlock Text="{Binding Summary}" Style="{StaticResource Text.Caption}" Margin="0,3,0,0" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1"
+                                   VerticalAlignment="Center"
+                                   Text="{Binding WindowHint}"
+                                   FontSize="10"
+                                   Foreground="#FF9A9484" />
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <Border Grid.Row="3" BorderBrush="{StaticResource Brush.Line}" BorderThickness="0,1,0,0" Padding="18,10">
+            <Grid>
+                <TextBlock Text="{Binding StorageHint}" Style="{StaticResource Text.Caption}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding ErrorText}"
+                           HorizontalAlignment="Right"
+                           FontSize="11"
+                           Foreground="#FFC0392B"
+                           TextTrimming="CharacterEllipsis" />
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

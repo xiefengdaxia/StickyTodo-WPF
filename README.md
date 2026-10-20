@@ -1,30 +1,32 @@
 # StickyTodo
 
-一个从零写的 Windows 桌面便签 / 待办应用：WPF + .NET 8 + SQLite，**默认人人都是永久会员，全部功能免费无限制**。
+一个从零写的 Windows 桌面便签 / 待办应用：WPF + .NET 8 + SQLite。**全程本地运行**——不联服务器、不做账号、不埋点、不检查更新；**所有用户默认就是永久会员，全部功能无限制**。
 
-> 设计参考了同类工具的产品形态（多看板、多窗口便签、重复任务、日历），但**代码、UI、文案、图标全部为原创实现**，没有复制任何第三方程序的反编译产物、资源文件或私有接口。
+> 借鉴了同类工具的产品形态（多看板、一板一窗、重复任务、日历），但**代码、UI、文案、配色全部为原创实现**，没有复制任何第三方程序的反编译产物、资源文件或私有接口。
+
+| 看板管理 | 便签窗口（含标签筛选） |
+|---|---|
+| ![看板管理](artifacts/manager.png) | ![便签窗口](artifacts/board-work.png) |
 
 ---
 
 ## 1. 快速开始
 
 ```powershell
-# 还原 + 编译
-dotnet build -c Debug
-
-# 跑单元测试（仓储 CRUD / 权益闸门 / 服务用例）
-dotnet test
-
-# 无界面自检：建库 + 种子看板 + 打印权益信息，退出码 0 表示正常
-./src/StickyTodo.App/bin/Debug/net8.0-windows/StickyTodo.exe --selftest
-
-# 启动应用（关窗口 = 收进托盘，托盘右键退出）
-./src/StickyTodo.App/bin/Debug/net8.0-windows/StickyTodo.exe
+dotnet build -c Debug                       # 编译
+dotnet test                                 # 单元测试（34 个）
 ```
 
-截图（由 `tools/capture-window.ps1` 自动抓取，输出到 `artifacts/mainwindow.png`）：
+```powershell
+$exe = ".\src\StickyTodo.App\bin\Debug\net8.0-windows\StickyTodo.exe"
 
-![主界面](artifacts/mainwindow.png)
+& $exe                                     # 正常使用
+& $exe --selftest                          # 无界面自检：建库 + 种子看板，退出码 0
+& $exe --demo                              # 种一份示例数据并打开两个便签窗口（库里没数据时才种）
+& $exe --demo --shot D:\shots              # 演示 + 把每个窗口渲染成 PNG，然后自动退出
+```
+
+`--shot` 用 `RenderTargetBitmap` 渲染窗口自身，不依赖屏幕截图，因此**不受 DPI 缩放/窗口遮挡影响**，可以直接放进 CI 做 UI 回归（产物见 `artifacts/`）。
 
 运行时文件位置：
 
@@ -32,8 +34,9 @@ dotnet test
 |---|---|
 | 数据库 | `%LOCALAPPDATA%\StickyTodo\sticky.db` |
 | 日志 | `%LOCALAPPDATA%\StickyTodo\logs\app-YYYYMMDD.log` |
+| 便携/独立数据目录 | 设置环境变量 `STICKYTODO_DATA_DIR` 即可（演示与 CI 用） |
 
-删掉整个 `%LOCALAPPDATA%\StickyTodo` 目录即可恢复出厂状态。
+删掉数据目录即恢复出厂状态。
 
 ---
 
@@ -41,46 +44,83 @@ dotnet test
 
 ```
 StickyTodo.sln
-├─ src/StickyTodo.Core             领域层（无第三方依赖，可单测）
-│   ├─ Entities/                   Board、TodoItem
+├─ src/StickyTodo.Core             领域层（零第三方依赖，可单测）
+│   ├─ Entities/                   Board / BoardWindowState / TodoItem / Tag
 │   ├─ Abstractions/               ITodoRepository
 │   ├─ Entitlements/               IEntitlementService + PermanentFree / FreeTier
-│   └─ Services/                   TodoService（用例 + 权益闸门）
+│   ├─ Geometry/                   SnapRect / WindowSnapper（吸附算法）
+│   └─ Services/                   TodoService（用例 + 权益闸门）、TodoOrdering（排序）
 ├─ src/StickyTodo.Infrastructure   基础设施（SQLite / 文件系统）
 │   ├─ Persistence/SqliteTodoRepository.cs
 │   └─ AppPaths.cs
 ├─ src/StickyTodo.App              WPF 表现层（net8.0-windows）
-│   ├─ App.xaml(.cs)               泛型 Host + DI + Serilog + 单实例
-│   ├─ MainWindow.xaml(.cs)        主面板
+│   ├─ App.xaml(.cs)               最小 Host + DI + Serilog + 单实例 + 自检/演示
+│   ├─ Views/                      ManagerWindow / BoardWindow / PromptWindow
 │   ├─ ViewModels/                 CommunityToolkit.Mvvm
-│   └─ Services/TrayService.cs     托盘图标
-├─ tests/StickyTodo.Tests          xUnit（9 个用例）
-└─ tools/capture-window.ps1        自动截当前窗口，用于 UI 回归
+│   ├─ Services/                   WindowManager / TrayService / ScreenHelper
+│   └─ Converters/
+└─ tests/StickyTodo.Tests          xUnit
 ```
 
-依赖方向：`App → Infrastructure → Core`，Core 不知道数据库与 UI 的存在。
+依赖方向：`App → Infrastructure → Core`。Core 不知道数据库、窗口和 DI 的存在。
 
 ---
 
-## 3. 数据模型
+## 3. 当前功能
+
+**看板**
+- 一个看板一个独立窗口，可同时开多个；再从托盘/管理面板打开同一个看板会激活已有窗口
+- 窗口位置与大小按看板分别记忆（重启后回到原位）；换显示器后自动夹回可见区域
+- **贴边吸附**：拖到屏幕边缘、或靠近其它便签窗口时自动对齐（阈值 10，X/Y 各自判断）
+- 管理面板：新建 / 重命名 / 删除 / 双击打开，显示每个看板的待办与完成数
+- 托盘图标：菜单里可勾选式开关任意看板窗口、打开管理面板、退出；点 X 只收进托盘
+
+**待办**
+- 回车快速添加、勾选完成（划线灰显）、悬停删除、显示/隐藏已完成
+- **拖拽排序**（用「移到某条之前」而不是下标，因此先按标签过滤再拖动也不会错位）
+- 右键菜单：切换完成状态、挂/摘标签、新建标签、删除
+
+**标签**
+- 全局标签，一条待办可挂多个；筛选胶囊 `全部 / 未分类 / 各标签`，带计数
+- 新建/重命名/删除标签；删除标签不影响待办本身
+
+**其他**
+- 单实例（`Local\StickyTodo.SingleInstance`）
+- Serilog 滚动日志 + 全局异常兜底
+- 数据库自动迁移（`PRAGMA user_version`，已实现 v1→v2）
+
+---
+
+## 4. 数据模型
 
 ```sql
-board(id, name, sort, is_default, created_at)
+board(id, name, sort, is_default, created_at,
+      win_left, win_top, win_width, win_height)          -- 窗口位置记忆
 todo(id, board_id→board.id ON DELETE CASCADE, title, note,
      is_done, done_at, due_at, sort, created_at, updated_at)
+tag(id, name UNIQUE COLLATE NOCASE, color, sort, created_at)
+todo_tag(todo_id→todo.id, tag_id→tag.id, PRIMARY KEY(todo_id, tag_id))
 ```
 
 设计要点：
 
-- **时间统一存 Unix 秒（INTEGER）**，避开 SQLite 的时区/字符串解析歧义；`DateTimeOffset` 在仓储边界转换。
-- **逻辑外键 + 级联删除**：每个连接开 `Foreign Keys=True`，删看板自动清待办。
-- **WAL 模式**（`journal_mode=WAL`、`synchronous=NORMAL`），多窗口/后台任务并发读更稳。
-- **迁移用 `PRAGMA user_version`**：`Initialize()` 幂等，版本到了就直接返回；下一个版本加 `ALTER TABLE` 即可，不需要第三方迁移框架。
-- 仓储用短连接 + 连接池，不持有长连接，避免 WPF 多线程下的竞态。
+- **时间统一存 Unix 秒（INTEGER）**，避开 SQLite 的时区/字符串解析歧义，`DateTimeOffset` 只在仓储边界转换。
+- **逻辑外键 + 级联删除**：每个连接开 `Foreign Keys=True`，删看板自动清待办，删标签自动清关联。
+- **WAL 模式**（`journal_mode=WAL`、`synchronous=NORMAL`），多窗口并发读更稳。
+- **迁移用 `PRAGMA user_version` 递增**，`Initialize()` 幂等；`SchemaMigrationTests` 用一个 v1 老库验证自动升级且数据不丢。
+- 仓储短连接 + 连接池，不持有长连接，避免多窗口/后台线程竞态。
 
 ---
 
-## 4. 会员策略（重点）
+## 5. 完全本地化（可验证，不是口号）
+
+- 没有任何 HTTP 客户端、没有账号体系、没有云同步、没有埋点、没有版本检查。
+- 宿主刻意用 `new HostBuilder()` 而不是 `Host.CreateDefaultBuilder()`：后者会去读 `appsettings.json` / 环境变量 / 命令行配置，这里配置来源全部关闭，行为只由代码决定。
+- 可执行的保证：`tests/StickyTodo.Tests/NoNetworkTests.cs` 断言 **Core 与 Infrastructure 程序集的引用列表里没有** `System.Net.Http` / `System.Net.Sockets` / `System.Net.Requests` / `System.Net.WebClient`。一旦有人加回网络依赖，测试立刻失败。
+
+---
+
+## 6. 会员策略（重点）
 
 发行版注册的是 `PermanentFreeEntitlement`：
 
@@ -89,70 +129,46 @@ todo(id, board_id→board.id ON DELETE CASCADE, title, note,
 services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 ```
 
-它的实现是「全部上限 = `int.MaxValue`、`IsPro = true`、`Tier = Lifetime`」，因此：
+`PermanentFreeEntitlement` = 所有上限 `int.MaxValue`、`IsPro = true`、`Tier = Lifetime`，所以：
 
-- 界面上的会员徽标、权益判断、额度校验**逻辑全部保留且正常工作**；
+- 界面上的会员徽标、权益判断、额度校验**逻辑全部保留且正常工作**，不是把判断删掉；
 - 用户体验上等于永久免费、无功能阉割；
-- 将来若要收费，只需换成 `FreeTierEntitlement`（已有 2 看板 / 3 标签 / 5 条重复规则 / 不含 ICS 的实现）或新增一个从服务端读档位的实现，**业务与界面代码一行不用改**。
+- 将来若要收费，只需换成 `FreeTierEntitlement`（已实现 2 看板 / 3 标签 / 5 条重复规则 / 不含 ICS），或新增一个「从本地授权文件读档位」的实现，**业务与界面代码一行不用改**。
 
-这是刻意和「在界面里写死 `if (true)`」区分开的：额度判断只允许出现在 `TodoService` 这一层，界面只负责把 `EntitlementLimitException` 显示出来。
+额度判断只允许出现在 `TodoService` 这一层，界面只负责把 `EntitlementLimitException` 显示出来。
 
 ---
 
-## 5. 已完成 / 路线图
+## 7. 已完成 / 路线图
 
-**M1（已完成）**
+**M1（已完成）**：分层骨架、DI、日志、全局异常、单实例、SQLite 建库与迁移、待办 CRUD、MVVM 主面板、托盘、权益抽象。
 
-- [x] 分层骨架 + DI + 日志 + 全局异常兜底
-- [x] 单实例 Mutex
-- [x] SQLite 建库/迁移、待办 CRUD、完成/恢复、删除
-- [x] MVVM 主面板（回车新增、勾选完成、删除、空状态、状态栏）
-- [x] 托盘图标（关闭收托盘、双击还原、退出）
-- [x] 权益抽象 + 永久会员实现 + 免费档实现
-- [x] 9 个单元测试 + `--selftest` 冒烟入口
+**M2（本次完成）**
+- [x] 多看板 + 一个看板一个窗口 + 窗口位置记忆
+- [x] 贴边吸附（屏幕边缘 + 相邻便签），纯函数 + 8 个单测
+- [x] 拖拽排序（`TodoOrdering.MoveBefore` + 6 个单测）
+- [x] 标签与筛选（含计数、右键挂标签、标签增删改）
+- [x] 托盘动态看板菜单、管理面板
+- [x] `--demo` / `--shot` 演示与 UI 回归截图
 
-**M2 核心体验**
+**M3 重复与提醒（下一步）**
+- [ ] 到期时间 `due_at` 的 UI（目前字段已入库未使用）
+- [ ] 本地提醒：到期弹窗 + 托盘气泡（不引入任何网络/推送服务）
+- [ ] 重复任务：基于 **iCalendar RRULE**（`Ical.Net`）而非自研规则，日/周/月/年/工作日/第 N 个周几
+- [ ] 重复规则按需展开成实例，不预生成无限条目
 
-- [ ] 多看板 + 每个看板一个独立窗口
-- [ ] 窗口吸附/贴边（学的是交互思路，几何算法自己写）
-- [ ] 拖拽排序、标签与过滤规则
-- [ ] 到期提醒（Toast 通知）
-
-**M3 重复任务**
-
-- [ ] 基于 **iCalendar RRULE**（`Ical.Net`）而非自研规则：日/周/月/年/工作日/第 N 个周几
-- [ ] 规则按需展开成实例（不预生成无限条目）
-- [ ] 农历/节假日可选
-
-**M4 外延能力**
-
+**M4 外延**
 - [ ] ICS 订阅与导入导出
 - [ ] Excel 导入导出（NPOI）
-- [ ] 多语言资源
-- [ ] 自动更新（Velopack / MSIX）
-- [ ] 自建同步服务（ASP.NET Core minimal API + 增量拉取 + 冲突策略），最后做
+- [ ] 多语言资源、主题切换
+- [ ] 便携模式打包（单文件 / Velopack）
 
 ---
 
-## 6. 与原程序的取舍
+## 8. 已知限制
 
-| 原实现 | 本项目 | 原因 |
-|---|---|---|
-| .NET Framework 4.6.1 + ClickOnce | .NET 8 + 自更新（规划） | 现代运行时、跨版本部署更可控 |
-| Access `.mdb` + Jet OLEDB + 明文口令 | SQLite 单文件 | 无 COM 依赖、可测试、跨机器迁移简单 |
-| 静态 `CState` 全局单例 | DI 容器 + 构造注入 | 可测、无隐式初始化顺序 |
-| `BackgroundWorker` 做同步 | `async/await` + `Task.Run` | 无回调地狱 |
-| `Set.ini` | JSON 配置（规划） | 结构化、可版本化 |
-| 会员限制散落在多个 View | 集中到 `TodoService` + `IEntitlementService` | 改策略只改一处 |
-| 单文件 170 KB 的 code-behind | ViewModel 拆分 | 可维护、可测试 |
-
-**明确没有沿用**：反编译源码、图片/图标/语言资源、`小黄条 / YYNote` 商标，以及任何第三方私有 API 与 AppSecret。
-
----
-
-## 7. 已知限制
-
-- 目前只有单看板 UI，多窗口/吸附在 M2。
-- 没有提醒与重复任务，`due_at` 已入库但未参与逻辑。
-- 没有设置界面，配色/主题是编译期资源。
-- 单元测试覆盖仓储与用例层，UI 层靠 `--selftest` + 截图脚本回归。
+- 没有标题栏自定义皮肤，用的是系统标题栏（拖拽/贴边依赖它，改动前要考虑手感）。
+- 吸附按窗口外框计算，不同 DPI 显示器之间是近似值。
+- 标签筛选是单选胶囊，多头筛选（同时选两个标签）还没做。
+- `due_at` 已入库但尚无 UI 与提醒逻辑（M3）。
+- UI 层没有自动化测试，靠 `--selftest` + `--shot` 做回归。
