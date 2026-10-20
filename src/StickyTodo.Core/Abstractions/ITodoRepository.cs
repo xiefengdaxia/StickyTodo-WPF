@@ -47,4 +47,9 @@ public interface ITodoRepository
     IReadOnlyDictionary<string, IReadOnlyList<string>> GetTodoTagMap(string boardId);
 
     void SetTodoTags(string todoId, IReadOnlyList<string> tagIds);
+
+    // ---- 设置（键值对，避免每加一个开关就改表结构）----
+    IReadOnlyDictionary<string, string> GetSettings();
+
+    void SetSetting(string key, string value);
 }

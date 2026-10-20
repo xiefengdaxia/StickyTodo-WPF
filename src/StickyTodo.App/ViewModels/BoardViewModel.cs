@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StickyTodo.App.Services;
 using StickyTodo.Core.Entities;
 using StickyTodo.Core.Services;
 
@@ -11,15 +12,21 @@ namespace StickyTodo.App.ViewModels;
 public partial class BoardViewModel : ObservableObject
 {
     private readonly TodoService _service;
+    private readonly AppSettingsService _settings;
+    private readonly SkinService _skin;
     private readonly Dictionary<string, Tag> _tagsById = new();
     private readonly Dictionary<string, List<string>> _tagMap = new();
     private List<TodoItem> _all = [];
 
-    public BoardViewModel(TodoService service, Board board)
+    public BoardViewModel(TodoService service, Board board, AppSettingsService settings, SkinService skin)
     {
         _service = service;
+        _settings = settings;
+        _skin = skin;
         Board = board;
         _boardName = board.Name;
+        _isTopmost = settings.GetBoardTopmost(board.Id);
+        _isLocked = settings.GetBoardLocked(board.Id);
     }
 
     public Board Board { get; }
@@ -46,6 +53,66 @@ public partial class BoardViewModel : ObservableObject
     /// <summary>是否显示已完成条目。</summary>
     [ObservableProperty]
     private bool _showDone = true;
+
+    /// <summary>窗口置顶（便签默认置顶）。</summary>
+    [ObservableProperty]
+    private bool _isTopmost;
+
+    /// <summary>锁定后内容区禁用，防止误改。</summary>
+    [ObservableProperty]
+    private bool _isLocked;
+
+    public string CurrentSkinKey => _skin.Current.Key;
+
+    public double CurrentOpacity => _skin.Opacity;
+
+    public IReadOnlyList<NoteSkin> Skins => NoteSkins.All;
+
+    public void ToggleTopmost()
+    {
+        IsTopmost = !IsTopmost;
+        _settings.SetBoardTopmost(BoardId, IsTopmost);
+    }
+
+    public void ToggleLock()
+    {
+        IsLocked = !IsLocked;
+        _settings.SetBoardLocked(BoardId, IsLocked);
+    }
+
+    public void SetSkin(string skinKey)
+    {
+        _skin.SetSkin(skinKey);
+        OnPropertyChanged(nameof(CurrentSkinKey));
+    }
+
+    public void SetOpacity(double opacity)
+    {
+        _skin.SetOpacity(opacity);
+        OnPropertyChanged(nameof(CurrentOpacity));
+    }
+
+    /// <summary>皮肤被别的窗口改过之后刷新一下绑定值。</summary>
+    public void RefreshAppearance()
+    {
+        OnPropertyChanged(nameof(CurrentSkinKey));
+        OnPropertyChanged(nameof(CurrentOpacity));
+    }
+
+    public async Task RenameBoardAsync(string name)
+    {
+        try
+        {
+            ErrorText = null;
+            await Task.Run(() => _service.RenameBoard(BoardId, name));
+            Board.Name = name;
+            BoardName = name;
+        }
+        catch (Exception ex)
+        {
+            ErrorText = ex.Message;
+        }
+    }
 
     public IReadOnlyList<Tag> Tags => _tagsById.Values.OrderBy(t => t.Sort).ToList();
 

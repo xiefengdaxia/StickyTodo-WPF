@@ -16,10 +16,15 @@ public sealed class WindowManager
     private readonly TodoService _todoService;
     private readonly Dictionary<string, BoardWindow> _windows = new();
 
-    public WindowManager(TodoService todoService)
+    public WindowManager(TodoService todoService, AppSettingsService settings, SkinService skinService)
     {
         _todoService = todoService;
+        _settings = settings;
+        _skinService = skinService;
     }
+
+    private readonly AppSettingsService _settings;
+    private readonly SkinService _skinService;
 
     /// <summary>打开的窗口数变化时触发（托盘菜单据此刷新）。</summary>
     public event EventHandler? BoardsChanged;
@@ -41,7 +46,7 @@ public sealed class WindowManager
             return existing;
         }
 
-        var viewModel = new BoardViewModel(_todoService, board);
+        var viewModel = new BoardViewModel(_todoService, board, _settings, _skinService);
         var window = new BoardWindow(viewModel, this);
         _windows[board.Id] = window;
         window.Closed += (_, _) =>
@@ -80,10 +85,30 @@ public sealed class WindowManager
         }
     }
 
-    /// <summary>其它可见便签窗口的矩形，供吸附计算使用。</summary>
-    public IReadOnlyList<SnapRect> GetOtherWindowRects(Window exclude) =>
+    /// <summary>其它可见便签窗口的矩形（已按阴影留白内缩），供吸附计算使用。</summary>
+    public IReadOnlyList<SnapRect> GetOtherWindowRects(Window exclude, double margin = 0) =>
         _windows.Values
             .Where(w => !ReferenceEquals(w, exclude) && w.IsVisible && w.WindowState == WindowState.Normal)
-            .Select(w => new SnapRect(w.Left, w.Top, w.ActualWidth, w.ActualHeight))
+            .Select(w => new SnapRect(
+                w.Left + margin,
+                w.Top + margin,
+                Math.Max(1, w.ActualWidth - (margin * 2)),
+                Math.Max(1, w.ActualHeight - (margin * 2))))
             .ToList();
+
+    /// <summary>皮肤或透明度变了，通知所有便签刷新菜单勾选状态。</summary>
+    public void NotifyAppearanceChanged()
+    {
+        foreach (var window in _windows.Values)
+        {
+            window.RefreshAppearance();
+        }
+    }
+
+    /// <summary>重新套用皮肤资源（改设置、切皮肤后调用）。</summary>
+    public void ApplySkin(string? skinKey = null, double? opacity = null)
+    {
+        _skinService.Apply(skinKey, opacity);
+        NotifyAppearanceChanged();
+    }
 }

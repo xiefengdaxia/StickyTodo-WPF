@@ -59,6 +59,17 @@ public partial class App : System.Windows.Application
             repository.Initialize();
             _host.Services.GetRequiredService<TodoService>().EnsureDefaultBoard();
 
+            // 命令行覆盖（演示/截图回归用）：--skin mint --opacity 0.6
+            var skinService = _host.Services.GetRequiredService<SkinService>();
+            var skinOverride = ReadOptionValue(e.Args, "--skin");
+            var opacityOverride = ReadOptionValue(e.Args, "--opacity");
+            skinService.Apply(
+                skinOverride,
+                double.TryParse(opacityOverride, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var parsedOpacity)
+                    ? parsedOpacity
+                    : null);
+
             var manager = _host.Services.GetRequiredService<ManagerWindow>();
             MainWindow = manager;
             manager.Show();
@@ -110,6 +121,8 @@ public partial class App : System.Windows.Application
 
                 services.AddSingleton<ITodoRepository>(_ => new SqliteTodoRepository(AppPaths.DatabasePath));
                 services.AddSingleton<TodoService>();
+                services.AddSingleton<AppSettingsService>();
+                services.AddSingleton<SkinService>();
                 services.AddSingleton<WindowManager>();
                 services.AddSingleton<TrayService>();
                 services.AddSingleton<ManagerViewModel>();
@@ -154,14 +167,15 @@ public partial class App : System.Windows.Application
         var first = windows.OpenBoard(defaultBoard);
         var second = windows.OpenBoard(workBoard);
 
-        // 先摆第一个窗口（会被吸到屏幕左边），再摆第二个（会吸到第一个的右边）
+        // 先摆第一个窗口（会被吸到屏幕左边），再摆第二个（会吸到第一个的右边）。
+        // 坐标故意偏几像素，用来验证吸附确实生效（窗口外圈 10px 是阴影留白，不算纸面）。
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(600) };
         timer.Tick += (_, _) =>
         {
             timer.Stop();
-            first.Left = 8;
+            first.Left = -4;
             first.Top = 140;
-            second.Left = 386;
+            second.Left = 336;
             second.Top = 140;
             Log.Information("[demo] 窗口1=({L1},{T1},{W1}x{H1}) 窗口2=({L2},{T2},{W2}x{H2})",
                 first.Left, first.Top, first.ActualWidth, first.ActualHeight,
@@ -201,6 +215,7 @@ public partial class App : System.Windows.Application
     /// <summary>
     /// 把每个可见窗口的视觉树渲染成 PNG。用 RenderTargetBitmap 而不是屏幕 BitBlt，
     /// 好处是结果与 DPI 缩放无关，也不会被其它窗口遮挡。
+    /// 便签窗口是半透明的，所以先铺一层彩色背景，一眼就能看出透明度是否生效。
     /// </summary>
     private int SaveWindowShots(string directory)
     {
@@ -221,6 +236,12 @@ public partial class App : System.Windows.Application
 
             var target = new RenderTargetBitmap(
                 width, height, 96 * scale, 96 * scale, PixelFormats.Pbgra32);
+
+            if (window is BoardWindow)
+            {
+                target.Render(CreateBackdropVisual(width, height));
+            }
+
             target.Render(window);
 
             var encoder = new PngBitmapEncoder();
@@ -241,6 +262,37 @@ public partial class App : System.Windows.Application
         }
 
         return saved;
+    }
+
+    /// <summary>截图用的假桌面背景：彩色渐变 + 几个色块，用来检查便签是否真的半透明。</summary>
+    private static DrawingVisual CreateBackdropVisual(int width, int height)
+    {
+        var visual = new DrawingVisual();
+        using var context = visual.RenderOpen();
+
+        var gradient = new LinearGradientBrush(
+            Color.FromRgb(0x1B, 0x3A, 0x6B), Color.FromRgb(0x0E, 0x8A, 0x74),
+            new Point(0, 0), new Point(1, 1));
+        context.DrawRectangle(gradient, null, new Rect(0, 0, width, height));
+
+        var pen = new Pen(new SolidColorBrush(Color.FromArgb(0x66, 0xFF, 0xFF, 0xFF)), width * 0.02);
+        for (var i = 0; i < 6; i++)
+        {
+            var size = width * 0.28;
+            context.DrawEllipse(
+                new SolidColorBrush(Color.FromArgb(0x33, 0xFF, 0xD5, 0x4F)),
+                pen,
+                new Point(width * (0.12 + (0.16 * i)), height * (0.2 + (0.11 * (i % 4)))),
+                size,
+                size);
+        }
+
+        context.DrawLine(
+            new Pen(new SolidColorBrush(Color.FromArgb(0x99, 0xFF, 0xFF, 0xFF)), width * 0.006),
+            new Point(0, height * 0.72),
+            new Point(width, height * 0.42));
+
+        return visual;
     }
 
     private static string? ReadOptionValue(string[] args, string name)

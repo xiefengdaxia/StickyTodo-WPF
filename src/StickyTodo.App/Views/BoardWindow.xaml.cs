@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 using StickyTodo.App.Services;
@@ -16,8 +17,24 @@ namespace StickyTodo.App.Views;
 /// </summary>
 public partial class BoardWindow : Window
 {
+    /// <summary>便签外圈留给阴影的空白，吸附时要把它排除掉，否则纸面离屏幕边缘差 10px。</summary>
+    private const double ShadowMargin = 10d;
+
+    /// <summary>边缘拖拽缩放的热区宽度。</summary>
+    private const double ResizeBorder = 8d;
+
     private const double SnapThreshold = 10d;
     private const int CascadeStep = 28;
+
+    private const int WmNcHitTest = 0x0084;
+    private const int HtLeft = 10;
+    private const int HtRight = 11;
+    private const int HtTop = 12;
+    private const int HtTopLeft = 13;
+    private const int HtTopRight = 14;
+    private const int HtBottom = 15;
+    private const int HtBottomLeft = 16;
+    private const int HtBottomRight = 17;
 
     private readonly BoardViewModel _viewModel;
     private readonly WindowManager _windows;
@@ -25,6 +42,7 @@ public partial class BoardWindow : Window
 
     private bool _isSnapping;
     private bool _geometryRestored;
+    private bool _isFullScreen;
 
     private Point _dragStart;
     private TodoRowViewModel? _dragCandidate;
@@ -50,6 +68,106 @@ public partial class BoardWindow : Window
             RestoreGeometry();
             await _viewModel.LoadAsync();
         };
+
+        StateChanged += (_, _) =>
+        {
+            _isFullScreen = WindowState == WindowState.Maximized;
+            if (_isFullScreen)
+            {
+                // 最大化时不保留圆角和阴影，避免纸面被拉伸得很难看
+                NoteRoot.CornerRadius = new CornerRadius(0);
+                NoteRoot.Effect = null;
+                NoteRoot.Margin = new Thickness(0);
+            }
+        };
+    }
+
+    // ---------------- 标题栏拖动 / 关闭 ----------------
+
+    private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ClickCount == 2)
+        {
+            // 双击标题：改用 Shift+双击 防止误触；这里只处理拖动
+        }
+
+        if (e.ButtonState == MouseButtonState.Pressed)
+        {
+            try
+            {
+                DragMove();
+            }
+            catch (InvalidOperationException)
+            {
+                // 鼠标已经提前抬起，忽略
+            }
+        }
+    }
+
+    private void Close_Click(object sender, RoutedEventArgs e) => Close();
+
+    private void ToggleTopmost_Click(object sender, RoutedEventArgs e) => _viewModel.ToggleTopmost();
+
+    private void ToggleLock_Click(object sender, RoutedEventArgs e) => _viewModel.ToggleLock();
+
+    // ---------------- 外观：皮肤 + 透明度 ----------------
+
+    private void Appearance_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement element)
+        {
+            return;
+        }
+
+        var menu = new ContextMenu();
+
+        var skinMenu = new MenuItem { Header = "皮肤" };
+        foreach (var skin in NoteSkins.All)
+        {
+            var item = new MenuItem
+            {
+                Header = skin.DisplayName,
+                IsCheckable = true,
+                IsChecked = string.Equals(skin.Key, _viewModel.CurrentSkinKey, StringComparison.OrdinalIgnoreCase),
+            };
+            var key = skin.Key;
+            item.Click += (_, _) =>
+            {
+                _viewModel.SetSkin(key);
+                _windows.NotifyAppearanceChanged();
+            };
+            skinMenu.Items.Add(item);
+        }
+
+        menu.Items.Add(skinMenu);
+
+        var opacityMenu = new MenuItem { Header = "背景透明度" };
+        for (var percent = 40; percent <= 100; percent += 10)
+        {
+            var value = percent / 100d;
+            var item = new MenuItem
+            {
+                Header = $"{percent}%",
+                IsCheckable = true,
+                IsChecked = Math.Abs(_viewModel.CurrentOpacity - value) < 0.02,
+            };
+            item.Click += (_, _) =>
+            {
+                _viewModel.SetOpacity(value);
+                _windows.NotifyAppearanceChanged();
+            };
+            opacityMenu.Items.Add(item);
+        }
+
+        menu.Items.Add(opacityMenu);
+
+        var hint = new MenuItem { Header = "透明度只影响背景，文字始终清晰", IsEnabled = false };
+        menu.Items.Add(new Separator());
+        menu.Items.Add(hint);
+
+        menu.PlacementTarget = element;
+        menu.IsOpen = true;
+        e.Handled = true;
     }
 
     // ---------------- 位置记忆与吸附 ----------------
@@ -80,10 +198,17 @@ public partial class BoardWindow : Window
         Top = cascadeTop;
     }
 
+    /// <summary>便签纸面（不含阴影留白）在屏幕上的矩形。</summary>
+    private SnapRect CurrentNoteRect() => new(
+        Left + ShadowMargin,
+        Top + ShadowMargin,
+        Math.Max(1, ActualWidth - (ShadowMargin * 2)),
+        Math.Max(1, ActualHeight - (ShadowMargin * 2)));
+
     protected override void OnLocationChanged(EventArgs e)
     {
         base.OnLocationChanged(e);
-        if (!_geometryRestored || _isSnapping)
+        if (!_geometryRestored || _isSnapping || _isFullScreen)
         {
             return;
         }
@@ -110,12 +235,12 @@ public partial class BoardWindow : Window
             return;
         }
 
-        var current = new SnapRect(Left, Top, ActualWidth, ActualHeight);
+        var note = CurrentNoteRect();
         var workArea = ScreenHelper.GetWorkArea(this);
-        var others = _windows.GetOtherWindowRects(this);
+        var others = _windows.GetOtherWindowRects(this, ShadowMargin);
 
-        var snapped = WindowSnapper.Snap(current, workArea, others, SnapThreshold);
-        if (Math.Abs(snapped.Left - Left) < 0.5 && Math.Abs(snapped.Top - Top) < 0.5)
+        var snapped = WindowSnapper.Snap(note, workArea, others, SnapThreshold);
+        if (Math.Abs(snapped.Left - note.Left) < 0.5 && Math.Abs(snapped.Top - note.Top) < 0.5)
         {
             return;
         }
@@ -123,8 +248,8 @@ public partial class BoardWindow : Window
         _isSnapping = true;
         try
         {
-            Left = snapped.Left;
-            Top = snapped.Top;
+            Left = snapped.Left - ShadowMargin;
+            Top = snapped.Top - ShadowMargin;
         }
         finally
         {
@@ -154,6 +279,66 @@ public partial class BoardWindow : Window
         _saveTimer.Stop();
         SaveGeometry();
         base.OnClosing(e);
+    }
+
+    // ---------------- 无边框窗口的边缘缩放 ----------------
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        if (PresentationSource.FromVisual(this) is HwndSource source)
+        {
+            source.AddHook(WndProc);
+        }
+    }
+
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg != WmNcHitTest || _isFullScreen || ResizeMode == ResizeMode.NoResize)
+        {
+            return IntPtr.Zero;
+        }
+
+        long raw = lParam.ToInt64();
+        var screenPoint = new NativePoint
+        {
+            X = (int)(short)(raw & 0xFFFF),
+            Y = (int)(short)((raw >> 16) & 0xFFFF),
+        };
+
+        if (!NativeMethods.ScreenToClient(hwnd, ref screenPoint))
+        {
+            return IntPtr.Zero;
+        }
+
+        var dpi = VisualTreeHelper.GetDpi(this);
+        var x = screenPoint.X / dpi.DpiScaleX;
+        var y = screenPoint.Y / dpi.DpiScaleY;
+        var width = ActualWidth;
+        var height = ActualHeight;
+
+        var onLeft = x <= ResizeBorder;
+        var onRight = x >= width - ResizeBorder;
+        var onTop = y <= ResizeBorder;
+        var onBottom = y >= height - ResizeBorder;
+
+        var hit = onTop && onLeft ? HtTopLeft
+            : onTop && onRight ? HtTopRight
+            : onBottom && onLeft ? HtBottomLeft
+            : onBottom && onRight ? HtBottomRight
+            : onLeft ? HtLeft
+            : onRight ? HtRight
+            : onTop ? HtTop
+            : onBottom ? HtBottom
+            : 0;
+
+        if (hit == 0)
+        {
+            return IntPtr.Zero;
+        }
+
+        handled = true;
+        return new IntPtr(hit);
     }
 
     // ---------------- 标签 ----------------
@@ -234,6 +419,12 @@ public partial class BoardWindow : Window
 
     private void TodoList_ContextMenuOpening(object sender, ContextMenuEventArgs e)
     {
+        if (_viewModel.IsLocked)
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (_contextRow is not { } row)
         {
             e.Handled = true;
@@ -356,4 +547,7 @@ public partial class BoardWindow : Window
 
         return null;
     }
+
+    /// <summary>皮肤/透明度变了之后刷新绑定（菜单勾选状态）。</summary>
+    public void RefreshAppearance() => _viewModel.RefreshAppearance();
 }

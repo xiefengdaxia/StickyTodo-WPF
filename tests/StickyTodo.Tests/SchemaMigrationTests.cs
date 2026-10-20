@@ -36,7 +36,11 @@ public sealed class SchemaMigrationTests : IDisposable
         repository.SetTodoTags(todo.Id, [tag.Id]);
         Assert.Single(repository.GetTodoTagMap(board.Id)[todo.Id]);
 
-Assert.Equal(2L, ReadSchemaVersion());
+        // v3 新增的设置表也可用
+        repository.SetSetting("appearance.skin", "graphite");
+        Assert.Equal("graphite", repository.GetSettings()["appearance.skin"]);
+
+        Assert.Equal(3L, ReadSchemaVersion());
     }
 
     private long ReadSchemaVersion()

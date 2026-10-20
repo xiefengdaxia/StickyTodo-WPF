@@ -12,7 +12,7 @@ namespace StickyTodo.Infrastructure.Persistence;
 /// </summary>
 public sealed class SqliteTodoRepository : ITodoRepository
 {
-    private const int CurrentSchemaVersion = 2;
+    private const int CurrentSchemaVersion = 3;
 
     private readonly string _connectionString;
 
@@ -51,6 +51,11 @@ public sealed class SqliteTodoRepository : ITodoRepository
         if (version < 2)
         {
             connection.Execute(SchemaV2, transaction: tx);
+        }
+
+        if (version < 3)
+        {
+            connection.Execute(SchemaV3, transaction: tx);
         }
 
         connection.Execute($"PRAGMA user_version={CurrentSchemaVersion};", transaction: tx);
@@ -116,6 +121,14 @@ public sealed class SqliteTodoRepository : ITodoRepository
         );
 
         CREATE INDEX IF NOT EXISTS ix_todo_tag_tag ON todo_tag (tag_id);
+        """;
+
+    private const string SchemaV3 = """
+        -- 通用设置表：外观、每个看板的置顶/锁定等
+        CREATE TABLE IF NOT EXISTS setting (
+            key   TEXT NOT NULL PRIMARY KEY,
+            value TEXT NOT NULL
+        );
         """;
 
     // ---------------- 看板 ----------------
@@ -394,6 +407,24 @@ public sealed class SqliteTodoRepository : ITodoRepository
         tx.Commit();
     }
 
+    // ---------------- 设置 ----------------
+
+    public IReadOnlyDictionary<string, string> GetSettings()
+    {
+        using var connection = Open();
+        return connection
+            .Query<SettingRow>("SELECT key, value FROM setting;")
+            .ToDictionary(row => row.key, row => row.value);
+    }
+
+    public void SetSetting(string key, string value)
+    {
+        using var connection = Open();
+        connection.Execute(
+            "INSERT INTO setting (key, value) VALUES (@key, @value) ON CONFLICT(key) DO UPDATE SET value = excluded.value;",
+            new { key, value });
+    }
+
     // ---------------- 映射 ----------------
 
     private static string NewId() => Guid.NewGuid().ToString("N");
@@ -484,5 +515,11 @@ public sealed class SqliteTodoRepository : ITodoRepository
     {
         public string todo_id { get; set; } = string.Empty;
         public string tag_id { get; set; } = string.Empty;
+    }
+
+    private sealed class SettingRow
+    {
+        public string key { get; set; } = string.Empty;
+        public string value { get; set; } = string.Empty;
     }
 }
