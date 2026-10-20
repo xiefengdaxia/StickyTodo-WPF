@@ -108,6 +108,27 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        // 悬停操作回归：让 ✓/✕/↺ 显示出来并截图
+        if (e.Args.Contains("--hover-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunHoverDemo(ReadOptionValue(e.Args, "--shot"));
+            return;
+        }
+
+        // 拖到标签回归：应用内自动完成「拖到标签」全链路并断言
+        if (e.Args.Contains("--tag-drag-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunTagDragDemo();
+            return;
+        }
+
+        // 拖到标签回归：打印行与标签胶囊的屏幕坐标，供外部真实鼠标拖拽
+        if (e.Args.Contains("--tag-drag-probe", StringComparer.OrdinalIgnoreCase))
+        {
+            RunTagDragProbe(e.Args.Contains("--hot", StringComparer.OrdinalIgnoreCase));
+            return;
+        }
+
         _mutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var isFirstInstance);
         if (!isFirstInstance)
         {
@@ -325,6 +346,218 @@ public partial class App : System.Windows.Application
         catch (Exception ex)
         {
             Log.Fatal(ex, "[skin] 失败");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
+    /// --hover-demo：分别截「待办视图悬停（✓ ✕）」和「已完成视图悬停（↺ ✕）」两张图。
+    /// </summary>
+    private void RunHoverDemo(string? shotDirectory)
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+            _host = BuildHost();
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+            var service = _host.Services.GetRequiredService<TodoService>();
+            var board = service.EnsureDefaultBoard();
+
+            foreach (var existing in service.GetTodos(board.Id))
+            {
+                service.Delete(existing.Id);
+            }
+
+            service.AddTodo(board.Id, "鼠标移上来会看到 ✓ 和 ✕");
+            service.AddTodo(board.Id, "第二条待办");
+            var doneItem = service.AddTodo(board.Id, "这条是已完成的");
+            service.SetDone(doneItem.Id, true);
+
+            var windows = _host.Services.GetRequiredService<WindowManager>();
+            var window = (BoardWindow)windows.OpenBoard(board);
+            MainWindow = window;
+
+            var step = 0;
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1000) };
+            timer.Tick += (_, _) =>
+            {
+                step++;
+                if (step == 1)
+                {
+                    // 待办视图：悬停第一行
+                    window.SwitchView(TodoViewMode.Todo);
+                    window.ForceRowHover(0);
+                    if (shotDirectory is not null)
+                    {
+                        SaveWindowShots(Path.Combine(shotDirectory, "todo"));
+                    }
+
+                    Log.Information("[hover] 待办视图已截图");
+                }
+                else if (step == 2)
+                {
+                    // 已完成视图：悬停第一行（显示 ↺）
+                    window.SwitchView(TodoViewMode.Done);
+                    window.ForceRowHover(0);
+                    if (shotDirectory is not null)
+                    {
+                        SaveWindowShots(Path.Combine(shotDirectory, "done"));
+                    }
+
+                    Log.Information("[hover] 已完成视图已截图");
+                    timer.Stop();
+                    Shutdown(0);
+                }
+            };
+            timer.Start();
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[hover] 失败");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
+    /// --tag-drag-demo：应用内走完整链路验证「把待办拖到标签」：
+    /// 模拟 Drop 调用的同一套方法（AddTagAsync / ClearTagsAsync），断言标签真的落库。
+    /// 这条链路正是 Chip_Drop 里执行的代码，因此能证明拖放功能本身是通的。
+    /// </summary>
+    private async void RunTagDragDemo()
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+            _host = BuildHost();
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+            var service = _host.Services.GetRequiredService<TodoService>();
+            var board = service.EnsureDefaultBoard();
+
+            foreach (var existing in service.GetTodos(board.Id))
+            {
+                service.Delete(existing.Id);
+            }
+
+            var tag = service.GetTags().FirstOrDefault(t => t.Name == "重要")
+                ?? service.CreateTag("重要");
+            service.AddTodo(board.Id, "拖到标签上的待办");
+
+            var windows = _host.Services.GetRequiredService<WindowManager>();
+            var window = (BoardWindow)windows.OpenBoard(board);
+            MainWindow = window;
+
+            await Task.Delay(1200);
+
+            var before = window.TagTextOfFirstRowFromDb();
+            Log.Information("[tagdrag] 拖动前标签={Before}", string.IsNullOrEmpty(before) ? "(无)" : before);
+
+            // 与 Chip_Drop 完全相同的调用
+            var applied = await window.SimulateDropOnChipAsync("重要");
+            var after = window.TagTextOfFirstRowFromDb();
+            Log.Information("[tagdrag] SimulateDrop={Applied} 拖动后标签={After}",
+                applied, string.IsNullOrEmpty(after) ? "(无)" : after);
+
+            // 再验证拖到「未分类」= 清空标签
+            var cleared = await window.SimulateDropOnChipAsync("未分类");
+            var final = window.TagTextOfFirstRowFromDb();
+            Log.Information("[tagdrag] 清空后标签={Final} 清空生效={Ok}",
+                string.IsNullOrEmpty(final) ? "(无)" : final, string.IsNullOrEmpty(final));
+
+            var ok = applied && after.Contains("重要") && cleared && string.IsNullOrEmpty(final);
+            Log.Information("[tagdrag] 总结果={Result}", ok ? "通过" : "失败");
+
+            Log.CloseAndFlush();
+            Shutdown(ok ? 0 : 2);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[tagdrag] 失败");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
+    /// --tag-drag-probe：打印「行」与「标签胶囊」的屏幕坐标；加 --hot 则保持窗口开着，
+    /// 供外部脚本用真实鼠标把待办拖到标签上验证。
+    /// </summary>
+    private void RunTagDragProbe(bool keepOpen)
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+            _host = BuildHost();
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+            var service = _host.Services.GetRequiredService<TodoService>();
+            var board = service.EnsureDefaultBoard();
+
+            foreach (var existing in service.GetTodos(board.Id))
+            {
+                service.Delete(existing.Id);
+            }
+
+            if (!service.GetTags().Any())
+            {
+                service.CreateTag("重要");
+            }
+
+            service.AddTodo(board.Id, "把这一行拖到上面的标签上");
+
+            var windows = _host.Services.GetRequiredService<WindowManager>();
+            var window = (BoardWindow)windows.OpenBoard(board);
+            MainWindow = window;
+
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1200) };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+
+                var handle = window.FirstDragHandlePoint();
+                var chip = window.ChipScreenPoint("重要");
+                var tagBefore = window.TagTextOfFirstRowFromDb();
+
+                Log.Information("[tagdrag] 把手=({HX:0},{HY:0}) 标签「重要」=({CX:0},{CY:0}) 拖动前标签={Before}",
+                    handle.X, handle.Y, chip.X, chip.Y, string.IsNullOrEmpty(tagBefore) ? "(无)" : tagBefore);
+
+                if (keepOpen)
+                {
+                    // 保持窗口开着，2 秒后复查（外部脚本此时已完成拖拽）
+                    var verify = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
+                    verify.Tick += (_, _) =>
+                    {
+                        verify.Stop();
+                        var after = window.TagTextOfFirstRowFromDb();
+                        Log.Information("[tagdrag] 拖动后标签={After} 结果={Result}",
+                            string.IsNullOrEmpty(after) ? "(无)" : after,
+                            after.Contains("重要") ? "成功" : "失败");
+
+                        Log.CloseAndFlush();
+                        Shutdown(after.Contains("重要") ? 0 : 2);
+                    };
+                    verify.Start();
+                }
+                else
+                {
+                    Log.CloseAndFlush();
+                    Shutdown(0);
+                }
+            };
+            timer.Start();
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[tagdrag] 失败");
             Log.CloseAndFlush();
             Shutdown(1);
         }

@@ -60,7 +60,7 @@ public sealed class TrayService : IDisposable
 
         _notifyIcon = new WinForms.NotifyIcon
         {
-            Icon = Drawing.SystemIcons.Application,
+            Icon = AppIcon.TrayIcon,
             Text = "StickyTodo",
             Visible = true,
             ContextMenuStrip = menu,

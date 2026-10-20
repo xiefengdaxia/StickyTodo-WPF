@@ -8,9 +8,17 @@
 |---|---|---|
 | ![便签](artifacts/board-default.png) | ![半透明](artifacts/board-translucent.png) | ![暗色](artifacts/board-dark.png) |
 
+![应用图标](artifacts/icon.png)
+
 | 主窗体（无边框 + 侧栏） | 独立设置页 | 主窗体卡片右键菜单 |
 |---|---|---|
 | ![主窗体](artifacts/manager.png) | ![设置](artifacts/settings.png) | ![看板菜单](artifacts/manager-menu.png) |
+
+悬停操作（鼠标移入本行才出现按钮）：
+
+| 待办行：✓ 标记完成 + ✕ 删除 | 已完成行：↺ 撤回 + ✕ 删除 |
+|---|---|
+| ![悬停待办](artifacts/hover-todo.png) | ![悬停已完成](artifacts/hover-done.png) |
 
 | 待办右键菜单 | 子菜单（含勾选） | 外观菜单 | 深色皮肤下的菜单 |
 |---|---|---|---|
@@ -56,6 +64,8 @@ $exe = ".\src\StickyTodo.App\bin\Debug\net8.0-windows\StickyTodo.exe"
 & $exe --inline-edit-demo                   # 行内编辑端到端验证（改标题/空标题拦截/草稿行新增），退出码 0 = 通过
 & $exe --inline-edit-demo --shot D:\shots   # 同上，并截一张「第一行处于编辑态」的图
 & $exe --interaction-demo                   # 拖拽排序 / 拖到标签 / 清空标签 / 点空白退出编辑，退出码 0 = 通过
+& $exe --tag-drag-demo                      # 拖到标签全链路（打标签 → 清空标签），退出码 0 = 通过
+& $exe --hover-demo --shot D:\shots         # 截「悬停显示 ✓ ✕」与「已完成悬停显示 ↺」
 & $exe --manager-menu-demo --shot D:\shots  # 主窗体卡片右键菜单（验证含「重命名」「删除」）
 & $exe --ui-probe                           # 打印拖动把手与行的屏幕坐标（配合 tools/drag-test.ps1 做真实鼠标拖拽）
 & $exe --skin graphite --opacity 0.6 --window-opacity 0.9   # 启动时覆盖外观（也用于截图回归）
@@ -79,8 +89,7 @@ $exe = ".\src\StickyTodo.App\bin\Debug\net8.0-windows\StickyTodo.exe"
 
 ```
 StickyTodo.sln
-├─ src/StickyTodo.Core             领域层（仅依赖 Ical.Net，无 UI/DB 依赖）
-│   ├─ Entities/                   Board / BoardWindowState / TodoItem / TodoCompletion / Tag / Note
+├─ src/StickyTodo.Core             领域层（仅依赖 Ical.Net，无 UI/DB 依赖）│   ├─ Entities/                   Board / BoardWindowState / TodoItem / TodoCompletion / Tag / Note
 │   ├─ Abstractions/               ITodoRepository
 │   ├─ Entitlements/               IEntitlementService + PermanentFree / FreeTier
 │   ├─ Geometry/                   SnapRect / WindowSnapper（吸附算法）
@@ -97,6 +106,12 @@ StickyTodo.sln
 │   ├─ Services/                   WindowManager / TrayService / ScreenHelper
 │   └─ Converters/
 └─ tests/StickyTodo.Tests          xUnit
+```
+
+图标生成器在 `tools/IconGen`（WPF 矢量绘制 → 多尺寸 ICO）：
+
+```powershell
+dotnet run --project tools/IconGen -c Release -- src/StickyTodo.App/Assets/stickytodo.ico
 ```
 
 依赖方向：`App → Infrastructure → Core`。Core 不知道数据库、窗口和 DI 的存在。
@@ -139,13 +154,13 @@ StickyTodo.sln
 - 数据来自**所有看板**的待办，重复待办会按规则展开成多次显示
 
 **待办（表格行内编辑）**
-- **没有「添加」按钮**：列表末尾常驻一行草稿行「＋ 在这里写一条，回车即添加」，输入后回车即可连续录入
+- **没有「添加」按钮、没有勾选框**：列表末尾常驻一行草稿行「＋ 在这里写一条，回车即添加」
+- **鼠标移入某行才显示操作按钮**：待办行是 `✓`（标记完成）和 `✕`（删除）；已完成行是 `↺`（撤回为待办）和 `✕`
 - **每一行都能直接改**：点标题即可编辑，回车提交并跳到下一行，Tab/点别处也会自动提交，Esc 撤销
   - 空标题会被拦下、恢复原值并在行内提示「内容不能为空」
   - 聚焦时该行高亮 + 输入框琥珀描边，不会误改别的行
-- 勾选完成（划线灰显）、悬停删除
 - **拖动把手**（每行左侧三点）：上下拖 = 调整顺序；拖到上方标签胶囊 = 打上该标签；拖到「全部 / 未分类」= 清空标签
-- **点空白处自动退出编辑**：点窗口里任何非输入区，正在编辑的行会提交并失焦；Esc 则撤销本次修改
+- **点空白处自动退出编辑**：点窗口里任何非输入区，正在编辑的行会提交并失焦
 - **TODO / Done 视图切换**：底部分段按钮（`待办 N` / `已完成 N`）一键切换
   - 待办视图只看未完成，沿用你手动拖拽的顺序
   - Done 视图只看已完成，**按完成时间倒序**（最近完成的在最上面），每行显示完成时间标签（今天 14:41 / 昨天 09:05 / 10月18日 20:11 / 2025年12月30日 08:00）
@@ -252,6 +267,10 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 - [x] **主窗体全窗可拖** + 卡片右键（打开/重命名/删除）
 - [x] **待办行拖动把手** + 拖到标签胶囊改标签
 - [x] **点空白退出编辑态**
+- [x] **行内操作按钮替代勾选框**：悬停显示 ✓（完成）/ ✕（删除），已完成行显示 ↺（撤回）
+- [x] **标题栏瘦身**：去掉计数行，只留看板名与窗口按钮
+- [x] **拖到标签修复**：`DragOver` 返回的 effect 与拖源头不一致导致 Drop 被取消
+- [x] **应用图标**：便签纸 + 折角 + 对勾，9 个尺寸（16–256）多尺寸 ICO，窗口与托盘共用
 - [x] 置顶 / 锁定（按看板记忆，存 `setting` 表）
 - [x] 截图回归带假桌面背景，一眼验证透明度
 

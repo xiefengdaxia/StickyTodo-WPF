@@ -274,6 +274,58 @@
             </Setter>
         </Style>
 
+        <!-- 行内悬停操作按钮：圆形，平时半透明 -->
+        <Style x:Key="Button.RowAction" TargetType="Button">
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="22" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root" CornerRadius="11" Background="{TemplateBinding Background}">
+                            <Viewbox Margin="4">
+                                <ContentPresenter />
+                            </Viewbox>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="#33B27F0A" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="#59B27F0A" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 关闭/删除用小圆钮：悬停变红 -->
+        <Style x:Key="Button.RowDelete" TargetType="Button" BasedOn="{StaticResource Button.RowAction}">
+            <Setter Property="Foreground" Value="{DynamicResource Brush.InkSoft}" />
+            <Setter Property="Content" Value="✕" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root" CornerRadius="11" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="#26C0392B" />
+                                <Setter Property="Foreground" Value="#FFC0392B" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- 表格行内编辑框：无边框无背景，聚焦时才显出输入区 -->
         <Style x:Key="TextBox.Inline" TargetType="TextBox">
             <Setter Property="Background" Value="Transparent" />

@@ -11,10 +11,17 @@
     <AssemblyName>StickyTodo</AssemblyName>
     <RootNamespace>StickyTodo.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- 应用图标（多尺寸 ICO，由 tools/IconGen 生成） -->
+    <ApplicationIcon>Assets\stickytodo.ico</ApplicationIcon>
     <!-- WFAC010：该分析器假设 UI 是 WinForms；本项目 UI 是 WPF，
          PerMonitorV2 必须写在 manifest 里才生效，因此保留并抑制此告警 -->
     <NoWarn>$(NoWarn);WFAC010</NoWarn>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Assets\stickytodo.ico" />
+    <Resource Include="Assets\stickytodo.ico" />
+  </ItemGroup>
 
   <!-- WinForms 的隐式 using 会和 WPF 的 Application/MessageBox 冲突，这里去掉 -->
   <ItemGroup>

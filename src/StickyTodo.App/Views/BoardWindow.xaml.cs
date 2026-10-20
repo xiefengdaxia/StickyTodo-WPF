@@ -163,6 +163,32 @@ public partial class BoardWindow : Window, IStickyWindow
         RefreshViewTabs();
     }
 
+    // ---------------- 行悬停操作：✓ / ✕ / ↺ ----------------
+
+    private async void RowDone_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: TodoRowViewModel row })
+        {
+            await _viewModel.MarkDoneAsync(row);
+        }
+    }
+
+    private async void RowUndone_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: TodoRowViewModel row })
+        {
+            await _viewModel.MarkUndoneAsync(row);
+        }
+    }
+
+    private async void RowDelete_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: TodoRowViewModel row })
+        {
+            await _viewModel.DeleteRowAsync(row);
+        }
+    }
+
     // ---------------- 表格行内编辑 ----------------
 
     /// <summary>行标题获得焦点：进入编辑态，全选便于整体替换。</summary>
@@ -466,6 +492,114 @@ public partial class BoardWindow : Window, IStickyWindow
         }
     }
 
+    /// <summary>给回归脚本读：某个标签胶囊的屏幕中心（用于真实鼠标拖到标签的验证）。</summary>
+    public (double X, double Y) ChipScreenPoint(string chipName)
+    {
+        UpdateLayout();
+        var root = FindChipsRoot();
+        if (root is null)
+        {
+            return (double.NaN, double.NaN);
+        }
+
+        foreach (var button in FindAllDescendants<Button>(root))
+        {
+            if (button.DataContext is TagChipViewModel chip && chip.Name == chipName)
+            {
+                var origin = button.PointToScreen(new Point(button.ActualWidth / 2, button.ActualHeight / 2));
+                var dpi = VisualTreeHelper.GetDpi(this);
+                return (origin.X / dpi.DpiScaleX, origin.Y / dpi.DpiScaleY);
+            }
+        }
+
+        return (double.NaN, double.NaN);
+    }
+
+    private DependencyObject? FindChipsRoot() => FindDescendant<ItemsControl>(this, "ChipList");
+
+    /// <summary>
+    /// 给回归脚本用：模拟「把第一行拖到名为 chipName 的胶囊上」。
+    /// 内部执行的就是 Chip_Drop 里的那段逻辑（打标签 / 清空标签），返回是否执行成功。
+    /// </summary>
+    public async Task<bool> SimulateDropOnChipAsync(string chipName)
+    {
+        var row = _viewModel.Rows.FirstOrDefault();
+        var chip = _viewModel.Chips.FirstOrDefault(c => c.Name == chipName);
+        if (row is null || chip is null)
+        {
+            Serilog.Log.Warning("[tagdrag] 找不到行或胶囊：row={Row} chip={Chip}", row is not null, chip is not null);
+            return false;
+        }
+
+        if (chip.IsAll || chip.IsNoTag)
+        {
+            await _viewModel.ClearTagsAsync(row);
+            return true;
+        }
+
+        if (chip.TagId is { } tagId)
+        {
+            await _viewModel.AddTagAsync(row, tagId);
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>给回归脚本读：某条待办当前挂了哪些标签（用来断言拖动结果）。</summary>
+    public string TagTextOfRow(int index) =>
+        index >= 0 && index < _viewModel.Rows.Count ? _viewModel.Rows[index].TagText : string.Empty;
+
+    /// <summary>给回归脚本读：直接从数据库读第一条待办的标签（绕开内存缓存，验证真的落库了）。</summary>
+    public string TagTextOfFirstRowFromDb() =>
+        _viewModel.TagTextOfRowFromDb(0);
+
+    /// <summary>给回归脚本用：模拟鼠标悬停在第 N 行（让 ✓ / ✕ / ↺ 显示出来）。</summary>
+    public void ForceRowHover(int index)
+    {
+        TodoList.UpdateLayout();
+        if (index < 0 || index >= _viewModel.Rows.Count)
+        {
+            return;
+        }
+
+        if (TodoList.ItemContainerGenerator.ContainerFromItem(_viewModel.Rows[index]) is ListBoxItem container)
+        {
+            // IsMouseOver 是只读依赖属性，用一个附加的触发器无法伪造；
+            // 这里直接把悬停按钮组的 Opacity 设为 1，等价于视觉结果
+            foreach (var panel in FindAllDescendants<StackPanel>(container))
+            {
+                if (panel.Children.Count > 0 && panel.Children[0] is Button)
+                {
+                    panel.Opacity = 1;
+                }
+            }
+        }
+    }
+
+    private static IEnumerable<T> FindAllDescendants<T>(DependencyObject? current) where T : DependencyObject
+    {
+        if (current is null)
+        {
+            yield break;
+        }
+
+        var count = VisualTreeHelper.GetChildrenCount(current);
+        for (var i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(current, i);
+            if (child is T match)
+            {
+                yield return match;
+            }
+
+            foreach (var nested in FindAllDescendants<T>(child))
+            {
+                yield return nested;
+            }
+        }
+    }
+
     /// <summary>给回归脚本读：第 N 行的屏幕中心（用于真实鼠标拖拽验证）。</summary>
     public (double X, double Y) RowScreenPoint(int index)
     {
@@ -747,21 +881,56 @@ public partial class BoardWindow : Window, IStickyWindow
     }
 
     /// <summary>把待办拖到标签胶囊上：拖过时高亮，松手即改标签。</summary>
+    /// <summary>拖动经过胶囊时给它一个明显的视觉反馈。</summary>
+    private void Chip_DragEnter(object sender, DragEventArgs e)
+    {
+        if (sender is Button element && e.Data.GetDataPresent(typeof(TodoRowViewModel)))
+        {
+            element.Opacity = 1.0;
+            element.ScaleTransformForDrag(1.08);
+            Serilog.Log.Debug("[tag] DragEnter：胶囊接受拖动");
+        }
+    }
+
+    private void Chip_DragLeave(object sender, DragEventArgs e)
+    {
+        if (sender is Button element)
+        {
+            element.Opacity = 1.0;
+            element.ScaleTransformForDrag(1.0);
+        }
+    }
+
+    /// <summary>
+    /// 把待办拖到标签胶囊上：拖过时高亮，松手即改标签。
+    /// 注意 effects 必须和拖源头一致（都是 Move），否则交集为空、Drop 根本不会触发。
+    /// </summary>
     private void Chip_DragOver(object sender, DragEventArgs e)
     {
-        if (sender is not Button { DataContext: TagChipViewModel chip })
+        if (sender is not Button element)
         {
             return;
         }
 
-        var canDrop = chip.IsRealTag && e.Data.GetDataPresent(typeof(TodoRowViewModel));
-        e.Effects = canDrop ? DragDropEffects.Copy : DragDropEffects.None;
+        var hasRow = e.Data.GetDataPresent(typeof(TodoRowViewModel));
+        e.Effects = hasRow ? DragDropEffects.Move : DragDropEffects.None;
+        Serilog.Log.Debug("[tag] DragOver：hasRow={Has} effects={Effects}", hasRow, e.Effects);
         e.Handled = true;
     }
 
     private async void Chip_Drop(object sender, DragEventArgs e)
     {
-        if (sender is not Button { DataContext: TagChipViewModel chip })
+        Serilog.Log.Information("[tag] Drop 被触发");
+
+        if (sender is not Button element)
+        {
+            return;
+        }
+
+        element.ScaleTransformForDrag(1.0);
+        element.Opacity = 1.0;
+
+        if (element.DataContext is not TagChipViewModel chip)
         {
             return;
         }
@@ -773,13 +942,8 @@ public partial class BoardWindow : Window, IStickyWindow
 
         e.Handled = true;
 
-        if (chip.IsAll)
-        {
-            await _viewModel.ClearTagsAsync(row);
-            return;
-        }
-
-        if (chip.IsNoTag)
+        // "全部" / "未分类"：清空这条待办的标签
+        if (chip.IsAll || chip.IsNoTag)
         {
             await _viewModel.ClearTagsAsync(row);
             return;

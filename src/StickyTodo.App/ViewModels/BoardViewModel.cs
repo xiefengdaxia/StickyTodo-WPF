@@ -448,6 +448,85 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
         await Task.CompletedTask;
     }
 
+    /// <summary>✓ 标记完成。重复待办走「滚到下一次」，普通待办直接置为已完成。</summary>
+    public async Task MarkDoneAsync(TodoRowViewModel row)
+    {
+        try
+        {
+            ErrorText = null;
+            var isRecurring = !string.IsNullOrWhiteSpace(row.Item.Recurrence);
+
+            await Task.Run(() =>
+            {
+                if (isRecurring)
+                {
+                    _service.CompleteOccurrence(row.Id);
+                }
+                else
+                {
+                    _service.SetDone(row.Id, true);
+                }
+            });
+
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorText = ex.Message;
+        }
+    }
+
+    /// <summary>↺ 撤回为待办。</summary>
+    public async Task MarkUndoneAsync(TodoRowViewModel row)
+    {
+        try
+        {
+            ErrorText = null;
+            await Task.Run(() => _service.SetDone(row.Id, false));
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorText = ex.Message;
+        }
+    }
+
+    /// <summary>✕ 删除（行悬停按钮用）。</summary>
+    public async Task DeleteRowAsync(TodoRowViewModel row)
+    {
+        try
+        {
+            ErrorText = null;
+            await Task.Run(() => _service.Delete(row.Id));
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorText = ex.Message;
+        }
+    }
+
+    /// <summary>给回归脚本读：指定行的标签（从数据库重新读，不经内存缓存）。</summary>
+    public string TagTextOfRowFromDb(int index)
+    {
+        if (index < 0 || index >= Rows.Count)
+        {
+            return string.Empty;
+        }
+
+        var todoId = Rows[index].Id;
+        var map = _service.GetTodoTagMap(BoardId);
+        if (!map.TryGetValue(todoId, out var ids) || ids.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var tags = _service.GetTags();
+        return string.Join("、", ids
+            .Select(id => tags.FirstOrDefault(t => t.Id == id)?.Name)
+            .Where(n => n is not null));
+    }
+
     [RelayCommand]
     public async Task ToggleAsync(TodoRowViewModel? row)
     {
@@ -591,17 +670,23 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
         {
             ErrorText = null;
             var ids = _tagMap.TryGetValue(row.Id, out var current) ? current.ToList() : [];
+            Serilog.Log.Debug("[tag] AddTagAsync 开始 todo={Todo} 现有标签={Ids} 目标={Tag}",
+                row.Title, string.Join(",", ids), tagId);
+
             if (ids.Contains(tagId))
             {
+                Serilog.Log.Debug("[tag] 已有该标签，跳过");
                 return;
             }
 
             ids.Add(tagId);
             await Task.Run(() => _service.SetTodoTags(row.Id, ids));
             await LoadAsync();
+            Serilog.Log.Debug("[tag] 写入完成");
         }
         catch (Exception ex)
         {
+            Serilog.Log.Error(ex, "[tag] AddTagAsync 失败");
             ErrorText = ex.Message;
         }
     }

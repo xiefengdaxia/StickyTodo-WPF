@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="{Binding BoardName}"
+        Icon="/Assets/stickytodo.ico"
         Width="360" Height="480"
         MinWidth="260" MinHeight="200"
         WindowStyle="None"
@@ -40,7 +41,7 @@
                     x:Name="TitleBar"
                     Background="{DynamicResource Brush.PaperDeep}"
                     CornerRadius="11,11,0,0"
-                    Padding="12,8"
+                    Padding="12,6"
                     MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -48,20 +49,16 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="{Binding BoardName}"
-                                       Style="{StaticResource Text.Title}"
-                                       TextTrimming="CharacterEllipsis" />
-                            <TextBlock Text=" 🔒"
-                                       FontSize="11"
-                                       VerticalAlignment="Center"
-                                       ToolTip="看板已锁定，点右上角解锁"
-                                       Visibility="{Binding IsLocked, Converter={StaticResource BoolToVis}}" />
-                        </StackPanel>
-                        <TextBlock Text="{Binding StatusText}"
-                                   Style="{StaticResource Text.Caption}"
-                                   Margin="0,2,0,0" />
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Orientation="Horizontal">
+                        <TextBlock Text="{Binding BoardName}"
+                                   Style="{StaticResource Text.Title}"
+                                   TextTrimming="CharacterEllipsis"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Text=" 🔒"
+                                   FontSize="11"
+                                   VerticalAlignment="Center"
+                                   ToolTip="看板已锁定，点右上角解锁"
+                                   Visibility="{Binding IsLocked, Converter={StaticResource BoolToVis}}" />
                     </StackPanel>
 
                     <!-- 平时淡显，鼠标移入窗口才完全显示 -->
@@ -152,7 +149,7 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <ItemsControl Grid.Column="0" ItemsSource="{Binding Chips}">
+                    <ItemsControl x:Name="ChipList" Grid.Column="0" ItemsSource="{Binding Chips}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <WrapPanel />
@@ -164,6 +161,8 @@
                                         Click="Chip_Click"
                                         MouseRightButtonUp="Chip_RightButtonUp"
                                         AllowDrop="True"
+                                        DragEnter="Chip_DragEnter"
+                                        DragLeave="Chip_DragLeave"
                                         DragOver="Chip_DragOver"
                                         Drop="Chip_Drop"
                                         ToolTip="{Binding ChipToolTip}">
@@ -280,14 +279,54 @@
                                         </StackPanel>
                                     </Border>
 
-                                    <!-- 复选框：与标题首行对齐 -->
-                                    <CheckBox Grid.Row="0" Grid.Column="1"
-                                              Style="{StaticResource CheckBox.Round}"
-                                              Margin="0,1,8,0"
-                                              VerticalAlignment="Top"
-                                              IsChecked="{Binding IsDone, Mode=OneWay}"
-                                              Command="{Binding DataContext.ToggleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                              CommandParameter="{Binding}" />
+                                    <!-- 悬停操作区：平时不可见，鼠标移入本行才出现。
+                                         待办：✓ 标记已办 + ✕ 删除；已完成：↺ 撤回为待办 -->
+                                    <StackPanel Grid.Row="0" Grid.Column="1"
+                                                Orientation="Horizontal"
+                                                Margin="0,0,6,0"
+                                                VerticalAlignment="Top">
+                                        <StackPanel.Style>
+                                            <Style TargetType="StackPanel">
+                                                <Setter Property="Opacity" Value="0" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                                                        <Setter Property="Opacity" Value="1" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </StackPanel.Style>
+
+                                        <!-- 未完成：✓ 标记为已办 -->
+                                        <Button Style="{StaticResource Button.RowAction}"
+                                                ToolTip="标记为已完成"
+                                                Click="RowDone_Click"
+                                                Visibility="{Binding IsDone, Converter={StaticResource InverseBoolToVis}}">
+                                            <Path Data="M 0.5,5.5 L 4.2,9.2 L 10.5,2"
+                                                  Stroke="{DynamicResource Brush.Accent}"
+                                                  StrokeThickness="1.9"
+                                                  StrokeStartLineCap="Round"
+                                                  StrokeEndLineCap="Round"
+                                                  StrokeLineJoin="Round" />
+                                        </Button>
+
+                                        <!-- 已完成：↺ 撤回为待办 -->
+                                        <Button Style="{StaticResource Button.RowAction}"
+                                                ToolTip="撤回为待办"
+                                                Click="RowUndone_Click"
+                                                Visibility="{Binding IsDone, Converter={StaticResource BoolToVis}}">
+                                            <Path Data="M 2.5,2 L 2.5,6 L 6.5,6 M 2.9,5.9 A 4.2,4.2 0 1 0 5.4,1"
+                                                  Stroke="{DynamicResource Brush.Accent}"
+                                                  StrokeThickness="1.7"
+                                                  StrokeStartLineCap="Round"
+                                                  StrokeEndLineCap="Round"
+                                                  StrokeLineJoin="Round" />
+                                        </Button>
+
+                                        <!-- 两个视图都有：✕ 删除 -->
+                                        <Button Style="{StaticResource Button.RowDelete}"
+                                                ToolTip="删除这条待办"
+                                                Click="RowDelete_Click" />
+                                    </StackPanel>
 
                                     <StackPanel Grid.Row="0" Grid.Column="2" VerticalAlignment="Center">
                                         <!-- 标题：行内直接编辑，回车/失焦提交 -->
@@ -307,16 +346,6 @@
                                             </TextBox.Style>
                                         </TextBox>
                                     </StackPanel>
-
-                                    <Button Grid.Row="0" Grid.Column="3"
-                                            Content="✕"
-                                            FontSize="11"
-                                            VerticalAlignment="Top"
-                                            Margin="6,1,0,0"
-                                            Style="{StaticResource Button.Link}"
-                                            ToolTip="删除（右键可挂标签）"
-                                            Command="{Binding DataContext.DeleteCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                            CommandParameter="{Binding}" />
 
                                     <!-- 第二行：元信息徽标（与标题左边缘对齐） -->
                                     <StackPanel Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2"
