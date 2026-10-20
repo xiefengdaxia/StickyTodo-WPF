@@ -23,6 +23,7 @@
         <conv:BoolToVisibilityConverter x:Key="BoolToVis" />
         <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis" />
         <conv:InverseBoolConverter x:Key="InverseBool" />
+        <conv:NullToCollapsedConverter x:Key="NullToCollapsed" />
 
         <Style x:Key="Text.Title" TargetType="TextBlock">
             <Setter Property="FontSize" Value="16" />
@@ -173,6 +174,46 @@
                     <Setter Property="Background" Value="#14C0392B" />
                 </Trigger>
             </Style.Triggers>
+        </Style>
+
+        <!-- 分段切换按钮：选中态靠 Tag 或样式触发器切背景 -->
+        <Style x:Key="SegmentTab" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{DynamicResource Brush.InkSoft}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="9,3" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root"
+                                CornerRadius="7"
+                                Background="{TemplateBinding Background}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="#33FFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.45" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="SegmentTab.Active" TargetType="Button" BasedOn="{StaticResource SegmentTab}">
+            <Setter Property="Background" Value="{DynamicResource Brush.Accent}" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
 
         <!-- 标签胶囊：选中态靠 Background 切换 -->

@@ -197,7 +197,8 @@
                              Grid.Column="0"
                              Style="{StaticResource TextBox.Flat}"
                              Text="{Binding NewTitle, UpdateSourceTrigger=PropertyChanged}"
-                             ToolTip="输入后按回车添加">
+                             ToolTip="{Binding NewTodoPlaceholder}"
+                             IsEnabled="{Binding IsTodoView}">
                         <TextBox.InputBindings>
                             <KeyBinding Key="Enter" Command="{Binding AddCommand}" />
                         </TextBox.InputBindings>
@@ -285,6 +286,14 @@
                                             <Border Margin="0,0,5,0"
                                                     Padding="5,1"
                                                     CornerRadius="6"
+                                                    Background="#332E7D32"
+                                                    Visibility="{Binding HasDoneAt, Converter={StaticResource BoolToVis}}">
+                                                <TextBlock Text="{Binding DoneAtText}" FontSize="10" Foreground="#FF2E7D32" />
+                                            </Border>
+
+                                            <Border Margin="0,0,5,0"
+                                                    Padding="5,1"
+                                                    CornerRadius="6"
                                                     Background="#33C0392B"
                                                     Visibility="{Binding HasCountdown, Converter={StaticResource BoolToVis}}">
                                                 <TextBlock Text="{Binding CountdownText}" FontSize="10">
@@ -342,7 +351,7 @@
                         </ListBox.ItemTemplate>
                     </ListBox>
 
-                    <TextBlock Text="还没有待办，写下第一条吧"
+                    <TextBlock Text="{Binding EmptyHint}"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
                                Foreground="{DynamicResource Brush.InkSoft}"
@@ -360,29 +369,45 @@
                     </TextBlock>
                 </Grid>
 
-                <!-- 底部 -->
+                <!-- 底部：状态 + TODO/Done 视图切换 -->
                 <Border Grid.Row="3"
                         BorderBrush="{DynamicResource Brush.Line}"
                         BorderThickness="0,1,0,0"
-                        Padding="12,6"
+                        Padding="10,6"
                         Margin="0,4,0,0">
                     <Grid>
-                        <TextBlock Text="右键待办可挂标签 · 拖拽排序"
-                                   Style="{StaticResource Text.Caption}"
-                                   Opacity="0.75"
-                                   VerticalAlignment="Center" />
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding StatusText}"
+                                       Style="{StaticResource Text.Caption}"
+                                       TextTrimming="CharacterEllipsis" />
                             <TextBlock Text="{Binding ErrorText}"
-                                       FontSize="11"
+                                       FontSize="10"
                                        Foreground="#FFC0392B"
-                                       MaxWidth="140"
                                        TextTrimming="CharacterEllipsis"
-                                       VerticalAlignment="Center" />
-                            <CheckBox Content="已完成"
-                                      FontSize="11"
-                                      Margin="8,0,0,0"
-                                      IsChecked="{Binding ShowDone}" />
+                                       Visibility="{Binding ErrorText, Converter={StaticResource NullToCollapsed}}" />
                         </StackPanel>
+
+                        <!-- 分段切换：待办 / 已完成 -->
+                        <Border Grid.Column="1"
+                                CornerRadius="9"
+                                Background="{DynamicResource Brush.ChipIdle}"
+                                BorderBrush="{DynamicResource Brush.Line}"
+                                BorderThickness="1"
+                                Padding="2">
+                            <StackPanel Orientation="Horizontal">
+                                <Button x:Name="TodoTab" Style="{StaticResource SegmentTab}" Click="TodoTab_Click" ToolTip="只看未完成">
+                                    <TextBlock Text="{Binding TodoViewText}" />
+                                </Button>
+                                <Button x:Name="DoneTab" Style="{StaticResource SegmentTab}" Click="DoneTab_Click" ToolTip="只看已完成">
+                                    <TextBlock Text="{Binding DoneViewText}" />
+                                </Button>
+                            </StackPanel>
+                        </Border>
                     </Grid>
                 </Border>
             </Grid>

@@ -10,6 +10,7 @@ using StickyTodo.App.ViewModels;
 using StickyTodo.Core.Entities;
 using StickyTodo.Core.Geometry;
 using StickyTodo.Core.Recurrence;
+using StickyTodo.Core.Services;
 
 namespace StickyTodo.App.Views;
 
@@ -68,6 +69,7 @@ public partial class BoardWindow : Window, IStickyWindow
         {
             RestoreGeometry();
             await _viewModel.LoadAsync();
+            RefreshViewTabs();
         };
 
         StateChanged += (_, _) =>
@@ -84,6 +86,26 @@ public partial class BoardWindow : Window, IStickyWindow
     }
 
     // ---------------- 标题栏拖动 / 关闭 ----------------
+
+    /// <summary>切换视图时同时更新两个 Tab 的高亮（样式里配了 DataTrigger，这里只需刷新绑定）。</summary>
+    private void RefreshViewTabs()
+    {
+        var todoActive = _viewModel.IsTodoView;
+        TodoTab.Style = (Style)FindResource(todoActive ? "SegmentTab.Active" : "SegmentTab");
+        DoneTab.Style = (Style)FindResource(todoActive ? "SegmentTab" : "SegmentTab.Active");
+    }
+
+    private void TodoTab_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.SwitchView(TodoViewMode.Todo);
+        RefreshViewTabs();
+    }
+
+    private void DoneTab_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.SwitchView(TodoViewMode.Done);
+        RefreshViewTabs();
+    }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
@@ -148,6 +170,21 @@ public partial class BoardWindow : Window, IStickyWindow
     public string BoardId => _viewModel.BoardId;
 
     public void RefreshAppearance() => _viewModel.RefreshAppearance();
+
+    /// <summary>当前列表里显示的行（给回归脚本读，验证视图切换真的换了内容）。</summary>
+    public IReadOnlyList<string> CurrentRowSnapshot() =>
+        _viewModel.Rows.Select(r => r.Title).ToList();
+
+    /// <summary>输入区状态（给回归脚本读，验证已完成视图下不能新增）。</summary>
+    public (bool InputEnabled, bool AddEnabled) CurrentInputState() =>
+        (InputBox.IsEnabled, _viewModel.AddCommand.CanExecute(null));
+
+    /// <summary>切换视图（回归脚本用）。</summary>
+    public void SwitchView(TodoViewMode mode)
+    {
+        _viewModel.SwitchView(mode);
+        RefreshViewTabs();
+    }
 
     // ---------------- 位置记忆与吸附 ----------------
 

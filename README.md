@@ -16,6 +16,12 @@
 
 带目标日期、提醒、重复规则的待办列表：`artifacts/board-work.png`
 
+TODO / Done 视图切换：
+
+| 待办视图（未完成） | Done 视图（含完成日期） |
+|---|---|
+| ![待办视图](artifacts/board-todo-view.png) | ![Done视图](artifacts/board-done-view.png) |
+
 ---
 
 ## 1. 快速开始
@@ -34,6 +40,7 @@ $exe = ".\src\StickyTodo.App\bin\Debug\net8.0-windows\StickyTodo.exe"
 & $exe --demo --shot D:\shots              # 演示 + 把每个窗口渲染成 PNG，然后自动退出
 & $exe --demo --reminder-demo --shot D:\shots   # 额外造一条到点提醒，验证弹窗链路
 & $exe --recurrence-demo                    # 重复待办端到端验证（建规则→勾选→滚动→日历展开），退出码 0 = 通过
+& $exe --view-demo --shot D:\shots          # 分别在待办视图/已完成视图下截图，验证视图切换
 & $exe --skin graphite --opacity 0.6 --window-opacity 0.9   # 启动时覆盖外观（也用于截图回归）
 ```
 
@@ -104,7 +111,11 @@ StickyTodo.sln
 - 数据来自**所有看板**的待办，重复待办会按规则展开成多次显示
 
 **待办**
-- 回车快速添加、勾选完成（划线灰显）、悬停删除、显示/隐藏已完成
+- 回车快速添加、勾选完成（划线灰显）、悬停删除
+- **TODO / Done 视图切换**：底部分段按钮（`待办 N` / `已完成 N`）一键切换
+  - 待办视图只看未完成，沿用你手动拖拽的顺序
+  - Done 视图只看已完成，**按完成时间倒序**（最近完成的在最上面），每行显示完成时间标签（今天 14:41 / 昨天 09:05 / 10月18日 20:11 / 2025年12月30日 08:00）
+  - Done 视图下新增输入框自动禁用，避免"加了却看不见"
 - **目标日期（倒数日）**：右键设置今天/明天/本周末/自定义，行上显示「还剩 N 天 / 今天到期 / 已过期 N 天」，过期标红
 - **到点提醒**：右键设 30 分钟后 / 1 小时后 / 今天 18:00 / 明天 9:00 / 自定义，到点弹右下角小窗 + 托盘气泡，可「稍后 10 分钟」；20 秒轮询一次，全部本地
 - **重复待办（RFC 5545 RRULE）**：右键选「每天 / 每个工作日 / 每周 / 每两周 / 每月 / 每月最后一天 / 每年」，或填自定义 RRULE（如 `FREQ=MONTHLY;BYDAY=2TU`）
@@ -219,6 +230,9 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 - [ ] 导入导出 Excel（NPOI）/ ICS 订阅
 - [ ] 日历周视图 / 日视图
 - [ ] 重复规则的「跳过这一次」与「编辑单次」
+
+**已完成（补充）**
+- [x] TODO / Done 视图切换 + Done 视图显示完成日期 + 按完成时间倒序
 
 **M4 外延**
 - [ ] ICS 订阅与导入导出

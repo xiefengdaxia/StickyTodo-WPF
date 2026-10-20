@@ -47,13 +47,34 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
 
     [ObservableProperty]
     private string _statusText = string.Empty;
-
     [ObservableProperty]
     private string? _errorText;
 
-    /// <summary>是否显示已完成条目。</summary>
+    /// <summary>当前视图：待办 / 已完成。</summary>
     [ObservableProperty]
-    private bool _showDone = true;
+    [NotifyPropertyChangedFor(nameof(IsTodoView))]
+    [NotifyPropertyChangedFor(nameof(IsDoneView))]
+    [NotifyPropertyChangedFor(nameof(TodoViewText))]
+    [NotifyPropertyChangedFor(nameof(DoneViewText))]
+    [NotifyPropertyChangedFor(nameof(EmptyHint))]
+    [NotifyPropertyChangedFor(nameof(NewTodoPlaceholder))]
+    private TodoViewMode _viewMode = TodoViewMode.Todo;
+
+    public bool IsTodoView => ViewMode == TodoViewMode.Todo;
+
+    public bool IsDoneView => ViewMode == TodoViewMode.Done;
+
+    /// <summary>「待办 3」这类标签，带未完成数量。</summary>
+    [ObservableProperty]
+    private string _todoViewText = "待办";
+
+    [ObservableProperty]
+    private string _doneViewText = "已完成";
+
+    public string EmptyHint => TodoViewFilter.EmptyHint(ViewMode);
+
+    /// <summary>新增输入框的占位提示（在已完成视图里提示切回待办）。</summary>
+    public string NewTodoPlaceholder => IsDoneView ? "切到待办视图才能新增" : "输入后按回车添加";
 
     /// <summary>窗口置顶（便签默认置顶）。</summary>
     [ObservableProperty]
@@ -243,25 +264,29 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
     private void RebuildRows()
     {
         var chip = SelectedChip;
-        var filtered = _all.Where(Matches);
-        if (!ShowDone)
-        {
-            filtered = filtered.Where(t => !t.IsDone);
-        }
+
+        // 标签筛选 & 视图（待办/已完成）是两层独立条件
+        var scoped = _all.Where(Matches).ToList();
+        var visible = TodoViewFilter.SortForView(
+            scoped.Where(t => TodoViewFilter.Matches(t.IsDone, ViewMode)),
+            ViewMode,
+            t => t.Sort,
+            t => t.DoneAt);
 
         Rows.Clear();
         var now = DateTimeOffset.Now;
-        foreach (var item in filtered)
+        foreach (var item in visible)
         {
             Rows.Add(new TodoRowViewModel(item, TagTextOf(item.Id), now));
         }
 
-        var scoped = _all.Where(Matches).ToList();
         var undone = scoped.Count(t => !t.IsDone);
+        var done = scoped.Count - undone;
+        TodoViewText = undone > 0 ? $"待办 {undone}" : "待办";
+        DoneViewText = done > 0 ? $"已完成 {done}" : "已完成";
+
         var filterName = chip.IsAll ? string.Empty : $"（{chip.Name}）";
-        StatusText = ShowDone
-            ? $"待办 {undone} · 已完成 {scoped.Count - undone}{filterName}"
-            : $"待办 {undone}{filterName}";
+        StatusText = $"{visible.Count} 项{filterName}";
 
         return;
 
@@ -285,7 +310,28 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
             .Select(id => _tagsById[id].Name));
     }
 
-    partial void OnShowDoneChanged(bool value) => RebuildRows();
+    partial void OnViewModeChanged(TodoViewMode value)
+    {
+        OnPropertyChanged(nameof(EmptyHint));
+        AddCommand.NotifyCanExecuteChanged();
+        RebuildRows();
+    }
+
+    /// <summary>切换视图。在已完成视图新增时自动切回待办，避免「看不见新加的东西」。</summary>
+    public void SwitchView(TodoViewMode mode)
+    {
+        ViewMode = mode;
+    }
+
+    public async Task GoToTodoViewAsync()
+    {
+        if (ViewMode != TodoViewMode.Todo)
+        {
+            ViewMode = TodoViewMode.Todo;
+        }
+
+        await Task.CompletedTask;
+    }
 
     public async Task SelectChipAsync(TagChipViewModel chip)
     {
@@ -298,7 +344,7 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
         await Task.CompletedTask;
     }
 
-    private bool CanAdd() => !string.IsNullOrWhiteSpace(NewTitle);
+    private bool CanAdd() => !string.IsNullOrWhiteSpace(NewTitle) && IsTodoView;
 
     [RelayCommand(CanExecute = nameof(CanAdd))]
     private async Task AddAsync()
@@ -313,6 +359,13 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
         {
             ErrorText = null;
             await Task.Run(() => _service.AddTodo(BoardId, title));
+
+            // 在已完成视图里新增（理论上按钮已禁用），保险起见切回待办，别让用户找不到
+            if (IsDoneView)
+            {
+                ViewMode = TodoViewMode.Todo;
+            }
+
             NewTitle = string.Empty;
             await LoadAsync();
         }

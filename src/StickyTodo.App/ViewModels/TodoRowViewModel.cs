@@ -1,6 +1,7 @@
 using StickyTodo.Core.Entities;
 using StickyTodo.Core.Recurrence;
 using StickyTodo.Core.Services;
+using DoneDateLabel = StickyTodo.Core.Services.DoneDateText;
 
 namespace StickyTodo.App.ViewModels;
 
@@ -26,6 +27,9 @@ public sealed class TodoRowViewModel
 
         RecurrenceText = RecurrenceEngine.Describe(item.Recurrence);
         IsRecurring = RecurrenceText.Length > 0;
+
+        DoneAtText = DoneDateLabel.Describe(item.DoneAt, now);
+        HasDoneAt = DoneAtText.Length > 0;
     }
 
     public TodoItem Item { get; }
@@ -55,4 +59,9 @@ public sealed class TodoRowViewModel
     public string RecurrenceText { get; }
 
     public bool IsRecurring { get; }
+
+    /// <summary>完成时间，如「今天 14:32」「昨天 09:05」「10月18日 20:11」。</summary>
+    public string DoneAtText { get; }
+
+    public bool HasDoneAt { get; }
 }

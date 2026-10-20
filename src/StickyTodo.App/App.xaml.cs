@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Threading;
 using System.Windows;
 using System.Windows.Media;
@@ -42,6 +42,13 @@ public partial class App : System.Windows.Application
         if (e.Args.Contains("--recurrence-demo", StringComparer.OrdinalIgnoreCase))
         {
             RunRecurrenceDemo();
+            return;
+        }
+
+        // 视图回归：分别在待办视图 / 已完成视图下截图
+        if (e.Args.Contains("--view-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunViewDemo(ReadOptionValue(e.Args, "--shot"));
             return;
         }
 
@@ -195,6 +202,102 @@ public partial class App : System.Windows.Application
 
         Log.Information("全局快捷键已注册：{New} 新建待办 / {Toggle} 显示隐藏 / {Lock} 锁定当前看板",
             HotKeyService.NewTodoHotKey, HotKeyService.ToggleBoardsHotKey, HotKeyService.LockActiveHotKey);
+    }
+
+    /// <summary>把完成时间改到过去某天（只用于演示数据，让三种日期写法都能看到）。</summary>
+    private static void BackdateCompletion(string todoId, DateTimeOffset doneAt)
+    {
+        using var connection = new Microsoft.Data.Sqlite.SqliteConnection(
+            $"Data Source={AppPaths.DatabasePath}");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "UPDATE todo SET done_at = @doneAt WHERE id = @id;";
+        command.Parameters.AddWithValue("@doneAt", doneAt.ToUnixTimeSeconds());
+        command.Parameters.AddWithValue("@id", todoId);
+        command.ExecuteNonQuery();
+    }
+
+    /// <summary>
+    /// --view-demo：造几条待办（含已完成的），依次在「待办视图」和「已完成视图」下截图，
+    /// 用来验证视图切换的渲染是否正常。退出码 0 表示两个视图都成功渲染。
+    /// </summary>
+    private void RunViewDemo(string? shotDirectory)
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+            _host = BuildHost();
+
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+            var service = _host.Services.GetRequiredService<TodoService>();
+            var board = service.EnsureDefaultBoard();
+
+            if (!service.GetTodos(board.Id).Any())
+            {
+                service.AddTodo(board.Id, "整理本周发布清单");
+                service.AddTodo(board.Id, "把便签拖到屏幕边缘试试吸附");
+                service.AddTodo(board.Id, "右键可以设目标日期和提醒");
+
+                // 完成时间故意拉开，方便一眼看出「今天/昨天/具体日期」三种写法
+                var done1 = service.AddTodo(board.Id, "写下第一条待办");
+                service.SetDone(done1.Id, true);
+
+                var done2 = service.AddTodo(board.Id, "配置好数据目录");
+                service.SetDone(done2.Id, true);
+
+                var done3 = service.AddTodo(board.Id, "定下界面配色");
+                service.SetDone(done3.Id, true);
+                BackdateCompletion(done3.Id, DateTimeOffset.Now.AddDays(-1));
+            }
+
+            var windows = _host.Services.GetRequiredService<WindowManager>();
+            var window = (BoardWindow)windows.OpenBoard(board);
+
+            var steps = new Queue<(string Name, TodoViewMode Mode)>();
+            steps.Enqueue(("todo", TodoViewMode.Todo));
+            steps.Enqueue(("done", TodoViewMode.Done));
+            steps.Enqueue(("done-to-todo", TodoViewMode.Todo));
+
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
+            timer.Tick += (_, _) =>
+            {
+                if (steps.Count == 0)
+                {
+                    timer.Stop();
+                    Log.Information("[view] 两个视图都已渲染完成");
+                    Shutdown(0);
+                    return;
+                }
+
+                var (name, mode) = steps.Dequeue();
+                window.SwitchView(mode);
+
+                var shot = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+                shot.Tick += (_, _) =>
+                {
+                    shot.Stop();
+                    var rows = window.CurrentRowSnapshot();
+                    var (inputEnabled, addEnabled) = window.CurrentInputState();
+                    Log.Information("[view] 视图={Name} 行数={Rows} 输入框可用={Input} 添加可用={Add} 内容={Items}",
+                        name, rows.Count, inputEnabled, addEnabled, string.Join(" | ", rows));
+                    if (shotDirectory is not null)
+                    {
+                        SaveWindowShots(Path.Combine(shotDirectory, name));
+                    }
+                };
+                shot.Start();
+            };
+            timer.Start();
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[view] 失败");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
     }
 
     /// <summary>
