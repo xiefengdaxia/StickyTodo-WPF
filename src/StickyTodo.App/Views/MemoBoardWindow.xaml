@@ -89,7 +89,7 @@
                             </Style>
                         </StackPanel.Style>
 
-                        <Button Style="{StaticResource Button.Chrome}" ToolTip="置顶" Click="ToggleTopmost_Click">
+                        <Button Style="{StaticResource Button.Chrome}" ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.topmost}" Click="ToggleTopmost_Click">
                             <TextBlock Text="📌" FontSize="11">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
@@ -104,7 +104,7 @@
                             </TextBlock>
                         </Button>
 
-                        <Button Style="{StaticResource Button.Chrome}" ToolTip="锁定（防误改）" Click="ToggleLock_Click">
+                        <Button Style="{StaticResource Button.Chrome}" ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.lockTip}" Click="ToggleLock_Click">
                             <TextBlock FontSize="11">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
@@ -119,9 +119,9 @@
                             </TextBlock>
                         </Button>
 
-                        <Button Style="{StaticResource Button.Chrome}" Content="🎨" FontSize="11" ToolTip="皮肤与透明度" Click="Appearance_Click" />
-                        <Button Style="{StaticResource Button.Chrome}" Content="⋯" FontSize="13" ToolTip="看板管理" Click="OpenManager_Click" />
-                        <Button Style="{StaticResource Button.Chrome}" Content="✕" FontSize="11" ToolTip="关闭" Click="Close_Click" />
+                        <Button Style="{StaticResource Button.Chrome}" Content="🎨" FontSize="11" ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.appearance}" Click="Appearance_Click" />
+                        <Button Style="{StaticResource Button.Chrome}" Content="⋯" FontSize="13" ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.manage}" Click="OpenManager_Click" />
+                        <Button Style="{StaticResource Button.Chrome}" Content="✕" FontSize="11" ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.close}" Click="Close_Click" />
                     </StackPanel>
                 </Grid>
             </Border>
@@ -149,7 +149,7 @@
                     BorderThickness="0,1,0,0"
                     Padding="12,6">
                 <Grid>
-                    <TextBlock Text="想写什么就写什么，自动保存"
+                    <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=memo.placeholder}"
                                Style="{StaticResource Text.Caption}"
                                Opacity="0.75"
                                VerticalAlignment="Center" />

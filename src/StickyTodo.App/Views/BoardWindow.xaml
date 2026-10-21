@@ -1,4 +1,4 @@
-<Window x:Class="StickyTodo.App.Views.BoardWindow"
+﻿<Window x:Class="StickyTodo.App.Views.BoardWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="{Binding BoardName}"
@@ -57,7 +57,7 @@
                         <TextBlock Text=" 🔒"
                                    FontSize="11"
                                    VerticalAlignment="Center"
-                                   ToolTip="看板已锁定，点右上角解锁"
+                                   ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.unlockTip}"
                                    Visibility="{Binding IsLocked, Converter={StaticResource BoolToVis}}" />
                     </StackPanel>
 
@@ -95,7 +95,7 @@
                         </StackPanel.Style>
 
                         <Button Style="{StaticResource Button.Chrome}"
-                                ToolTip="置顶"
+                                ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.topmost}"
                                 Click="ToggleTopmost_Click">
                             <TextBlock Text="📌" FontSize="11">
                                 <TextBlock.Style>
@@ -126,26 +126,26 @@
                                 </TextBlock.Style>
                             </TextBlock>
                             <Button.ToolTip>
-                                <TextBlock Text="锁定看板（防止误改）" />
+                                <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.lockTip}" />
                             </Button.ToolTip>
                         </Button>
 
                         <Button Style="{StaticResource Button.Chrome}"
                                 Content="🎨"
                                 FontSize="11"
-                                ToolTip="皮肤与透明度"
+                                ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.appearance}"
                                 Click="Appearance_Click" />
 
                         <Button Style="{StaticResource Button.Chrome}"
                                 Content="⋯"
                                 FontSize="13"
-                                ToolTip="看板管理与标签"
+                                ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.manageAndTags}"
                                 Click="OpenManager_Click" />
 
                         <Button Style="{StaticResource Button.Chrome}"
                                 Content="✕"
                                 FontSize="11"
-                                ToolTip="关闭这个便签"
+                                ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.closeBoard}"
                                 Click="Close_Click" />
                     </StackPanel>
                 </Grid>
@@ -219,12 +219,12 @@
                     </ItemsControl>
 
                     <Button Grid.Column="1"
-                            Content="＋标签"
+                            Content="{Binding Converter={StaticResource Loc}, ConverterParameter=board.addTag}"
                             VerticalAlignment="Top"
                             Style="{StaticResource Button.Ghost}"
                             FontSize="11"
                             Padding="8,3"
-                            ToolTip="新建标签"
+                            ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=board.addTagTip}"
                             Click="AddTag_Click" />
                 </Grid>
 
@@ -311,7 +311,7 @@
                                             VerticalAlignment="Center"
                                             Background="Transparent"
                                             Cursor="SizeAll"
-                                            ToolTip="拖动可调整顺序；拖到上方的标签上可改标签"
+                                            ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=board.dragHandleTip}"
                                             PreviewMouseLeftButtonDown="DragHandle_PreviewMouseLeftButtonDown"
                                             PreviewMouseMove="DragHandle_PreviewMouseMove">
                                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
@@ -456,7 +456,7 @@
 
                                         <!-- 未完成：✓ 标记为已办 -->
                                         <Button Style="{StaticResource Button.RowAction}"
-                                                ToolTip="标记为已完成"
+                                                ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=row.markDone}"
                                                 Click="RowDone_Click"
                                                 Visibility="{Binding IsDone, Converter={StaticResource InverseBoolToVis}}">
                                             <Path Data="M 0.5,5.5 L 4.2,9.2 L 10.5,2"
@@ -469,7 +469,7 @@
 
                                         <!-- 已完成：↺ 撤回为待办 -->
                                         <Button Style="{StaticResource Button.RowAction}"
-                                                ToolTip="撤回为待办"
+                                                ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=row.undo}"
                                                 Click="RowUndone_Click"
                                                 Visibility="{Binding IsDone, Converter={StaticResource BoolToVis}}">
                                             <Path Data="M 2.5,2 L 2.5,6 L 6.5,6 M 2.9,5.9 A 4.2,4.2 0 1 0 5.4,1"
@@ -482,7 +482,7 @@
 
                                         <!-- 两个视图都有：✕ 删除 -->
                                         <Button Style="{StaticResource Button.RowDelete}"
-                                                ToolTip="删除这条待办"
+                                                ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=row.delete}"
                                                 Click="RowDelete_Click" />
                                     </StackPanel>
                                 </Grid>
@@ -601,10 +601,10 @@
                                 BorderThickness="1"
                                 Padding="2">
                             <StackPanel Orientation="Horizontal">
-                                <Button x:Name="TodoTab" Style="{StaticResource SegmentTab}" Click="TodoTab_Click" ToolTip="只看未完成">
+                                <Button x:Name="TodoTab" Style="{StaticResource SegmentTab}" Click="TodoTab_Click" ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=view.todoTip}">
                                     <TextBlock Text="{Binding TodoViewText}" />
                                 </Button>
-                                <Button x:Name="DoneTab" Style="{StaticResource SegmentTab}" Click="DoneTab_Click" ToolTip="只看已完成">
+                                <Button x:Name="DoneTab" Style="{StaticResource SegmentTab}" Click="DoneTab_Click" ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=view.doneTip}">
                                     <TextBlock Text="{Binding DoneViewText}" />
                                 </Button>
                             </StackPanel>

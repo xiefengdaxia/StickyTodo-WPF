@@ -1,5 +1,7 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
+
+using StickyTodo.Core.Localization;
 
 namespace StickyTodo.App.Views;
 
@@ -40,7 +42,7 @@ public partial class PromptWindow : Window
         var text = Input.Text.Trim();
         if (string.IsNullOrEmpty(text))
         {
-            ShowError("不能为空。");
+            ShowError(Loc.T("prompt.required"));
             return;
         }
 

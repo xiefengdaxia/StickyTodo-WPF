@@ -55,6 +55,15 @@ public partial class SettingsWindow : Window
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 
+    /// <summary>语言下拉框：选中项的变更由 ViewModel 处理，这里只把焦点移开。</summary>
+    private void LanguageBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (LanguageBox.SelectedItem is not null)
+        {
+            Keyboard.ClearFocus();
+        }
+    }
+
     /// <summary>地址框失焦时保存。</summary>
     private void TokenDatabaseBox_LostFocus(object sender, RoutedEventArgs e) => _viewModel.CommitTokenDatabasePath();
 

@@ -32,6 +32,12 @@
         <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis" />
         <conv:InverseBoolConverter x:Key="InverseBool" />
         <conv:NullToCollapsedConverter x:Key="NullToCollapsed" />
+        <!-- 多语言：{Binding Converter={StaticResource Loc}, ConverterParameter=key} -->
+        <conv:LocalizedStringConverter x:Key="Loc" />
+        <conv:LocalizedFormatConverter x:Key="LocFormat" />
+        <conv:LanguageNameConverter x:Key="LocLanguage" />
+        <conv:LocalizedYearConverter x:Key="LocYear" />
+        <conv:LocalizedMonthConverter x:Key="LocMonth" />
 
         <!-- ==================== 动效基元 ==================== -->
         <!--

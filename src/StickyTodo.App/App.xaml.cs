@@ -128,6 +128,13 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        // 多语言回归：四种语言逐一切换并校验界面文案
+        if (e.Args.Contains("--i18n-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunI18nDemo(ReadOptionValue(e.Args, "--shot"));
+            return;
+        }
+
         // 动效回归：确认各处动画真的在跑、且不抛异常
         if (e.Args.Contains("--motion-demo", StringComparer.OrdinalIgnoreCase))
         {
@@ -227,10 +234,28 @@ public partial class App : System.Windows.Application
 
             var repository = _host.Services.GetRequiredService<ITodoRepository>();
             repository.Initialize();
+
+            // 回归/演示路径也要跟随设置里的语言
+            ApplyLanguageForCurrentRun();
             _host.Services.GetRequiredService<TodoService>().EnsureDefaultBoard();
 
             // 命令行覆盖（演示/截图回归用）：--skin mint --opacity 0.6 --window-opacity 0.9
             var skinService = _host.Services.GetRequiredService<SkinService>();
+
+            // 语言必须在任何窗口创建之前应用，否则会先渲染中文再切换，闪一下
+            var localization = _host.Services.GetRequiredService<LocalizationService>();
+            var languageOverride = ReadOptionValue(e.Args, "--lang");
+            if (!string.IsNullOrWhiteSpace(languageOverride))
+            {
+                // 命令行覆盖只影响本次运行，不写回设置（截图回归用）
+                StickyTodo.Core.Localization.Translator.Current.Language =
+                    StickyTodo.Core.Localization.AppLanguages.Resolve(languageOverride).Language;
+            }
+            else
+            {
+                localization.ApplyFromSettings();
+            }
+
             var skinOverride = ReadOptionValue(e.Args, "--skin");
             var opacityOverride = ReadOptionValue(e.Args, "--opacity");
             var windowOpacityOverride = ReadOptionValue(e.Args, "--window-opacity");
@@ -399,6 +424,7 @@ public partial class App : System.Windows.Application
                 services.AddSingleton<TodoService>();
                 services.AddSingleton<AppSettingsService>();
                 services.AddSingleton<SkinService>();
+                services.AddSingleton<LocalizationService>();
                 services.AddSingleton<WindowManager>();
                 services.AddSingleton<TrayService>();
                 services.AddSingleton<ReminderPump>();
@@ -425,6 +451,28 @@ public partial class App : System.Windows.Application
                 services.AddSingleton<SettingsWindow>();
             })
             .Build();
+    }
+
+    /// <summary>
+    /// 所有 demo / 回归路径进入 WPF 界面前都调一次：把设置里的语言应用上去。
+    /// 否则只有正常启动路径会本地化，`--settings-demo` 之类的回归截图仍是中文。
+    /// </summary>
+    private void ApplyLanguageForCurrentRun()
+    {
+        if (_host is null)
+        {
+            return;
+        }
+
+        var overrideKey = ReadOptionValue(Environment.GetCommandLineArgs(), "--lang");
+        if (!string.IsNullOrWhiteSpace(overrideKey))
+        {
+            StickyTodo.Core.Localization.Translator.Current.Language =
+                StickyTodo.Core.Localization.AppLanguages.Resolve(overrideKey).Language;
+            return;
+        }
+
+        _host.Services.GetRequiredService<LocalizationService>().ApplyFromSettings();
     }
 
     /// <summary>
@@ -497,6 +545,9 @@ public partial class App : System.Windows.Application
             _host = BuildHost();
             var repository = _host.Services.GetRequiredService<ITodoRepository>();
             repository.Initialize();
+
+            // 回归/演示路径也要跟随设置里的语言
+            ApplyLanguageForCurrentRun();
             var service = _host.Services.GetRequiredService<TodoService>();
             var board = service.EnsureDefaultBoard();
             if (!service.GetTodos(board.Id).Any())
@@ -619,6 +670,9 @@ public partial class App : System.Windows.Application
 
             var repository = _host.Services.GetRequiredService<ITodoRepository>();
             repository.Initialize();
+
+            // 回归/演示路径也要跟随设置里的语言
+            ApplyLanguageForCurrentRun();
             var service = _host.Services.GetRequiredService<TodoService>();
             var board = service.EnsureDefaultBoard();
 
@@ -718,6 +772,9 @@ public partial class App : System.Windows.Application
 
             var repository = _host.Services.GetRequiredService<ITodoRepository>();
             repository.Initialize();
+
+            // 回归/演示路径也要跟随设置里的语言
+            ApplyLanguageForCurrentRun();
             var service = _host.Services.GetRequiredService<TodoService>();
 
             var board = service.CreateBoard("日历", BoardKind.Calendar);
@@ -816,6 +873,105 @@ public partial class App : System.Windows.Application
     }
 
     /// <summary>
+    /// --i18n-demo：多语言回归。逐一设置四种语言，用真实的 ViewModel 拼出文案，
+    /// 确认界面文本确实跟着语言变，而不是始终返回中文。
+    /// </summary>
+    private async void RunI18nDemo(string? shotDirectory)
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+        InstallGlobalExceptionHandlers();
+
+        try
+        {
+            _host = BuildHost();
+            await _host.StartAsync();
+
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+
+            var service = _host.Services.GetRequiredService<TodoService>();
+            var board = service.EnsureDefaultBoard();
+            foreach (var existing in service.GetTodos(board.Id))
+            {
+                service.Delete(existing.Id);
+            }
+
+            service.AddTodo(board.Id, "国际化回归条目");
+            service.CreateTag("i18n");
+
+            var settings = _host.Services.GetRequiredService<AppSettingsService>();
+            var localization = _host.Services.GetRequiredService<LocalizationService>();
+            var windows = _host.Services.GetRequiredService<WindowManager>();
+
+            var ok = true;
+            var previous = localization.Language;
+
+            var expectations = new (string Key, string Url, string[] MustContain)[]
+            {
+                ("zh-CN", "zh", ["待办", "设置", "日历", "番茄", "农历"]),
+                ("en", "en", ["To-do", "Settings", "Calendar", "Pomodoro", "Lunar"]),
+                ("ja", "ja", ["未完了", "設定", "カレンダー", "ポモドーロ", "旧暦"]),
+                ("ko", "ko", ["할 일", "설정", "캘린더", "뽀모도로", "음력"]),
+            };
+
+            foreach (var (key, code, mustContain) in expectations)
+            {
+                var info = StickyTodo.Core.Localization.AppLanguages.Resolve(key);
+                localization.SetLanguage(info);
+
+                // 1) 翻译器本身
+                ok &= StickyTodo.Core.Localization.Translator.Current.Language == info.Language;
+
+                // 2) 设置里的语言值已落库
+                ok &= settings.Language == info.Key;
+
+                // 3) 看板的视图文本（由 BoardViewModel 用翻译器拼出来）
+                var boardWindow = windows.OpenBoard(board) as BoardWindow;
+                await Task.Delay(500);
+
+                var viewTexts = boardWindow?.LocalizedTextsForTest() ?? string.Empty;
+                Log.Information("[i18n] {Key,-6} 看板文案：{Texts}", key, viewTexts);
+
+                foreach (var needle in mustContain)
+                {
+                    var hit = viewTexts.Contains(needle, StringComparison.OrdinalIgnoreCase);
+                    if (!hit)
+                    {
+                        Log.Warning("[i18n] {Key} 文案里缺少「{Needle}」：{Texts}", key, needle, viewTexts);
+                    }
+
+                    ok &= hit;
+                }
+
+                // 4) 窗口标题也是本地化的
+                var windowTitle = boardWindow?.Title ?? string.Empty;
+                Log.Information("[i18n] {Key,-6} 窗口标题={Title}", key, windowTitle);
+
+                if (shotDirectory is not null && boardWindow is not null)
+                {
+                    SaveWindowShots(Path.Combine(shotDirectory, code));
+                }
+            }
+
+            // 收尾：恢复中文，避免把测试语言留在真实设置里
+            localization.SetLanguage(StickyTodo.Core.Localization.AppLanguages.ChineseSimplified);
+            _ = previous;
+
+            Log.Information("[i18n] 总结果={Result}", ok ? "通过" : "失败");
+
+            Log.CloseAndFlush();
+            Shutdown(ok ? 0 : 2);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[i18n] 异常");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
     /// --motion-demo：动效回归。检查窗口入场、按钮按下缩放、复选框弹跳、
     /// 行删除淡出、刷新旋转等是否真的产生了动画（读属性值而不是看截图）。
     /// </summary>
@@ -832,6 +988,9 @@ public partial class App : System.Windows.Application
 
             var repository = _host.Services.GetRequiredService<ITodoRepository>();
             repository.Initialize();
+
+            // 回归/演示路径也要跟随设置里的语言
+            ApplyLanguageForCurrentRun();
             var service = _host.Services.GetRequiredService<TodoService>();
             var board = service.EnsureDefaultBoard();
 
@@ -956,6 +1115,9 @@ public partial class App : System.Windows.Application
             var repository = _host.Services.GetRequiredService<ITodoRepository>();
             repository.Initialize();
 
+            // 回归/演示路径也要跟随设置里的语言
+            ApplyLanguageForCurrentRun();
+
             var settings = _host.Services.GetRequiredService<AppSettingsService>();
             settings.PomodoroCountToday = 0;
             settings.PomodoroCountDate = DateOnly.FromDateTime(DateTime.Today);
@@ -1079,6 +1241,9 @@ public partial class App : System.Windows.Application
 
             var repository = _host.Services.GetRequiredService<ITodoRepository>();
             repository.Initialize();
+
+            // 回归/演示路径也要跟随设置里的语言
+            ApplyLanguageForCurrentRun();
             var service = _host.Services.GetRequiredService<TodoService>();
 
             // 只留一个 Token 看板，避免默认待办看板混进来
@@ -1211,6 +1376,9 @@ public partial class App : System.Windows.Application
 
             var repository = _host.Services.GetRequiredService<ITodoRepository>();
             repository.Initialize();
+
+            // 回归/演示路径也要跟随设置里的语言
+            ApplyLanguageForCurrentRun();
             var service = _host.Services.GetRequiredService<TodoService>();
             service.EnsureDefaultBoard();
 
@@ -1382,6 +1550,9 @@ public partial class App : System.Windows.Application
 
             var repository = _host.Services.GetRequiredService<ITodoRepository>();
             repository.Initialize();
+
+            // 回归/演示路径也要跟随设置里的语言
+            ApplyLanguageForCurrentRun();
             _host.Services.GetRequiredService<TodoService>().EnsureDefaultBoard();
 
             var manager = _host.Services.GetRequiredService<ManagerWindow>();
@@ -1441,6 +1612,9 @@ public partial class App : System.Windows.Application
             _host = BuildHost();
             var repository = _host.Services.GetRequiredService<ITodoRepository>();
             repository.Initialize();
+
+            // 回归/演示路径也要跟随设置里的语言
+            ApplyLanguageForCurrentRun();
             var service = _host.Services.GetRequiredService<TodoService>();
             var board = service.EnsureDefaultBoard();
 
@@ -1509,6 +1683,9 @@ public partial class App : System.Windows.Application
             _host = BuildHost();
             var repository = _host.Services.GetRequiredService<ITodoRepository>();
             repository.Initialize();
+
+            // 回归/演示路径也要跟随设置里的语言
+            ApplyLanguageForCurrentRun();
             var service = _host.Services.GetRequiredService<TodoService>();
             var board = service.EnsureDefaultBoard();
 
@@ -1577,6 +1754,9 @@ public partial class App : System.Windows.Application
             _host = BuildHost();
             var repository = _host.Services.GetRequiredService<ITodoRepository>();
             repository.Initialize();
+
+            // 回归/演示路径也要跟随设置里的语言
+            ApplyLanguageForCurrentRun();
             var service = _host.Services.GetRequiredService<TodoService>();
             var board = service.EnsureDefaultBoard();
 
@@ -1651,6 +1831,9 @@ public partial class App : System.Windows.Application
             _host = BuildHost();
             var repository = _host.Services.GetRequiredService<ITodoRepository>();
             repository.Initialize();
+
+            // 回归/演示路径也要跟随设置里的语言
+            ApplyLanguageForCurrentRun();
             var service = _host.Services.GetRequiredService<TodoService>();
             var board = service.EnsureDefaultBoard();
 
@@ -1712,6 +1895,9 @@ public partial class App : System.Windows.Application
             _host = BuildHost();
             var repository = _host.Services.GetRequiredService<ITodoRepository>();
             repository.Initialize();
+
+            // 回归/演示路径也要跟随设置里的语言
+            ApplyLanguageForCurrentRun();
             var service = _host.Services.GetRequiredService<TodoService>();
             var board = service.EnsureDefaultBoard();
 
@@ -1790,6 +1976,9 @@ public partial class App : System.Windows.Application
             _host = BuildHost();
             var repository = _host.Services.GetRequiredService<ITodoRepository>();
             repository.Initialize();
+
+            // 回归/演示路径也要跟随设置里的语言
+            ApplyLanguageForCurrentRun();
             var service = _host.Services.GetRequiredService<TodoService>();
             service.EnsureDefaultBoard();
             if (service.GetBoards().Count < 2)
@@ -1844,6 +2033,9 @@ public partial class App : System.Windows.Application
             _host = BuildHost();
             var repository = _host.Services.GetRequiredService<ITodoRepository>();
             repository.Initialize();
+
+            // 回归/演示路径也要跟随设置里的语言
+            ApplyLanguageForCurrentRun();
             var service = _host.Services.GetRequiredService<TodoService>();
             var board = service.EnsureDefaultBoard();
 
@@ -1901,6 +2093,9 @@ public partial class App : System.Windows.Application
             _host = BuildHost();
             var repository = _host.Services.GetRequiredService<ITodoRepository>();
             repository.Initialize();
+
+            // 回归/演示路径也要跟随设置里的语言
+            ApplyLanguageForCurrentRun();
             var service = _host.Services.GetRequiredService<TodoService>();
             var board = service.EnsureDefaultBoard();
 
@@ -1974,6 +2169,9 @@ public partial class App : System.Windows.Application
             _host = BuildHost();
             var repository = _host.Services.GetRequiredService<ITodoRepository>();
             repository.Initialize();
+
+            // 回归/演示路径也要跟随设置里的语言
+            ApplyLanguageForCurrentRun();
             var service = _host.Services.GetRequiredService<TodoService>();
             var board = service.EnsureDefaultBoard();
 
@@ -2066,6 +2264,9 @@ public partial class App : System.Windows.Application
             _host = BuildHost();
             var repository = _host.Services.GetRequiredService<ITodoRepository>();
             repository.Initialize();
+
+            // 回归/演示路径也要跟随设置里的语言
+            ApplyLanguageForCurrentRun();
             var service = _host.Services.GetRequiredService<TodoService>();
             var board = service.EnsureDefaultBoard();
 
@@ -2205,6 +2406,9 @@ public partial class App : System.Windows.Application
             _host = BuildHost();
             var repository = _host.Services.GetRequiredService<ITodoRepository>();
             repository.Initialize();
+
+            // 回归/演示路径也要跟随设置里的语言
+            ApplyLanguageForCurrentRun();
             _host.Services.GetRequiredService<TodoService>().EnsureDefaultBoard();
 
             var settings = _host.Services.GetRequiredService<SettingsWindow>();
@@ -2265,6 +2469,9 @@ public partial class App : System.Windows.Application
 
             var repository = _host.Services.GetRequiredService<ITodoRepository>();
             repository.Initialize();
+
+            // 回归/演示路径也要跟随设置里的语言
+            ApplyLanguageForCurrentRun();
             var service = _host.Services.GetRequiredService<TodoService>();
             var board = service.EnsureDefaultBoard();
 
@@ -2346,6 +2553,9 @@ public partial class App : System.Windows.Application
         {
             var repository = new SqliteTodoRepository(AppPaths.DatabasePath);
             repository.Initialize();
+
+            // 回归/演示路径也要跟随设置里的语言
+            ApplyLanguageForCurrentRun();
             var service = new TodoService(repository, new PermanentFreeEntitlement());
             var board = service.EnsureDefaultBoard();
 
@@ -2647,6 +2857,9 @@ public partial class App : System.Windows.Application
         {
             var repository = new SqliteTodoRepository(AppPaths.DatabasePath);
             repository.Initialize();
+
+            // 回归/演示路径也要跟随设置里的语言
+            ApplyLanguageForCurrentRun();
 
             var service = new TodoService(repository, new PermanentFreeEntitlement());
             var boards = service.GetBoards();

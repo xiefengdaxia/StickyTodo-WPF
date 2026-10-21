@@ -1,6 +1,7 @@
-using System.Windows;
+﻿using System.Windows;
 using StickyTodo.App.Services;
 using StickyTodo.Core.Entities;
+using StickyTodo.Core.Localization;
 using StickyTodo.Core.Services;
 
 namespace StickyTodo.App.Views;
@@ -19,7 +20,7 @@ public partial class ReminderPopup : Window
 
         TimeText.Text = DateTimeOffset.Now.ToString("HH:mm");
         TitleText.Text = item.Title;
-        BoardText.Text = $"来自看板：{boardName}";
+        BoardText.Text = Loc.F("reminder.fromBoard", boardName);
 
         Loaded += (_, _) =>
         {

@@ -1,7 +1,8 @@
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using StickyTodo.App.Services;
 using StickyTodo.Core.Entities;
+using StickyTodo.Core.Localization;
 using StickyTodo.Core.Services;
 
 namespace StickyTodo.App.ViewModels;
@@ -66,7 +67,7 @@ public partial class MemoBoardViewModel : ObservableObject, IAppearanceHost
     public void MarkDirty()
     {
         IsDirty = true;
-        StatusText = "编辑中…";
+        StatusText = Loc.T("memo.saving");
     }
 
     public async Task SaveIfDirtyAsync()
@@ -87,15 +88,15 @@ public partial class MemoBoardViewModel : ObservableObject, IAppearanceHost
         catch (Exception ex)
         {
             ErrorText = ex.Message;
-            StatusText = "保存失败";
+            StatusText = Loc.T("memo.saveFailed");
         }
     }
 
     private void UpdateStatus(DateTimeOffset? updatedAt)
     {
         var chars = Content.Count(c => !char.IsWhiteSpace(c));
-        var saved = updatedAt is null ? "尚未保存" : $"已保存 {updatedAt.Value:MM-dd HH:mm}";
-        StatusText = $"{chars} 字 · {saved}";
+        var saved = updatedAt is null ? Loc.T("memo.unsaved") : Loc.F("memo.saved", updatedAt.Value.ToString("MM-dd HH:mm"));
+        StatusText = Loc.F("memo.status", chars, saved);
     }
 
     public void ToggleTopmost()

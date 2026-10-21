@@ -1,5 +1,6 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
+using StickyTodo.Core.Localization;
 
 namespace StickyTodo.App.Services;
 
@@ -19,7 +20,7 @@ internal static class AppearanceMenu
     {
         var menu = new ContextMenu();
 
-        var skinMenu = new MenuItem { Header = "皮肤" };
+        var skinMenu = new MenuItem { Header = Loc.T("menu.skin") };
         foreach (var skin in NoteSkins.All)
         {
             var item = new MenuItem
@@ -42,7 +43,7 @@ internal static class AppearanceMenu
         // 弹窗里按 10 档选，和设置页滑块保持一致，比 +1% 好点
         var backgroundMenu = new MenuItem
         {
-            Header = $"背景透明度：{Math.Round(host.CurrentOpacity * 100)}%",
+            Header = Loc.F("menu.bgOpacity", Math.Round(host.CurrentOpacity * 100)),
         };
 
         for (var percent = 10; percent <= 100; percent += 10)
@@ -54,7 +55,7 @@ internal static class AppearanceMenu
 
         var windowMenu = new MenuItem
         {
-            Header = $"整窗透明度：{Math.Round(host.CurrentWindowOpacity * 100)}%",
+            Header = Loc.F("menu.winOpacity", Math.Round(host.CurrentWindowOpacity * 100)),
         };
 
         for (var percent = 10; percent <= 100; percent += 10)
@@ -67,7 +68,7 @@ internal static class AppearanceMenu
         menu.Items.Add(new Separator());
         menu.Items.Add(new MenuItem
         {
-            Header = "10% 一档；精确调整请打开设置页",
+            Header = Loc.T("menu.opacityHint"),
             IsEnabled = false,
         });
 

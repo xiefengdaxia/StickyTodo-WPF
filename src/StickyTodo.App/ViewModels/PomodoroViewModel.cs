@@ -1,6 +1,7 @@
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StickyTodo.Core.Localization;
 using StickyTodo.Core.Pomodoro;
 using StickyTodo.Core.Services;
 
@@ -37,22 +38,22 @@ public partial class PomodoroViewModel : ObservableObject
     private string _timeText = "25:00";
 
     [ObservableProperty]
-    private string _phaseText = "专注";
+    private string _phaseText = Loc.T("pomodoro.focus");
 
     [ObservableProperty]
     private bool _isRunning;
 
     [ObservableProperty]
-    private string _primaryActionText = "开始";
+    private string _primaryActionText = Loc.T("pomodoro.start");
 
     [ObservableProperty]
     private double _progress;
 
     [ObservableProperty]
-    private string _roundText = "第 1 / 4 个番茄";
+    private string _roundText = string.Empty;
 
     [ObservableProperty]
-    private string _todayText = "今天完成 0 个";
+    private string _todayText = string.Empty;
 
     /// <summary>进度圆环的扫过角度（0–360），用 StrokeDashArray 不好控，直接算角度。</summary>
     [ObservableProperty]
@@ -62,17 +63,27 @@ public partial class PomodoroViewModel : ObservableObject
     [ObservableProperty]
     private bool _isBreak;
 
+    /// <summary>番茄钟阶段对应的翻译键。</summary>
+    private static string PhaseKey(PomodoroPhase phase) => phase switch
+    {
+        PomodoroPhase.ShortBreak => "pomodoro.shortBreak",
+        PomodoroPhase.LongBreak => "pomodoro.longBreak",
+        _ => "pomodoro.focus",
+    };
+
     /// <summary>把引擎状态同步到界面。每秒调一次。</summary>
     public void Sync()
     {
         TimeText = PomodoroEngine.Format(_engine.Remaining);
-        PhaseText = PomodoroEngine.PhaseName(_engine.Phase);
+        PhaseText = Loc.T(PhaseKey(_engine.Phase));
         IsRunning = _engine.Status == PomodoroStatus.Running;
-        PrimaryActionText = IsRunning ? "暂停" : _engine.Remaining == _engine.CurrentLength ? "开始" : "继续";
+        PrimaryActionText = IsRunning
+            ? Loc.T("pomodoro.pause")
+            : _engine.Remaining == _engine.CurrentLength ? Loc.T("pomodoro.start") : Loc.T("pomodoro.resume");
         Progress = _engine.Progress;
         ProgressAngle = _engine.Progress * 360;
-        RoundText = $"第 {_engine.RoundInCycle} / {_engine.RoundsPerCycle} 个番茄";
-        TodayText = $"今天完成 {_engine.CompletedToday} 个";
+        RoundText = Loc.F("pomodoro.round", _engine.RoundInCycle, _engine.RoundsPerCycle);
+        TodayText = Loc.F("pomodoro.today", _engine.CompletedToday);
         IsBreak = _engine.Phase != PomodoroPhase.Focus;
     }
 

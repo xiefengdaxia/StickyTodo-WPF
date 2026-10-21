@@ -1,9 +1,10 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StickyTodo.App.Services;
 using StickyTodo.Core.Entities;
+using StickyTodo.Core.Localization;
 using StickyTodo.Core.Services;
 
 namespace StickyTodo.App.ViewModels;
@@ -74,10 +75,10 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
 
     /// <summary>「待办 3」这类标签，带未完成数量。</summary>
     [ObservableProperty]
-    private string _todoViewText = "待办";
+    private string _todoViewText = Loc.T("view.todo");
 
     [ObservableProperty]
-    private string _doneViewText = "已完成";
+    private string _doneViewText = Loc.T("view.done");
 
     public string EmptyHint => TodoViewFilter.EmptyHint(ViewMode);
 
@@ -94,10 +95,10 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
     public void SetTopmost(bool topmost) => IsTopmost = topmost;
 
     public string DraftPlaceholder => CanAdd
-        ? "在这里写一条，回车即添加"
+        ? Loc.T("board.draftPlaceholder")
         : IsDoneView
-            ? "已完成的视图不能新增"
-            : "看板已锁定";
+            ? Loc.T("board.doneViewReadOnly")
+            : Loc.T("board.locked");
 
     /// <summary>提交某一行改过的标题。返回 false 表示没改成（空标题等）。</summary>
     public async Task<bool> CommitTitleAsync(TodoRowViewModel row)
@@ -117,7 +118,7 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
 
         if (string.IsNullOrEmpty(newTitle))
         {
-            row.EditError = "内容不能为空";
+            row.EditError = Loc.T("row.titleEmpty");
             row.Title = row.Item.Title;
             return false;
         }
@@ -307,6 +308,36 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
 
     public IReadOnlyList<Tag> Tags => _tagsById.Values.OrderBy(t => t.Sort).ToList();
 
+    /// <summary>
+    /// 语言切换后重建所有由翻译器拼出来的文案。
+    /// Split 视图文本、状态行、标签胶囊名（「全部」「未分类」）都是运行时拼的，
+    /// 光靠 XAML 绑定的刷新不够，必须主动重算。
+    /// </summary>
+    public void RefreshLocalizedText()
+    {
+        // 标签胶囊里「全部 / 未分类」这两个是内置的，名字要重取
+        foreach (var chip in Chips)
+        {
+            if (chip.TagId is null)
+            {
+                chip.SetName(Loc.T("tag.all"));
+            }
+            else if (chip.TagId == TagChipViewModel.NoTagId)
+            {
+                chip.SetName(Loc.T("tag.none"));
+            }
+        }
+
+        RebuildRows();
+
+        OnPropertyChanged(nameof(DraftPlaceholder));
+
+        if (Rows.Count == 0)
+        {
+            StatusText = Loc.F("board.itemCount", 0);
+        }
+    }
+
     public async Task LoadAsync()
     {
         var items = await Task.Run(() => _service.GetTodos(BoardId));
@@ -342,9 +373,9 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
         var previous = Chips.FirstOrDefault(c => c.IsSelected)?.TagId;
         Chips.Clear();
 
-        var all = new TagChipViewModel(null, "全部", TagColors.Default) { Count = _all.Count };
+        var all = new TagChipViewModel(null, Loc.T("tag.all"), TagColors.Default) { Count = _all.Count };
         Chips.Add(all);
-        var noTag = new TagChipViewModel(TagChipViewModel.NoTagId, "未分类", TagColors.Default)
+        var noTag = new TagChipViewModel(TagChipViewModel.NoTagId, Loc.T("tag.none"), TagColors.Default)
         {
             Count = _all.Count(t => !_tagMap.TryGetValue(t.Id, out var ids) || ids.Count == 0),
         };
@@ -388,11 +419,13 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
 
         var undone = scoped.Count(t => !t.IsDone);
         var done = scoped.Count - undone;
-        TodoViewText = undone > 0 ? $"待办 {undone}" : "待办";
-        DoneViewText = done > 0 ? $"已完成 {done}" : "已完成";
+        TodoViewText = undone > 0 ? Loc.F("view.todoCount", undone) : Loc.T("view.todo");
+        DoneViewText = done > 0 ? Loc.F("view.doneCount", done) : Loc.T("view.done");
 
-        var filterName = chip.IsAll ? string.Empty : $"（{chip.Name}）";
-        StatusText = $"{visible.Count} 项{filterName}";
+        var filterName = chip.IsAll ? string.Empty : chip.Name;
+        StatusText = string.IsNullOrEmpty(filterName)
+            ? Loc.F("board.itemCount", visible.Count)
+            : Loc.F("board.itemCountInTag", visible.Count, filterName);
 
         return;
 

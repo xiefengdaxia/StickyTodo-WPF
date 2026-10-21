@@ -1,7 +1,7 @@
 ﻿<Window x:Class="StickyTodo.App.Views.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="设置"
+        Title="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.title}"
         Icon="/Assets/stickytodo.ico"
         Width="520" Height="700"
         MinWidth="460" MinHeight="560"
@@ -39,8 +39,8 @@
                     MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <Grid>
                     <StackPanel>
-                        <TextBlock Text="设置" Style="{StaticResource Text.Display}" />
-                        <TextBlock Text="外观与数据都存在本机，不联网"
+                        <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.title}" Style="{StaticResource Text.Display}" />
+                        <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.subtitle}"
                                    Style="{StaticResource Text.Caption}"
                                    Margin="0,3,0,0" />
                     </StackPanel>
@@ -49,7 +49,7 @@
                         <Button Style="{StaticResource Button.ChromeClose}"
                                 Content="✕"
                                 FontSize="11"
-                                ToolTip="关闭"
+                                ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.close}"
                                 Click="Close_Click" />
                     </StackPanel>
                 </Grid>
@@ -59,12 +59,12 @@
                 <StackPanel>
 
                     <!-- ===== 外观：皮肤 ===== -->
-                    <TextBlock Text="外观" Style="{StaticResource Text.Section}" Margin="2,0,0,8" />
+                    <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.appearance}" Style="{StaticResource Text.Section}" Margin="2,0,0,8" />
 
                     <Border Style="{StaticResource Card}" Margin="0,0,0,14">
                         <StackPanel>
-                            <TextBlock Text="配色" Style="{StaticResource Text.Title}" FontSize="13" Margin="0,0,0,3" />
-                            <TextBlock Text="选一套喜欢的纸色，所有便签立即生效"
+                            <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.palette}" Style="{StaticResource Text.Title}" FontSize="13" Margin="0,0,0,3" />
+                            <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.paletteHint}"
                                        Style="{StaticResource Text.Caption}"
                                        Margin="0,0,0,12" />
 
@@ -129,11 +129,37 @@
                         </StackPanel>
                     </Border>
 
+                    <!-- ===== 外观：语言 ===== -->
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                        <StackPanel>
+                            <Grid Margin="0,0,0,6">
+                                <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.language}"
+                                           FontSize="13" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource Brush.Ink}" />
+                                <ComboBox x:Name="LanguageBox"
+                                          HorizontalAlignment="Right"
+                                          Width="132"
+                                          ItemsSource="{Binding Languages}"
+                                          SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}"
+                                          SelectionChanged="LanguageBox_SelectionChanged">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Converter={StaticResource LocLanguage}}" FontSize="12" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </Grid>
+                            <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.languageHint}"
+                                       Style="{StaticResource Text.Caption}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
                     <!-- ===== 外观：透明度 ===== -->
                     <Border Style="{StaticResource Card}" Margin="0,0,0,14">
                         <StackPanel>
                             <Grid Margin="0,0,0,4">
-                                <TextBlock Text="背景透明度" Style="{StaticResource Text.Title}" FontSize="13" />
+                                <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.bgOpacity}" Style="{StaticResource Text.Title}" FontSize="13" />
                                 <TextBlock Text="{Binding BackgroundOpacityText}"
                                            HorizontalAlignment="Right"
                                            VerticalAlignment="Center"
@@ -141,7 +167,7 @@
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource Brush.Accent}" />
                             </Grid>
-                            <TextBlock Text="只让纸变透，文字始终清晰"
+                            <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.bgOpacityHint}"
                                        Style="{StaticResource Text.Caption}"
                                        Margin="0,0,0,6" />
                             <Slider Style="{StaticResource Slider.Slim}"
@@ -156,7 +182,7 @@
                             <Border Height="1" Background="{DynamicResource Brush.Line}" Margin="0,10" />
 
                             <Grid Margin="0,0,0,4">
-                                <TextBlock Text="整窗透明度" Style="{StaticResource Text.Title}" FontSize="13" />
+                                <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.winOpacity}" Style="{StaticResource Text.Title}" FontSize="13" />
                                 <TextBlock Text="{Binding WindowOpacityText}"
                                            HorizontalAlignment="Right"
                                            VerticalAlignment="Center"
@@ -164,7 +190,7 @@
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource Brush.Accent}" />
                             </Grid>
-                            <TextBlock Text="连文字一起变淡，更像贴在屏幕上的便签"
+                            <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.winOpacityHint}"
                                        Style="{StaticResource Text.Caption}"
                                        Margin="0,0,0,6" />
                             <Slider Style="{StaticResource Slider.Slim}"
@@ -179,44 +205,44 @@
                     </Border>
 
                     <!-- ===== 启动 ===== -->
-                    <TextBlock Text="启动" Style="{StaticResource Text.Section}" Margin="2,4,0,8" />
+                    <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.startup}" Style="{StaticResource Text.Section}" Margin="2,4,0,8" />
 
                     <Border Style="{StaticResource Card}" Margin="0,0,0,14">
                         <StackPanel>
                             <CheckBox Style="{StaticResource CheckBox.Labeled}"
-                                      Content="开机自动启动"
+                                      Content="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.autoStart}"
                                       FontSize="12.5"
                                       IsChecked="{Binding LaunchAtStartup, Mode=TwoWay}" />
-                            <TextBlock Text="勾选后写入当前用户的启动项，不需要管理员权限"
+                            <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.autoStartHint}"
                                        Style="{StaticResource Text.Caption}"
                                        Margin="24,5,0,0" />
 
                             <Border Height="1" Background="{DynamicResource Brush.Line}" Margin="0,11" />
 
                             <CheckBox Style="{StaticResource CheckBox.Labeled}"
-                                      Content="启动时恢复上次打开的看板"
+                                      Content="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.restoreSession}"
                                       FontSize="12.5"
                                       IsChecked="{Binding RestoreSession, Mode=TwoWay}" />
-                            <TextBlock Text="会重新打开上次关闭前的便签/日历窗口，并回到原来的位置和大小"
+                            <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.restoreSessionHint}"
                                        Style="{StaticResource Text.Caption}"
                                        Margin="24,5,0,0" />
                         </StackPanel>
                     </Border>
 
                     <!-- ===== Token 用量 ===== -->
-                    <TextBlock Text="Token 用量" Style="{StaticResource Text.Section}" Margin="2,4,0,8" />
+                    <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.token}" Style="{StaticResource Text.Section}" Margin="2,4,0,8" />
 
                     <Border Style="{StaticResource Card}" Margin="0,0,0,14">
                         <StackPanel>
-                            <TextBlock Text="opencode 数据库" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
+                            <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.tokenDb}" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
                             <TextBox x:Name="TokenDatabaseBox"
                                      Text="{Binding TokenDatabasePath, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource TextBox.Flat}"
                                      Margin="0,6,0,0"
-                                     ToolTip="留空使用默认位置"
+                                     ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.tokenDbTip}"
                                      LostFocus="TokenDatabaseBox_LostFocus"
                                      KeyDown="TokenDatabaseBox_KeyDown" />
-                            <TextBlock Text="留空 = 默认位置 ~/.local/share/opencode/opencode.db。Token 看板只读这个库，不联网。"
+                            <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.tokenDbHint}"
                                        Style="{StaticResource Text.Caption}"
                                        TextWrapping="Wrap"
                                        Margin="2,5,0,0" />
@@ -224,12 +250,12 @@
                     </Border>
 
                     <!-- ===== 快捷键 ===== -->
-                    <TextBlock Text="快捷键" Style="{StaticResource Text.Section}" Margin="2,4,0,8" />
+                    <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.shortcuts}" Style="{StaticResource Text.Section}" Margin="2,4,0,8" />
 
                     <Border Style="{StaticResource Card}" Margin="0,0,0,14">
                         <StackPanel>
                             <Grid Margin="0,0,0,9">
-                                <TextBlock Text="新建待办" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
+                                <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.scNewTodo}" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
                                 <Border HorizontalAlignment="Right" Background="{DynamicResource Brush.AccentSoft}"
                                         CornerRadius="6" Padding="8,2">
                                     <TextBlock Text="{Binding ShortcutNewTodo}" FontSize="11"
@@ -237,7 +263,7 @@
                                 </Border>
                             </Grid>
                             <Grid Margin="0,0,0,9">
-                                <TextBlock Text="显示 / 隐藏全部便签" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
+                                <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.scToggle}" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
                                 <Border HorizontalAlignment="Right" Background="{DynamicResource Brush.AccentSoft}"
                                         CornerRadius="6" Padding="8,2">
                                     <TextBlock Text="{Binding ShortcutToggleBoards}" FontSize="11"
@@ -245,7 +271,7 @@
                                 </Border>
                             </Grid>
                             <Grid>
-                                <TextBlock Text="锁定 / 解锁当前看板" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
+                                <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.scLock}" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
                                 <Border HorizontalAlignment="Right" Background="{DynamicResource Brush.AccentSoft}"
                                         CornerRadius="6" Padding="8,2">
                                     <TextBlock Text="{Binding ShortcutLockActive}" FontSize="11"
@@ -256,25 +282,25 @@
                     </Border>
 
                     <!-- ===== 数据 ===== -->
-                    <TextBlock Text="数据" Style="{StaticResource Text.Section}" Margin="2,4,0,8" />
+                    <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.data}" Style="{StaticResource Text.Section}" Margin="2,4,0,8" />
 
                     <Border Style="{StaticResource Card}">
                         <StackPanel>
                             <Grid Margin="0,0,0,9">
-                                <TextBlock Text="会员状态" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
+                                <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.entitlement}" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
                                 <TextBlock Text="{Binding EntitlementText}"
                                            HorizontalAlignment="Right"
                                            FontSize="11.5"
                                            Foreground="{DynamicResource Brush.Accent}" />
                             </Grid>
                             <Grid Margin="0,0,0,9">
-                                <TextBlock Text="内容统计" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
+                                <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.stats}" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
                                 <TextBlock Text="{Binding StatsText}"
                                            HorizontalAlignment="Right"
                                            FontSize="11.5"
                                            Foreground="{DynamicResource Brush.InkSoft}" />
                             </Grid>
-                            <TextBlock Text="存储位置" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" Margin="0,0,0,4" />
+                            <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.storage}" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" Margin="0,0,0,4" />
                             <Border Background="{DynamicResource Brush.AccentSoft}" CornerRadius="7" Padding="9,7">
                                 <TextBlock Text="{Binding DataPathText}"
                                            FontSize="10.5"
@@ -293,7 +319,7 @@
                     Padding="18,10"
                     Background="{DynamicResource Brush.PaperDeep}"
                     CornerRadius="0,0,13,13">
-                <TextBlock Text="改动即时保存"
+                <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.autoSaved}"
                            Style="{StaticResource Text.Caption}" />
             </Border>
         </Grid>

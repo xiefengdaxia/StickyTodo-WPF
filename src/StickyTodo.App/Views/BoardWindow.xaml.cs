@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -8,6 +8,7 @@ using System.Windows.Threading;
 using StickyTodo.App.Services;
 using StickyTodo.App.ViewModels;
 using StickyTodo.Core.Entities;
+using StickyTodo.Core.Localization;
 using StickyTodo.Core.Geometry;
 using StickyTodo.Core.Recurrence;
 using StickyTodo.Core.Services;
@@ -228,6 +229,34 @@ public partial class BoardWindow : Window, IStickyWindow
     }
 
     // ---------------- 回归测试用入口 ----------------
+
+    /// <summary>
+    /// 给回归用：把界面上由翻译器拼出来的文案汇总成一行，
+    /// 供 --i18n-demo 校验"切语言后文字真的变了"。
+    /// </summary>
+    internal string LocalizedTextsForTest()
+    {
+        var vm = _viewModel;
+
+        var chipNames = string.Join(",", vm.Chips.Select(c => c.Name));
+        var draftHint = vm.DraftPlaceholder;
+
+        return string.Join(" | ",
+            Loc.T("view.todo"),
+            Loc.T("view.done"),
+            Loc.T("common.settings"),
+            Loc.T("common.exit"),
+            Loc.T("menu.dueDate"),
+            Loc.T("pomodoro.title"),
+            Loc.T("cal.lunarWord"),
+            Loc.T("manager.kindCalendar"),
+            Loc.T("token.title"),
+            vm.TodoViewText,
+            vm.DoneViewText,
+            vm.StatusText,
+            chipNames,
+            draftHint);
+    }
 
     /// <summary>给回归用：当前列表里的行数。</summary>
     internal int RowCountForTest() => _viewModel.Rows.Count;

@@ -85,7 +85,7 @@
                             </Style>
                         </StackPanel.Style>
 
-                        <Button Style="{StaticResource Button.Chrome}" ToolTip="置顶" Click="ToggleTopmost_Click">
+                        <Button Style="{StaticResource Button.Chrome}" ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.topmost}" Click="ToggleTopmost_Click">
                             <TextBlock Text="📌" FontSize="11">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
@@ -99,7 +99,7 @@
                                 </TextBlock.Style>
                             </TextBlock>
                         </Button>
-                        <Button Style="{StaticResource Button.Chrome}" ToolTip="锁定" Click="ToggleLock_Click">
+                        <Button Style="{StaticResource Button.Chrome}" ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.lock}" Click="ToggleLock_Click">
                             <TextBlock FontSize="11">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
@@ -113,9 +113,9 @@
                                 </TextBlock.Style>
                             </TextBlock>
                         </Button>
-                        <Button Style="{StaticResource Button.Chrome}" Content="🎨" FontSize="11" ToolTip="皮肤与透明度" Click="Appearance_Click" />
-                        <Button Style="{StaticResource Button.Chrome}" Content="⋯" FontSize="13" ToolTip="看板管理" Click="OpenManager_Click" />
-                        <Button Style="{StaticResource Button.Chrome}" Content="✕" FontSize="11" ToolTip="关闭" Click="Close_Click" />
+                        <Button Style="{StaticResource Button.Chrome}" Content="🎨" FontSize="11" ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.appearance}" Click="Appearance_Click" />
+                        <Button Style="{StaticResource Button.Chrome}" Content="⋯" FontSize="13" ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.manage}" Click="OpenManager_Click" />
+                        <Button Style="{StaticResource Button.Chrome}" Content="✕" FontSize="11" ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.close}" Click="Close_Click" />
                     </StackPanel>
                 </Grid>
             </Border>
@@ -130,7 +130,7 @@
 
                 <Grid Grid.Row="0" Margin="2,0,2,6">
                     <StackPanel Orientation="Horizontal">
-                        <Button Content="‹" Style="{StaticResource Button.Ghost}" Padding="10,2" Click="PrevMonth_Click" ToolTip="上个月" />
+                        <Button Content="‹" Style="{StaticResource Button.Ghost}" Padding="10,2" Click="PrevMonth_Click" ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=cal.prevMonth}" />
 
                         <!-- 年月下拉框：选完直接跳过去 -->
                         <ComboBox x:Name="YearBox"
@@ -142,7 +142,7 @@
                                   SelectionChanged="YearBox_SelectionChanged">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding StringFormat={}{0} 年}" FontSize="11" />
+                                    <TextBlock Text="{Binding Converter={StaticResource LocYear}}" FontSize="11" />
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>
@@ -156,25 +156,25 @@
                                   SelectionChanged="MonthBox_SelectionChanged">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding StringFormat={}{0} 月}" FontSize="11" />
+                                    <TextBlock Text="{Binding Converter={StaticResource LocMonth}}" FontSize="11" />
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>
 
-                        <Button Content="›" Style="{StaticResource Button.Ghost}" Padding="10,2" Margin="4,0,0,0" Click="NextMonth_Click" ToolTip="下个月" />
+                        <Button Content="›" Style="{StaticResource Button.Ghost}" Padding="10,2" Margin="4,0,0,0" Click="NextMonth_Click" ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=cal.nextMonth}" />
                     </StackPanel>
-                    <Button Content="今天" HorizontalAlignment="Right" Style="{StaticResource Button.Ghost}"
+                    <Button Content="{Binding Converter={StaticResource Loc}, ConverterParameter=common.today}" HorizontalAlignment="Right" Style="{StaticResource Button.Ghost}"
                             Padding="10,2" FontSize="11" Click="Today_Click" />
                 </Grid>
 
                 <UniformGrid Grid.Row="1" Columns="7" Margin="0,0,0,4">
-                    <TextBlock Text="一" Style="{StaticResource Text.Caption}" HorizontalAlignment="Center" />
-                    <TextBlock Text="二" Style="{StaticResource Text.Caption}" HorizontalAlignment="Center" />
-                    <TextBlock Text="三" Style="{StaticResource Text.Caption}" HorizontalAlignment="Center" />
-                    <TextBlock Text="四" Style="{StaticResource Text.Caption}" HorizontalAlignment="Center" />
-                    <TextBlock Text="五" Style="{StaticResource Text.Caption}" HorizontalAlignment="Center" />
-                    <TextBlock Text="六" Style="{StaticResource Text.Caption}" HorizontalAlignment="Center" />
-                    <TextBlock Text="日" Style="{StaticResource Text.Caption}" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding DataContext.WeekHeaders[0], RelativeSource={RelativeSource AncestorType=Window}}" Style="{StaticResource Text.Caption}" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding DataContext.WeekHeaders[1], RelativeSource={RelativeSource AncestorType=Window}}" Style="{StaticResource Text.Caption}" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding DataContext.WeekHeaders[2], RelativeSource={RelativeSource AncestorType=Window}}" Style="{StaticResource Text.Caption}" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding DataContext.WeekHeaders[3], RelativeSource={RelativeSource AncestorType=Window}}" Style="{StaticResource Text.Caption}" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding DataContext.WeekHeaders[4], RelativeSource={RelativeSource AncestorType=Window}}" Style="{StaticResource Text.Caption}" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding DataContext.WeekHeaders[5], RelativeSource={RelativeSource AncestorType=Window}}" Style="{StaticResource Text.Caption}" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding DataContext.WeekHeaders[6], RelativeSource={RelativeSource AncestorType=Window}}" Style="{StaticResource Text.Caption}" HorizontalAlignment="Center" />
                 </UniformGrid>
 
                 <ItemsControl Grid.Row="2" ItemsSource="{Binding Days}">
@@ -403,7 +403,7 @@
 
                                             <Button Grid.Column="2" Content="✕" FontSize="10"
                                                     Style="{StaticResource Button.Link}"
-                                                    ToolTip="删除"
+                                                    ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=common.delete}"
                                                     Click="DeleteEntry_Click" />
                                         </Grid>
                                     </Border>
@@ -417,7 +417,7 @@
                         </ItemsControl>
                     </ScrollViewer>
 
-                    <TextBlock Grid.Row="2" Text="这一天没有日程"
+                    <TextBlock Grid.Row="2" Text="{Binding Converter={StaticResource Loc}, ConverterParameter=cal.noEntries}"
                                HorizontalAlignment="Center"
                                Margin="0,6,0,6"
                                IsHitTestVisible="False">
@@ -439,7 +439,7 @@
             <Border Grid.Row="3" BorderBrush="{DynamicResource Brush.Line}" BorderThickness="0,1,0,0" Padding="12,6">
                 <Grid>
                     <TextBlock Text="{Binding ErrorText}" FontSize="11" Foreground="#FFC0392B" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="把待办从列表拖到日期格 = 改期" Style="{StaticResource Text.Caption}"
+                    <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=cal.dragHint}" Style="{StaticResource Text.Caption}"
                                HorizontalAlignment="Right" Opacity="0.75" />
                 </Grid>
             </Border>

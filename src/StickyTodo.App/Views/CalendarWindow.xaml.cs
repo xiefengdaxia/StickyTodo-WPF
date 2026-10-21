@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -6,6 +6,7 @@ using System.Windows.Media;
 using StickyTodo.App.Services;
 using StickyTodo.App.ViewModels;
 using StickyTodo.Core.Entities;
+using StickyTodo.Core.Localization;
 
 namespace StickyTodo.App.Views;
 
@@ -146,8 +147,8 @@ public partial class CalendarWindow : Window, IStickyWindow
         }
 
         var confirm = MessageBox.Show(
-            $"删除「{entry.Title}」？\n如果它是重复待办，整条规则都会被删除。",
-            "确认删除",
+            Loc.F("cal.deleteConfirm", entry.Title),
+            Loc.T("cal.deleteTitle"),
             MessageBoxButton.OKCancel,
             MessageBoxImage.Warning);
 
@@ -167,7 +168,7 @@ public partial class CalendarWindow : Window, IStickyWindow
         }
         catch (Exception ex)
         {
-            MessageBox.Show(ex.Message, "删除失败", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(ex.Message, Loc.T("cal.deleteFailed"), MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 

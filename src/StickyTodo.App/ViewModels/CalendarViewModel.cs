@@ -1,9 +1,10 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using StickyTodo.App.Services;
 using StickyTodo.Core.Calendar;
 using StickyTodo.Core.Entities;
+using StickyTodo.Core.Localization;
 using StickyTodo.Core.Services;
 
 namespace StickyTodo.App.ViewModels;
@@ -87,7 +88,11 @@ public partial class CalendarViewModel : ObservableObject, IAppearanceHost
 
     public ObservableCollection<CalendarEntryViewModel> SelectedDayEntries { get; } = new();
 
-    public IReadOnlyList<string> WeekHeaders => ["一", "二", "三", "四", "五", "六", "日"];
+    public IReadOnlyList<string> WeekHeaders =>
+    [
+        Loc.T("cal.weekMon"), Loc.T("cal.weekTue"), Loc.T("cal.weekWed"), Loc.T("cal.weekThu"),
+        Loc.T("cal.weekFri"), Loc.T("cal.weekSat"), Loc.T("cal.weekSun"),
+    ];
 
     [ObservableProperty]
     private string _boardName;
@@ -140,7 +145,7 @@ public partial class CalendarViewModel : ObservableObject, IAppearanceHost
 
     public async Task LoadAsync()
     {
-        MonthTitle = $"{Year} 年 {Month} 月";
+        MonthTitle = Loc.F("cal.yearFormat", Year) + " " + Loc.F("cal.monthFormat", Month);
 
         var (fromDay, toDay) = MonthGrid.VisibleRange(Year, Month);
         var from = new DateTimeOffset(fromDay.ToDateTime(TimeOnly.MinValue));
@@ -162,7 +167,7 @@ public partial class CalendarViewModel : ObservableObject, IAppearanceHost
         }
 
         UpdateSelectedDay();
-        StatusText = $"本月 {_monthEntries.Count(e => e.Entry.Day.Month == Month && e.Entry.Day.Year == Year)} 项日程";
+        StatusText = Loc.F("cal.itemCount", _monthEntries.Count(e => e.Entry.Day.Month == Month && e.Entry.Day.Year == Year));
     }
 
     private void UpdateSelectedDay()
@@ -171,35 +176,41 @@ public partial class CalendarViewModel : ObservableObject, IAppearanceHost
         var lunar = almanac.Lunar;
 
         var week = WeekdayName(SelectedDate.DayOfWeek);
-        SelectedDateText = lunar.IsValid
-            ? $"{SelectedDate.Month} 月 {SelectedDate.Day} 日 · {week} · 农历{lunar.FullText}"
-            : $"{SelectedDate.Month} 月 {SelectedDate.Day} 日 · {week}";
 
-        // 黄历：日期信息 + 建除十二神 + 宜/忌
+        // 说明：农历日期、干支、建除十二神、宜忌条目本身**保持中文**——
+        // 这些是中文历法术语，硬译过去反而看不懂（例如「宜 捕捉 狩猎」）。
+        // 只有「农历」「节气」「节假日」这些**标签**跟随界面语言。
+        var lunarWord = Loc.T("cal.lunarWord");
+        var monthDay = Loc.F("cal.selectedDate", SelectedDate.Month, SelectedDate.Day);
+
+        SelectedDateText = lunar.IsValid
+            ? Loc.F("cal.selectedDateWithLunar", SelectedDate.Month, SelectedDate.Day, week, lunar.FullText)
+            : $"{monthDay} · {week}";
+
         AlmanacDateText = lunar.IsValid
-            ? $"农历{lunar.FullText} · {LunarCalendar.YearGanZhi(lunar.Year)}年（{LunarCalendar.YearZodiac(lunar.Year)}）· {almanac.GanZhi}日 · {almanac.Officer}日"
+            ? $"{lunarWord}{lunar.FullText} · {LunarCalendar.YearGanZhi(lunar.Year)}年（{LunarCalendar.YearZodiac(lunar.Year)}）· {almanac.GanZhi}日 · {almanac.Officer}日"
             : $"{almanac.GanZhi}日 · {almanac.Officer}日";
 
         var extras = new List<string>();
         if (!string.IsNullOrEmpty(almanac.SolarTerm))
         {
-            extras.Add($"节气 {almanac.SolarTerm}");
+            extras.Add(Loc.F("cal.solarTermTag", almanac.SolarTerm));
         }
 
         if (!string.IsNullOrEmpty(almanac.HolidayName))
         {
-            extras.Add($"节假日 {almanac.HolidayName}");
+            extras.Add(Loc.F("cal.holidayTag", almanac.HolidayName));
         }
 
         if (almanac.Kind == DayKind.MakeupWorkday)
         {
-            extras.Add("调休补班");
+            extras.Add(Loc.T("cal.makeupTag"));
         }
 
         AlmanacMetaText = string.Join(" · ", extras);
 
-        AlmanacYiText = "宜 " + string.Join(" ", almanac.Yi);
-        AlmanacJiText = "忌 " + string.Join(" ", almanac.Ji);
+        AlmanacYiText = Loc.T("cal.yi") + " " + string.Join(" ", almanac.Yi);
+        AlmanacJiText = Loc.T("cal.ji") + " " + string.Join(" ", almanac.Ji);
         ShowAlmanac = true;
 
         SelectedDayEntries.Clear();
@@ -209,16 +220,16 @@ public partial class CalendarViewModel : ObservableObject, IAppearanceHost
         }
     }
 
-    private static string WeekdayName(DayOfWeek day) => day switch
+    private static string WeekdayName(DayOfWeek day) => Loc.T(day switch
     {
-        DayOfWeek.Monday => "周一",
-        DayOfWeek.Tuesday => "周二",
-        DayOfWeek.Wednesday => "周三",
-        DayOfWeek.Thursday => "周四",
-        DayOfWeek.Friday => "周五",
-        DayOfWeek.Saturday => "周六",
-        _ => "周日",
-    };
+        DayOfWeek.Monday => "cal.weekdayMon",
+        DayOfWeek.Tuesday => "cal.weekdayTue",
+        DayOfWeek.Wednesday => "cal.weekdayWed",
+        DayOfWeek.Thursday => "cal.weekdayThu",
+        DayOfWeek.Friday => "cal.weekdayFri",
+        DayOfWeek.Saturday => "cal.weekdaySat",
+        _ => "cal.weekdaySun",
+    });
 
     public async Task GoToMonthAsync(int delta)
     {

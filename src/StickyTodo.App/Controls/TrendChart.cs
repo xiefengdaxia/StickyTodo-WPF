@@ -1,7 +1,8 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using StickyTodo.Core.Entities;
+using StickyTodo.Core.Localization;
 
 namespace StickyTodo.App.Controls;
 
@@ -80,7 +81,7 @@ public sealed class TrendChart : FrameworkElement
         var series = Series;
         if (series is null || series.Count == 0)
         {
-            DrawText(dc, "暂无数据", width / 2, height / 2, 11, Brushes.Gray, center: true);
+            DrawText(dc, Loc.T("token.noData"), width / 2, height / 2, 11, Brushes.Gray, center: true);
             return;
         }
 

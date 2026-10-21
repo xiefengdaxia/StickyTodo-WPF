@@ -7,6 +7,7 @@ using System.Windows.Threading;
 using StickyTodo.App;
 using StickyTodo.App.Services;
 using StickyTodo.App.ViewModels;
+using StickyTodo.Core.Localization;
 using StickyTodo.Core.Pomodoro;
 
 namespace StickyTodo.App.Views;
@@ -115,10 +116,16 @@ public partial class PomodoroWindow : Window
 
     private void OnPhaseFinished(PomodoroPhase finished)
     {
-        var next = PomodoroEngine.PhaseName(_viewModel.Engine.Phase);
+        var nextKey = _viewModel.Engine.Phase switch
+        {
+            PomodoroPhase.ShortBreak => "pomodoro.shortBreak",
+            PomodoroPhase.LongBreak => "pomodoro.longBreak",
+            _ => "pomodoro.focus",
+        };
+
         var (title, text) = finished == PomodoroPhase.Focus
-            ? ("专注结束", $"休息一下，接下来是{next}")
-            : ("休息结束", "回到专注，继续加油");
+            ? (Loc.T("pomodoro.focusDone"), Loc.F("pomodoro.focusDoneBody", Loc.T(nextKey)))
+            : (Loc.T("pomodoro.breakDone"), Loc.T("pomodoro.breakDoneBody"));
 
         _notify?.Invoke(title, text);
 

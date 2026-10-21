@@ -1,6 +1,7 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using StickyTodo.Core.Calendar;
+using StickyTodo.Core.Localization;
 namespace StickyTodo.App.ViewModels;
 
 /// <summary>日历里的一天。</summary>
@@ -104,5 +105,5 @@ public sealed class CalendarEntryViewModel
         ? string.Empty
         : Entry.Occurrence.ToString("HH:mm");
 
-    public string BoardTag => Entry.IsVirtual ? "重复" : string.Empty;
+    public string BoardTag => Entry.IsVirtual ? Loc.T("memo.repeatLabel") : string.Empty;
 }

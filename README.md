@@ -1,6 +1,8 @@
 ﻿# StickyTodo
 
-一个从零写的 Windows 桌面便签 / 待办应用：WPF + .NET 8 + SQLite。**全程本地运行**——不联服务器、不做账号、不埋点、不检查更新；**所有用户默认就是永久会员，全部功能无限制**。
+**简体中文** | [English](README.en.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
+
+一个从零写的 Windows 桌面便签 / 待办应用：WPF + .NET 8 + SQLite。**全程本地运行**——不联服务器、不做账号、不埋点、不检查更新；**所有用户默认就是永久会员，全部功能无限制**。界面支持**简体中文 / English / 日本語 / 한국어**四种语言，可在设置里随时切换。
 
 > 借鉴了同类工具的产品形态（多看板、一板一窗、重复任务、日历），但**代码、UI、文案、配色全部为原创实现**，没有复制任何第三方程序的反编译产物、资源文件或私有接口。
 
@@ -56,19 +58,30 @@ TODO / Done 视图切换：
 |---|---|---|
 | ![待办视图](artifacts/board-todo-view.png) | ![Done视图](artifacts/board-done-view.png) | ![行内编辑](artifacts/board-inline-edit.png) |
 
+四种语言的界面（看板名为用户数据，保持原样）：
+
+| English | 日本語 | 한국어 |
+|---|---|---|
+| ![EN](artifacts/i18n-en.png) | ![JA](artifacts/i18n-ja.png) | ![KO](artifacts/i18n-ko.png) |
+
+设置页也可切换语言（下图为日文界面）：
+
+![日文设置页](artifacts/i18n-settings-ja.png)
+
 ---
 
 ## 1. 快速开始
 
 ```powershell
 dotnet build -c Debug                       # 编译
-dotnet test                                 # 单元测试（226 个）
+dotnet test                                 # 单元测试（245 个）
 ```
 
 ```powershell
 $exe = ".\src\StickyTodo.App\bin\Debug\net8.0-windows\StickyTodo.exe"
 
 & $exe                                     # 正常使用
+& $exe --lang en                           # 强制英文界面（本次运行有效，不改设置）
 & $exe --selftest                          # 无界面自检：建库 + 种子看板，退出码 0
 & $exe --demo                              # 种一份示例数据并打开两个便签窗口（库里没数据时才种）
 & $exe --demo --shot D:\shots              # 演示 + 把每个窗口渲染成 PNG，然后自动退出
@@ -91,8 +104,9 @@ $exe = ".\src\StickyTodo.App\bin\Debug\net8.0-windows\StickyTodo.exe"
 & $exe --token-demo --shot D:\shots         # Token 看板回归（假数据源，不读库）
 & $exe --token-demo --live                  # Token 看板回归，读真实的本机 opencode 库
 & $exe --calendar-demo --shot D:\shots      # 日历回归：农历/节气/休班/黄历/年月下拉
-&  --pomodoro-demo --shot D:\shots      # 番茄钟回归：整周期、暂停、跳过、今日计数
-&  --motion-demo --shot D:\shots        # 动效回归：入场/脉冲/勾选/删除/完成，读属性验证动画真在跑
+& $exe --pomodoro-demo --shot D:\shots      # 番茄钟回归：整周期、暂停、跳过、今日计数
+& $exe --motion-demo --shot D:\shots        # 动效回归：入场/脉冲/勾选/删除/完成，读属性验证动画真在跑
+& $exe --i18n-demo --shot D:\shots          # 多语言回归：四种语言逐一切换并校验界面文案
 & $exe --manager-menu-demo --shot D:\shots  # 主窗体卡片右键菜单（验证含「重命名」「删除」）
 & $exe --settings-reopen-demo              # 反复打开/关闭设置页 5 轮，验证不会崩（退出码 0 = 通过）
 & $exe --window-opacity-demo --shot D:\shots  # 整窗透明度 100/60/40% 并读回 Window.Opacity 断言
@@ -120,22 +134,26 @@ $exe = ".\src\StickyTodo.App\bin\Debug\net8.0-windows\StickyTodo.exe"
 StickyTodo.sln
 ├─ src/StickyTodo.Core             领域层（仅依赖 Ical.Net，无 UI/DB 依赖）
 │   ├─ Entities/                   Board / BoardWindowState / TodoItem / TodoCompletion / Tag / Note
-│   ├─ Abstractions/               ITodoRepository
+│   ├─ Abstractions/               ITodoRepository / ITokenStatsProvider
+│   ├─ Localization/               AppLanguage / UiStrings（四语文案）/ Translator
 │   ├─ Entitlements/               IEntitlementService + PermanentFree / FreeTier
 │   ├─ Geometry/                   SnapRect / WindowSnapper（吸附算法）
-│   ├─ Calendar/                   MonthGrid（月网格）、CalendarProjection（待办投影到日期）
+│   ├─ Calendar/                   MonthGrid / CalendarProjection / LunarCalendar / SolarTerms / ChineseHolidays / Almanac / Festivals
+│   ├─ Pomodoro/                   PomodoroEngine（纯状态机，可单测）
 │   ├─ Recurrence/                 RecurrenceEngine（RFC 5545 RRULE）
 │   └─ Services/                   TodoService、AppSettingsService、TodoOrdering、DueDateText
 ├─ src/StickyTodo.Infrastructure   基础设施（SQLite / 文件系统）
 │   ├─ Persistence/SqliteTodoRepository.cs
+│   ├─ Token/OpenCodeTokenStatsProvider.cs
 │   └─ AppPaths.cs
 ├─ src/StickyTodo.App              WPF 表现层（net8.0-windows）
 │   ├─ App.xaml(.cs)               最小 Host + DI + Serilog + 单实例 + 自检/演示
-│   ├─ Views/                      ManagerWindow / SettingsWindow / BoardWindow / MemoBoardWindow / CalendarWindow / PromptWindow / ReminderPopup
-│   ├─ ViewModels/                 CommunityToolkit.Mvvm（四类看板 + 设置页）
-│   ├─ Services/                   WindowManager / TrayService / ScreenHelper
-│   └─ Converters/
-└─ tests/StickyTodo.Tests          xUnit
+│   ├─ Views/                      ManagerWindow / SettingsWindow / BoardWindow / MemoBoardWindow / CalendarWindow / TokenBoardWindow / PomodoroWindow / PromptWindow / ReminderPopup
+│   ├─ ViewModels/                 CommunityToolkit.Mvvm（四类看板 + 设置页 + 番茄钟）
+│   ├─ Controls/                   TrendChart（自绘趋势图）
+│   ├─ Services/                   WindowManager / TrayService / SkinService / LocalizationService / Motion / ScreenHelper
+│   └─ Converters/                 含多语言转换器（Loc / LocFormat / LocYear / LocMonth）
+└─ tests/StickyTodo.Tests          xUnit（245 个）
 ```
 
 图标生成器在 `tools/IconGen`（WPF 矢量绘制 → 多尺寸 ICO）：
@@ -150,6 +168,15 @@ dotnet run --project tools/IconGen -c Release -- src/StickyTodo.App/Assets/stick
 
 ## 3. 当前功能
 
+**多语言（4 种）**
+- 界面支持 **简体中文 / English / 日本語 / 한국어**，在设置页「语言」下拉里切换，**立即生效不用重启**
+- 切换语言时会遍历所有已打开窗口，把带转换器的绑定重新求值（`LocalizationService.RefreshAllWindows`），因此切完当场就能看到全部文案变化
+- 语言选择落库（`appearance.language`），下次启动自动恢复；启动时在创建任何窗口**之前**应用，避免先闪一下中文
+- `--lang en|ja|ko|zh-CN` 可临时强制某语言（截图回归用，不写回设置）
+- **农历术语保留中文**：农历日期、干支、建除十二神、节气名、宜/忌条目本身不翻译（这些是中文历法专有概念，硬译反而看不懂），只有「农历」「节气」「宜」「忌」这些**标签**跟随界面语言
+- 数字单位按语言切换：中文用「万/亿」，其它语言用 `M/B`
+- `` `--` `` 文案一致性由单测守住：`LocalizationTests` 校验 4 种语言齐全、占位符 `{0}/{1}` 跨语言一致、每条译文都能被 `string.Format` 正确处理
+
 **外观（贴纸感）**
 - **所有窗口都没有系统标题栏**：主窗体、设置页、便签窗口、输入框全部自绘标题栏（可拖动，主窗与设置页支持边缘缩放与最大化）
 - 便签窗口**无边框 + 圆角 + 投影**，边缘 8px 可缩放（自己处理 `WM_NCHITTEST`）
@@ -161,9 +188,10 @@ dotnet run --project tools/IconGen -c Release -- src/StickyTodo.App/Assets/stick
 - 便签不在任务栏占位（贴纸风格），入口走托盘和主窗体
 
 **设置页（独立窗口）**
+- **语言下拉**：四种语言原生名称，选定立即生效
 - 10 套配色以**色卡网格**呈现（两行各 5 个），点一下所有窗口立即生效（不需要重启）
 - 两个透明度滑块，实时预览并即时保存
-- 三个全局快捷键一覧
+- 三个全局快捷键一览
 - 数据区：会员状态、内容统计（看板/待办/已完成/标签数）、本地存储路径
 - 入口：主窗体左下「设置」、托盘右键菜单「设置」
 
@@ -178,7 +206,7 @@ dotnet run --project tools/IconGen -c Release -- src/StickyTodo.App/Assets/stick
 - 托盘图标：可勾选式开关任意看板窗口、显示/隐藏全部、打开管理面板、退出；点 X 只收进托盘
 
 **日历看板**
-- 月视图固定 6 周网格（周一开头），今天高亮、周末标红、跨月日期淡化
+- 月视图固定 6 周网格（周一开头），今天高亮、周末标红、跨月日期淡化；星期表头随语言变化
 - **每格显示农历**（初一显示「X月」，其余显示「初二 / 廿三」）
 - **节气 / 传统节日 / 法定节假日**都会写在格子里：节气（立春、清明、霜降…）、除夕、春节、元宵、端午、七夕、中秋、重阳、腊八，以及元旦、劳动节、国庆等
 - **「休」「班」角标**：红色「休」= 放假，灰色「班」= 调休补班（数据来自国务院 2024–2026 年放假通知，手工录入，不联网）
@@ -203,7 +231,7 @@ dotnet run --project tools/IconGen -c Release -- src/StickyTodo.App/Assets/stick
 **番茄时钟**
 - 托盘菜单「番茄时钟」打开，独立悬浮小窗，默认置顶
 - 25 分钟专注 + 5 分钟短休息，**每 4 个番茄换 15 分钟长休息**（周期数在 `PomodoroEngine` 里可配）
-- 圆环进度 + 大字倒计时；**专注 / 休息两种配色**
+- 圆环进度 + 大字倒计时；**专注 / 休息两种配色**，圆环 30fps 补间
 - 开始 / 暂停 / 继续 / 重置 / 跳过；专注结束弹托盘通知，休息结束自动进入下一轮专注
 - **今日完成个数落库**，跨天自动归零
 
@@ -263,7 +291,7 @@ dotnet run --project tools/IconGen -c Release -- src/StickyTodo.App/Assets/stick
 
 ```sql
 board(id, name, sort, is_default, kind, created_at,
-      win_left, win_top, win_width, win_height)          -- kind: todo | memo | calendar
+      win_left, win_top, win_width, win_height)          -- kind: todo | memo | calendar | token
 todo(id, board_id→board.id ON DELETE CASCADE, title, note,
      is_done, done_at, due_at, remind_at, reminded_at, recurrence,
      sort, created_at, updated_at)                        -- recurrence: RFC5545 RRULE
@@ -327,7 +355,7 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 **M2.5 外观（已完成）**
 - [x] 便签窗口无边框 + 圆角 + 投影 + 自绘标题栏 + 边缘缩放
 - [x] 背景半透明（10 档，默认 92%），文字始终清晰
-- [x] **整窗透明度**（连文字一起，6 档）可与背景透明度**分别调**
+- [x] **整窗透明度**（连文字一起，10 档）可与背景透明度**分别调**
 - [x] **主窗体与设置页也改成无边框自绘标题栏**，主窗改为「左侧操作栏 + 右侧看板卡片」布局
 - [x] **独立设置页**：色卡网格选皮肤 / 双透明度滑块 / 快捷键一览 / 数据统计与存储路径
 - [x] 皮肤扩到 **10 套**（新增「暖橘杏」亮色、「深棕咖」暗色，补齐 3 亮彩 + 3 彩色 + 1 中性 + 3 暗色），画刷走 `DynamicResource`，切换即时全局生效；`--skin-check` 会逐套校验对比度（正文 ≥4.5、强调 ≥2.5）与资源同步
@@ -343,7 +371,7 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 - [x] **应用图标**：便签纸 + 折角 + 对勾，9 个尺寸（16–256）多尺寸 ICO，窗口与托盘共用
 - [x] **悬停按钮移到行尾最右侧**，第二行标签与标题左边缘对齐
 - [x] **修复锁定后白屏**：`IsEnabled=false` 时 ListBox 默认模板会画出系统白底，改为透明模板
-- [x] **主窗体与设置页改为不透明窗口**，透明度只作用于三类看板；滑块 10% 一档
+- [x] **主窗体与设置页改为不透明窗口**，透明度只作用于看板；滑块 10% 一档
 - [x] **修复「开关设置窗口后程序崩溃」**：单例窗口被 Close 后再 Show 会抛异常，改为关闭仅隐藏 + 全局异常兜底
 - [x] 置顶 / 锁定（按看板记忆，存 `setting` 表）
 - [x] 截图回归带假桌面背景，一眼验证透明度
@@ -375,14 +403,19 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 - [x] **开机自启**（注册表 `Run` + `--autostart`）：自启时只恢复上次的看板，不弹管理面板；没有可恢复看板时才回落显示
 
 **M5（已完成）**
-- [x] **Token 用量看板（读本机 opencode 库）**：5/15/30 秒自动刷新 + 手动刷新、今天/近3/7/30 天范围、趋势图（堆叠柱 + 折线）、点柱子看时段明细、按模型占比；兼容 v1/v2 两套消息表且不重复计数
+- [x] **Token 用量看板（读本机 opencode 库）**：5/15/30 秒自动刷新 + 手动刷新、今天/近3/7/30 天范围、趋势图（堆叠柱 + 折线）、点柱子看时段明细、按模型占比
 - [x] **日历看板升级**：农历日期、二十四节气、传统节日、法定节假日「休」/ 调休补班「班」、点击某天显示黄历宜忌（干支 + 建除十二神 + 宜/忌）、年月下拉框任意跳转
 - [x] **番茄时钟**：25/5/15 分钟三段、圆环进度、开始/暂停/重置/跳过、托盘通知、今日完成数落库跨天归零
+- [x] **全面动效**：窗口入场、按钮按下缩放、复选框弹跳、行操作反馈、刷新旋转、圆环补间，且尊重系统「减少动效」设置
+
+**M6（已完成）**
+- [x] **四语言界面**：简体中文 / English / 日本語 / 한국어，设置页即时切换，农历术语保留中文；单测守住译文完整性与占位符一致性
+- [x] **README 四语版本**：`README.md`（中）/ `.en.md` / `.ja.md` / `.ko.md`，顶部互相链接
 
 **M4 外延**
 - [ ] ICS 订阅与导入导出
 - [ ] Excel 导入导出（NPOI）
-- [ ] 多语言资源、主题切换
+- [ ] 更多语言（可选）
 - [ ] 便携模式打包（单文件 / Velopack）
 
 ---
@@ -396,11 +429,12 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 - **节假日/调休数据是手工录入的**（覆盖 2024–2026 年），国务院每年 11 月左右发布次年安排，届时需要往 `ChineseHolidays` 里补数据；超出范围的年份只有「周末休息」的默认判断。
 - **二十四节气用通用日数公式计算**，个别年份可能与官方历书差一天（公式内的特例表已覆盖已知偏差）。
 - **黄历的宜忌是按建除十二神给的通用条目**，不是逐日通书，只作参考；不涉及择日、神煞、时辰吉凶。
+- **非中文界面下农历内容仍显示中文**：这是刻意的取舍（见上文「多语言」）。如果希望完全本地化，可以自行在 `UiStrings` 里补译文并把 `Almanac` 的条目也做成资源。
 - **Token 看板依赖 opencode 的库表结构**（`session_message.data` 里的 `tokens` / `model` 字段）。opencode 改版导致字段变动时读数会变 0，需要跟着调整 SQL；库不存在时页脚会提示去设置里指定路径。
 - Token 看板的**首次**打开某个大范围（近 30 天要读 100MB+）仍需 1 秒左右，之后同一范围是毫秒级；历史日期的缓存只存在内存里，重启程序后第一次进入需要重算。
 - Token 统计的是**消息级用量累加**，与 opencode 自己按会话累加的 `session_v2.tokens_*` 在口径上可能有细微差别（消息级更细，也更能按时间分桶）。
 - 重复待办的完成历史目前只记录、未展示（将来用在「本月完成了多少次」这类统计上）。
-- UI 层没有自动化测试，靠 `--selftest` / `--recurrence-demo` / `--shot` 做回归。
+- UI 层没有自动化测试，靠 `--selftest` / `--recurrence-demo` / `--shot` 等 12 个回归模式做保障。
 
 ---
 
@@ -409,4 +443,4 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 [MIT](LICENSE) © 2026 xiefengdaxia
 
 代码、UI、文案、配色全部为本项目原创实现，没有复制任何第三方程序的反编译产物、资源文件或私有接口。
-渲染用的系统字体（如「Microsoft YaHei UI」）需遵守其各自的授权，不属于本项目分发内容。
+渲染用的系统字体（如「Microsoft YaHei UI」/「Yu Gothic UI」/「Malgun Gothic」）需遵守其各自的授权，不属于本项目分发内容。

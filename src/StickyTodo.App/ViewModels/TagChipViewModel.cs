@@ -1,4 +1,5 @@
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
+using StickyTodo.Core.Localization;
 
 namespace StickyTodo.App.ViewModels;
 
@@ -12,13 +13,33 @@ public partial class TagChipViewModel : ObservableObject
     public TagChipViewModel(string? tagId, string name, string color)
     {
         TagId = tagId;
-        Name = name;
+        _name = name;
         Color = color;
     }
 
     public string? TagId { get; }
 
-    public string Name { get; }
+    /// <summary>显示名。内置的「全部 / 未分类」会随语言变化，所以是可写属性。</summary>
+    public string Name
+    {
+        get => _name;
+        private set
+        {
+            if (_name == value)
+            {
+                return;
+            }
+
+            _name = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(ChipToolTip));
+        }
+    }
+
+    private string _name;
+
+    /// <summary>切换语言时更新显示名。</summary>
+    public void SetName(string name) => Name = name;
 
     public string Color { get; }
 
@@ -31,9 +52,9 @@ public partial class TagChipViewModel : ObservableObject
     /// <summary>悬停提示：说清楚拖上去会发生什么。</summary>
     public string ChipToolTip => TagId switch
     {
-        null => "显示全部待办；把待办拖到这里可清空它的标签",
-        NoTagId => "只看没有标签的待办；把待办拖到这里可清空它的标签",
-        _ => $"只看「{Name}」；把待办拖到这里可打上这个标签",
+        null => Loc.T("tag.allTip"),
+        NoTagId => Loc.T("tag.noneTip"),
+        _ => Loc.F("tag.someTip", Name),
     };
 
     [ObservableProperty]

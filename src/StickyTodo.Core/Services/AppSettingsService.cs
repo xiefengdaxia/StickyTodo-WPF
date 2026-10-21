@@ -9,6 +9,7 @@ namespace StickyTodo.Core.Services;
 public sealed class AppSettingsService
 {
     public const string SkinKey = "appearance.skin";
+    public const string LanguageKey = "appearance.language";
     public const string OpacityKey = "appearance.opacity";
     public const string WindowOpacityKey = "appearance.windowOpacity";
 
@@ -61,6 +62,15 @@ public sealed class AppSettingsService
 
     /// <summary>番茄钟计数对应的日期（用来跨天清零）。</summary>
     public const string PomodoroCountDateKey = "pomodoro.countDate";
+
+    /// <summary>
+    /// 界面语言（存储键如 zh-CN / en / ja / ko）。无法识别时回落简体中文。
+    /// </summary>
+    public string Language
+    {
+        get => Localization.AppLanguages.Resolve(GetString(LanguageKey, null)).Key;
+        set => _repository.SetSetting(LanguageKey, Localization.AppLanguages.Resolve(value).Key);
+    }
 
     /// <summary>背景色方案。</summary>
     public string Skin

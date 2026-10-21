@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 using StickyTodo.App.Services;
 using StickyTodo.Core.Abstractions;
 using StickyTodo.Core.Entities;
+using StickyTodo.Core.Localization;
 using StickyTodo.Core.Services;
 
 namespace StickyTodo.App.ViewModels;
@@ -88,10 +89,10 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, ID
         _isLocked = settings.GetBoardLocked(board.Id);
         _windowOpacity = skin.WindowOpacity;
 
-        Ranges.Add(new TokenRangeOption(0, "今天"));
-        Ranges.Add(new TokenRangeOption(3, "近3天"));
-        Ranges.Add(new TokenRangeOption(7, "近7天"));
-        Ranges.Add(new TokenRangeOption(30, "近30天"));
+        Ranges.Add(new TokenRangeOption(0, Loc.T("token.rangeToday")));
+        Ranges.Add(new TokenRangeOption(3, Loc.T("token.range3")));
+        Ranges.Add(new TokenRangeOption(7, Loc.T("token.range7")));
+        Ranges.Add(new TokenRangeOption(30, Loc.T("token.range30")));
 
         Intervals.Add(new TokenIntervalOption(5));
         Intervals.Add(new TokenIntervalOption(15));
@@ -103,7 +104,7 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, ID
         SelectInterval(_refreshSeconds, persist: false);
 
         _sourceText = provider.SourceDescription;
-        SourceError = provider.IsAvailable ? null : "找不到 opencode 数据库，请到设置里指定路径";
+        SourceError = provider.IsAvailable ? null : Loc.T("token.sourceMissing");
 
         _timer = new DispatcherTimer();
         _timer.Tick += async (_, _) => await RefreshAsync();
@@ -134,7 +135,7 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, ID
     private string? _errorText;
 
     [ObservableProperty]
-    private string _updatedText = "尚未刷新";
+    private string _updatedText = Loc.T("token.never");
 
     [ObservableProperty]
     private string _rangeText = string.Empty;
@@ -144,7 +145,7 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, ID
     private string _totalText = "0";
 
     [ObservableProperty]
-    private string _stepsText = "0 次";
+    private string _stepsText = "-";
 
     [ObservableProperty]
     private string _cacheRatioText = "0%";
@@ -216,7 +217,7 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, ID
         }
     }
 
-    public string RefreshHint => $"每 {RefreshSeconds}s 自动刷新";
+    public string RefreshHint => Loc.F("token.refreshHint", RefreshSeconds);
 
     public void SelectRange(int days, bool persist = true)
     {
@@ -353,8 +354,8 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, ID
         {
             if (generation == _fetchGeneration && !silent)
             {
-                ErrorText = $"读取失败：{ex.Message}";
-                UpdatedText = $"刷新失败 · {DateTime.Now:HH:mm:ss}";
+                ErrorText = Loc.F("token.readFailed", ex.Message);
+                UpdatedText = Loc.F("token.refreshFailed", DateTime.Now.ToString("HH:mm:ss"));
             }
         }
         finally
@@ -379,19 +380,22 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, ID
         HasData = true;
 
         TotalText = FormatTokens(stats.Total.Total);
-        StepsText = $"{stats.Steps} 次";
+        StepsText = stats.Steps.ToString();
         CacheRatioText = $"{stats.Total.CacheRatio * 100:0.0}%";
-        BreakdownText =
-            $"输入 {FormatTokens(stats.Total.Input)} · 输出 {FormatTokens(stats.Total.Output)} · " +
-            $"推理 {FormatTokens(stats.Total.Reasoning)} · 缓存读 {FormatTokens(stats.Total.CacheRead)}";
+        BreakdownText = Loc.F(
+            "token.breakdown",
+            FormatTokens(stats.Total.Input),
+            FormatTokens(stats.Total.Output),
+            FormatTokens(stats.Total.Reasoning),
+            FormatTokens(stats.Total.CacheRead));
 
         RangeText = stats.From == DateTimeOffset.MinValue
             ? string.Empty
             : RangeDays == 0
-                ? $"{stats.From:MM-dd} 今天 · {stats.Series.Count(p => p.Total > 0)} 个时段有用量"
-                : $"{stats.From:MM-dd} ~ {stats.To:MM-dd} · 活跃 {stats.ActiveDays} 天";
+                ? Loc.F("token.rangeTodayMeta", stats.From.ToString("MM-dd"), stats.Series.Count(p => p.Total > 0))
+                : Loc.F("token.rangeMeta", stats.From.ToString("MM-dd"), stats.To.ToString("MM-dd"), stats.ActiveDays);
 
-        UpdatedText = $"更新于 {DateTime.Now:HH:mm:ss}";
+        UpdatedText = Loc.F("token.updatedAt", DateTime.Now.ToString("HH:mm:ss"));
 
         Models.Clear();
         foreach (var model in stats.Models.OrderByDescending(m => m.Total))
@@ -423,11 +427,15 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, ID
 
         var point = Stats.Series[index];
         SelectedIndex = index;
-        DetailTitle = $"{point.Key} · 共 {FormatTokens(point.Total)}";
-        DetailBody =
-            $"调用 {point.Steps} 次 · 输入 {FormatTokens(point.Usage.Input)} · " +
-            $"输出 {FormatTokens(point.Usage.Output)} · 推理 {FormatTokens(point.Usage.Reasoning)} · " +
-            $"缓存读 {FormatTokens(point.Usage.CacheRead)} · 缓存比 {point.Usage.CacheRatio * 100:0.0}%";
+        DetailTitle = Loc.F("token.detailTitle", point.Key, FormatTokens(point.Total));
+        DetailBody = Loc.F(
+            "token.detailBody",
+            point.Steps,
+            FormatTokens(point.Usage.Input),
+            FormatTokens(point.Usage.Output),
+            FormatTokens(point.Usage.Reasoning),
+            FormatTokens(point.Usage.CacheRead),
+            $"{point.Usage.CacheRatio * 100:0.0}%");
         HasDetail = true;
     }
 
@@ -442,14 +450,32 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, ID
     /// <summary>把 12345678 显示成 12.35M 这类好读的写法。</summary>
     public static string FormatTokens(long value)
     {
-        if (value >= 100_000_000)
-        {
-            return $"{value / 100_000_000.0:0.##}亿";
-        }
+        // 中文用「亿/万」，其它语言用国际单位 B/M/K，避免出现 "1.2亿" 这种看不懂的写法
+        var isChinese = Loc.Language == AppLanguage.ChineseSimplified;
 
-        if (value >= 10_000)
+        if (isChinese)
         {
-            return $"{value / 10_000.0:0.#}万";
+            if (value >= 100_000_000)
+            {
+                return $"{value / 100_000_000.0:0.##}亿";
+            }
+
+            if (value >= 10_000)
+            {
+                return $"{value / 10_000.0:0.#}万";
+            }
+        }
+        else
+        {
+            if (value >= 1_000_000_000)
+            {
+                return $"{value / 1_000_000_000.0:0.##}B";
+            }
+
+            if (value >= 1_000_000)
+            {
+                return $"{value / 1_000_000.0:0.##}M";
+            }
         }
 
         if (value >= 1_000)
@@ -570,13 +596,14 @@ public sealed class TokenModelUsageRow
 
     public string TotalText => TokenBoardViewModel.FormatTokens(Usage.Total);
 
-    public string StepsText => $"{Usage.Steps} 次";
+    public string StepsText => Usage.Steps.ToString();
 
     public string ShareText => $"{Share * 100:0.#}%";
 
-    public string DetailText =>
-        $"输入 {TokenBoardViewModel.FormatTokens(Usage.Usage.Input)} · " +
-        $"输出 {TokenBoardViewModel.FormatTokens(Usage.Usage.Output)} · " +
-        $"推理 {TokenBoardViewModel.FormatTokens(Usage.Usage.Reasoning)} · " +
-        $"缓存 {TokenBoardViewModel.FormatTokens(Usage.Usage.CacheRead)}";
+    public string DetailText => Loc.F(
+        "token.modelDetail",
+        TokenBoardViewModel.FormatTokens(Usage.Usage.Input),
+        TokenBoardViewModel.FormatTokens(Usage.Usage.Output),
+        TokenBoardViewModel.FormatTokens(Usage.Usage.Reasoning),
+        TokenBoardViewModel.FormatTokens(Usage.Usage.CacheRead));
 }

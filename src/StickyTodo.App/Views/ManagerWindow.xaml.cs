@@ -1,9 +1,10 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
 using StickyTodo.App.Services;
 using StickyTodo.App.ViewModels;
 using StickyTodo.Core.Entities;
+using StickyTodo.Core.Localization;
 
 namespace StickyTodo.App.Views;
 
@@ -295,13 +296,13 @@ public partial class ManagerWindow : Window
     {
         var (title, initial) = kind switch
         {
-            BoardKind.Memo => ("新建便签看板", "新便签"),
-            BoardKind.Calendar => ("新建日历看板", "日历"),
-            BoardKind.Token => ("新建 Token 看板", "Token 用量"),
-            _ => ("新建待办看板", "新看板"),
+            BoardKind.Memo => (Loc.T("manager.newBoardTitle") + " · " + Loc.T("manager.kindMemo"), Loc.T("manager.newMemoDefault")),
+            BoardKind.Calendar => (Loc.T("manager.newBoardTitle") + " · " + Loc.T("manager.kindCalendar"), Loc.T("manager.newCalendarDefault")),
+            BoardKind.Token => (Loc.T("manager.newBoardTitle") + " · " + Loc.T("manager.kindToken"), Loc.T("token.title")),
+            _ => (Loc.T("manager.newBoardTitle") + " · " + Loc.T("manager.kindTodo"), Loc.T("board.untitled")),
         };
 
-        var name = PromptWindow.Prompt(this, title, "看板名称", initial);
+        var name = PromptWindow.Prompt(this, title, Loc.T("manager.boardName"), initial);
         if (name is null)
         {
             return;
@@ -403,7 +404,7 @@ public partial class ManagerWindow : Window
     {
         if (SelectedBoard is not { } board)
         {
-            Warn("先选中一个看板。");
+            Warn(Loc.T("manager.pickFirst"));
             return;
         }
 
@@ -413,8 +414,8 @@ public partial class ManagerWindow : Window
     private async Task DeleteBoardAsync(Board board)
     {
         var confirm = MessageBox.Show(
-            $"删除看板「{board.Name}」？\n其中的内容会一并删除，且不可恢复。",
-            "确认删除",
+            Loc.F("manager.deleteConfirm", board.Name),
+            Loc.T("cal.deleteTitle"),
             MessageBoxButton.OKCancel,
             MessageBoxImage.Warning);
 
@@ -434,7 +435,7 @@ public partial class ManagerWindow : Window
     {
         if (SelectedBoard is not { } board)
         {
-            Warn("先选中一个看板。");
+            Warn(Loc.T("manager.pickFirst"));
             return;
         }
 
@@ -444,7 +445,7 @@ public partial class ManagerWindow : Window
     /// <summary>重命名（左侧按钮和卡片右键共用）。</summary>
     private async Task RenameBoardAsync(Board board)
     {
-        var name = PromptWindow.Prompt(this, "重命名看板", "看板名称", board.Name);
+        var name = PromptWindow.Prompt(this, Loc.T("manager.renameBoardTitle"), Loc.T("manager.boardName"), board.Name);
         if (name is null)
         {
             return;

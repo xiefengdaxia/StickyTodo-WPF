@@ -1,15 +1,16 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using StickyTodo.App.Services;
 using StickyTodo.Core.Entities;
 using StickyTodo.Core.Entitlements;
+using StickyTodo.Core.Localization;
 using StickyTodo.Core.Services;
 
 namespace StickyTodo.App.ViewModels;
 
 /// <summary>看板列表里的一行。</summary>
-public sealed class BoardRowViewModel
+public sealed class BoardRowViewModel : ObservableObject
 {
     public BoardRowViewModel(Board board, int pending, int done)
     {
@@ -22,7 +23,13 @@ public sealed class BoardRowViewModel
 
     public string Name => Board.Name;
 
-    public string KindText => BoardKinds.DisplayName(Board.Kind);
+    public string KindText => Loc.T(Board.Kind switch
+    {
+        BoardKind.Memo => "manager.kindMemo",
+        BoardKind.Calendar => "manager.kindCalendar",
+        BoardKind.Token => "manager.kindToken",
+        _ => "manager.kindTodo",
+    });
 
     /// <summary>卡片左侧的类型图标。</summary>
     public string KindGlyph => Board.Kind switch
@@ -44,14 +51,22 @@ public sealed class BoardRowViewModel
     public int Done { get; }
 
     public string Summary => IsMemo
-        ? "便签 · 边写边存"
+        ? Loc.T("manager.summaryMemo")
         : IsCalendar
-            ? "月视图 · 汇总所有看板的目标日期"
+            ? Loc.T("manager.summaryCalendar")
             : IsToken
-                ? "Token 用量 · 定时刷新"
-                : $"{Pending} 待办 · {Done} 已完成";
+                ? Loc.T("manager.summaryToken")
+                : Loc.F("manager.summaryTodo", Pending, Done);
 
-    public string WindowHint => Board.Window is null ? string.Empty : "已记住窗口位置";
+    public string WindowHint => Board.Window is null ? string.Empty : Loc.T("manager.rememberedGeometry");
+
+    /// <summary>语言切换后通知这一行所有拼接文本重算。</summary>
+    public void RefreshLocalizedText()
+    {
+        OnPropertyChanged(nameof(KindText));
+        OnPropertyChanged(nameof(Summary));
+        OnPropertyChanged(nameof(WindowHint));
+    }
 }
 
 /// <summary>管理面板：看板清单 + 增删改名。</summary>
@@ -70,13 +85,30 @@ public partial class ManagerViewModel : ObservableObject
 
     public string EntitlementBadge =>
         _entitlement.Tier == PlanTier.Lifetime
-            ? $"{_entitlement.DisplayName} · 全部功能免费"
-            : $"{_entitlement.DisplayName} · 可升级";
+            ? Loc.F("settings.entitlementLifetime", EntitlementName)
+            : Loc.F("settings.entitlementLimited", EntitlementName);
 
-    public string StorageHint => "全部数据保存在本机 SQLite，程序不发起任何网络请求";
+    public string StorageHint => Loc.T("manager.storageHint");
+
+    /// <summary>语言切换后重算卡片上由 C# 拼出来的文本。</summary>
+    public void RefreshLocalizedText()
+    {
+        foreach (var row in Boards)
+        {
+            row.RefreshLocalizedText();
+        }
+
+        OnPropertyChanged(nameof(EntitlementBadge));
+        OnPropertyChanged(nameof(StorageHint));
+        OnPropertyChanged(nameof(FooterHint));
+    }
+
+    /// <summary>会员档位显示名（按当前语言）。</summary>
+    private string EntitlementName =>
+        Loc.T(_entitlement.Tier == PlanTier.Lifetime ? "entitlement.lifetime" : "entitlement.free");
 
     public string FooterHint =>
-        $"全部本地存储 · 快捷键 {HotKeyService.NewTodoHotKey} 新建待办";
+        Loc.F("manager.footerHint", HotKeyService.NewTodoHotKey);
 
     [ObservableProperty]
     private string? _errorText;

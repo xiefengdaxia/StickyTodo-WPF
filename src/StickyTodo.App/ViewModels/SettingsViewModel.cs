@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using StickyTodo.App.Services;
 using StickyTodo.Core.Entitlements;
+using StickyTodo.Core.Localization;
 using StickyTodo.Core.Services;
 using StickyTodo.Infrastructure;
 
@@ -20,6 +21,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly IEntitlementService _entitlement;
     private readonly WindowManager _windows;
     private readonly AutoStartService _autoStart;
+    private readonly LocalizationService _localization;
 
     private bool _suppressSync;
 
@@ -29,7 +31,8 @@ public partial class SettingsViewModel : ObservableObject
         TodoService todos,
         IEntitlementService entitlement,
         WindowManager windows,
-        AutoStartService autoStart)
+        AutoStartService autoStart,
+        LocalizationService localization)
     {
         _skin = skin;
         _settings = settings;
@@ -37,8 +40,10 @@ public partial class SettingsViewModel : ObservableObject
         _entitlement = entitlement;
         _windows = windows;
         _autoStart = autoStart;
+        _localization = localization;
 
         BuildSkinOptions();
+        BuildLanguageOptions();
         LoadStartupSettings();
 
         _suppressSync = true;
@@ -51,10 +56,56 @@ public partial class SettingsViewModel : ObservableObject
 
     public ObservableCollection<SkinOptionViewModel> Skins { get; } = new();
 
+    /// <summary>可选语言（原生名称，不翻译——用户永远能认出自己的母语）。</summary>
+    public ObservableCollection<LanguageInfo> Languages { get; } = new();
+
+    [ObservableProperty]
+    private LanguageInfo? _selectedLanguage;
+
+    private bool _suppressLanguageSync;
+
+    private void BuildLanguageOptions()
+    {
+        _suppressLanguageSync = true;
+        try
+        {
+            Languages.Clear();
+            foreach (var info in AppLanguages.All)
+            {
+                Languages.Add(info);
+            }
+
+            _selectedLanguage = AppLanguages.Resolve(_settings.Language);
+        }
+        finally
+        {
+            _suppressLanguageSync = false;
+        }
+    }
+
+    /// <summary>下拉框选中语言：立即落库、立即切换界面文案。</summary>
+    partial void OnSelectedLanguageChanged(LanguageInfo? value)
+    {
+        if (_suppressLanguageSync || value is null)
+        {
+            return;
+        }
+
+        _localization.SetLanguage(value);
+
+        // 语言一变，这里所有由 C# 拼出来的文案都要重算
+        RefreshText();
+        StatusText = Loc.T("settings.language");
+    }
+
+    /// <summary>会员档位的显示名（按当前语言）。Core 里的 DisplayName 是给日志/诊断用的中文常量。</summary>
+    private string EntitlementName =>
+        Loc.T(_entitlement.Tier == PlanTier.Lifetime ? "entitlement.lifetime" : "entitlement.free");
+
     public string EntitlementText =>
         _entitlement.Tier == PlanTier.Lifetime
-            ? $"{_entitlement.DisplayName} · 全部功能已解锁"
-            : $"{_entitlement.DisplayName} · 部分功能受限";
+            ? Loc.F("settings.entitlementLifetime", EntitlementName)
+            : Loc.F("settings.entitlementLimited", EntitlementName);
 
     public string DataPathText => AppPaths.DataDirectory;
 
@@ -125,11 +176,11 @@ public partial class SettingsViewModel : ObservableObject
         if (_autoStart.SetEnabled(value, out var error))
         {
             ErrorText = null;
-            StatusText = value ? "已设为开机启动" : "已取消开机启动";
+            StatusText = value ? Loc.T("settings.autoStartOn") : Loc.T("settings.autoStartOff");
         }
         else
         {
-            ErrorText = $"设置开机启动失败：{error}";
+            ErrorText = Loc.F("settings.autoStartFailed", error);
 
             // 写失败就把开关拨回去，避免显示与实际不符
             _suppressStartupSync = true;
@@ -146,7 +197,7 @@ public partial class SettingsViewModel : ObservableObject
         }
 
         _settings.RestoreSession = value;
-        StatusText = value ? "启动时会恢复上次的看板" : "启动时不再恢复看板";
+        StatusText = value ? Loc.T("settings.restoreOn") : Loc.T("settings.restoreOff");
     }
 
     /// <summary>路径失焦/回车时保存；留空表示回到默认位置。</summary>
@@ -159,20 +210,20 @@ public partial class SettingsViewModel : ObservableObject
             _settings.TokenDatabasePath = string.Empty;
             TokenDatabasePath = string.Empty;
             ErrorText = null;
-            StatusText = "Token 数据源已恢复默认位置";
+            StatusText = Loc.T("settings.tokenDbReset");
             return;
         }
 
         if (!System.IO.File.Exists(text))
         {
-            ErrorText = "找不到这个数据库文件";
+            ErrorText = Loc.T("settings.tokenDbInvalid");
             TokenDatabasePath = _settings.TokenDatabasePath;
             return;
         }
 
         _settings.TokenDatabasePath = text;
         ErrorText = null;
-        StatusText = "Token 数据源已保存";
+        StatusText = Loc.T("settings.tokenDbSaved");
     }
 
     [ObservableProperty]
@@ -241,6 +292,13 @@ public partial class SettingsViewModel : ObservableObject
     {
         BackgroundOpacityText = $"{Math.Round(BackgroundOpacity)}%";
         WindowOpacityText = $"{Math.Round(WindowOpacity)}%";
+
+        // 这些文案是在 C# 里拼的，语言切换后必须重算，否则页面上会中英混杂
+        OnPropertyChanged(nameof(EntitlementText));
+        OnPropertyChanged(nameof(StatsText));
+
+        // 通知所有由转换器取文案的绑定重新求值
+        LocalizationService.RefreshAllWindows();
     }
 
     /// <summary>从数据库重新统计，避免设置页显示旧数字。</summary>
@@ -257,6 +315,6 @@ public partial class SettingsViewModel : ObservableObject
                 _todos.GetTags().Count);
         });
 
-        StatsText = $"{boards} 个看板 · {pending} 条待办 · {done} 条已完成 · {tags} 个标签";
+        StatsText = Loc.F("settings.statsLine", boards, pending, done, tags);
     }
 }

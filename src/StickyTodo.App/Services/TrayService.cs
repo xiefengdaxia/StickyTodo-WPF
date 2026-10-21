@@ -1,9 +1,10 @@
-using System;
+﻿using System;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using StickyTodo.App.Views;
 using StickyTodo.Core.Entities;
+using StickyTodo.Core.Localization;
 using StickyTodo.Core.Services;
 using Drawing = System.Drawing;
 using WinForms = System.Windows.Forms;
@@ -54,28 +55,29 @@ public sealed class TrayService : IDisposable
 
         var menu = new WinForms.ContextMenuStrip();
 
-        var manager = new WinForms.ToolStripMenuItem("管理面板");
+        var manager = new WinForms.ToolStripMenuItem(Loc.T("tray.manager"));
         manager.Click += (_, _) => ShowManager();
         menu.Items.Add(manager);
 
-        var settings = new WinForms.ToolStripMenuItem("设置");
+        var settings = new WinForms.ToolStripMenuItem(Loc.T("common.settings"));
         settings.Click += (_, _) => (System.Windows.Application.Current as App)?.ShowSettings();
         menu.Items.Add(settings);
 
-        var pomodoro = new WinForms.ToolStripMenuItem("番茄时钟");
+        var pomodoro = new WinForms.ToolStripMenuItem(Loc.T("tray.pomodoro"));
         pomodoro.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(ShowPomodoro);
         menu.Items.Add(pomodoro);
 
-        _boardsMenu = new WinForms.ToolStripMenuItem("看板");
+        _boardsMenu = new WinForms.ToolStripMenuItem(Loc.T("tray.boards"));
         menu.Items.Add(_boardsMenu);
 
-        var toggleAll = new WinForms.ToolStripMenuItem($"显示 / 隐藏全部便签\t{HotKeyService.ToggleBoardsHotKey}");
+        var toggleLabel = Loc.T("tray.toggleAll") + "\t" + HotKeyService.ToggleBoardsHotKey;
+        var toggleAll = new WinForms.ToolStripMenuItem(toggleLabel);
         toggleAll.Click += (_, _) => _windows.ToggleBoardsVisibility();
         menu.Items.Add(toggleAll);
 
         menu.Items.Add(new WinForms.ToolStripSeparator());
 
-        var exit = new WinForms.ToolStripMenuItem("退出");
+        var exit = new WinForms.ToolStripMenuItem(Loc.T("common.exit"));
         exit.Click += (_, _) => ExitApplication();
         menu.Items.Add(exit);
 
@@ -104,7 +106,7 @@ public sealed class TrayService : IDisposable
         var boards = _todoService.GetBoards();
         if (boards.Count == 0)
         {
-            _boardsMenu.DropDownItems.Add(new WinForms.ToolStripMenuItem("（没有看板）") { Enabled = false });
+            _boardsMenu.DropDownItems.Add(new WinForms.ToolStripMenuItem(Loc.T("tray.noBoards")) { Enabled = false });
             return;
         }
 
