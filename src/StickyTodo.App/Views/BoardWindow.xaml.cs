@@ -69,6 +69,9 @@ public partial class BoardWindow : Window, IStickyWindow
             RestoreGeometry();
             await _viewModel.LoadAsync();
             RefreshViewTabs();
+
+            // 位置已经定好，再做入场（先定位后淡入，避免看到"从别处跳过来"）
+            Motion.FadeInWindow(this);
         };
 
         // 点窗口里任何"非可编辑"的区域都要退出编辑态（含标签栏、空白区、标题栏）
@@ -167,25 +170,86 @@ public partial class BoardWindow : Window, IStickyWindow
 
     private async void RowDone_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is FrameworkElement { DataContext: TodoRowViewModel row })
+        if (sender is FrameworkElement { DataContext: TodoRowViewModel row } button)
         {
+            // 先给"这一行"一个即时反馈，再走数据（数据回来会把行从列表里移走）
+            if (FindRowContainer(button) is { } container)
+            {
+                Motion.Pulse(container, 1.03);
+            }
+
             await _viewModel.MarkDoneAsync(row);
         }
     }
 
     private async void RowUndone_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is FrameworkElement { DataContext: TodoRowViewModel row })
+        if (sender is FrameworkElement { DataContext: TodoRowViewModel row } button)
         {
+            if (FindRowContainer(button) is { } container)
+            {
+                Motion.Pulse(container, 1.03);
+            }
+
             await _viewModel.MarkUndoneAsync(row);
         }
     }
 
     private async void RowDelete_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is FrameworkElement { DataContext: TodoRowViewModel row })
+        if (sender is FrameworkElement { DataContext: TodoRowViewModel row } button)
         {
+            var container = FindRowContainer(button);
+
+            // 删除：先把这一行淡出，再真正删数据，避免"啪一下没了"
+            if (container is not null && Motion.Enabled)
+            {
+                var completion = new TaskCompletionSource();
+                Motion.FadeOutAndRemove(container, () => completion.TrySetResult());
+
+                // 动画最多等 160ms，别让删除被动画拖慢
+                await Task.WhenAny(completion.Task, Task.Delay(160));
+            }
+
             await _viewModel.DeleteRowAsync(row);
+        }
+    }
+
+    /// <summary>从一个按钮往上找到它所在的 ListBoxItem（行容器）。</summary>
+    private FrameworkElement? FindRowContainer(DependencyObject start)
+    {
+        var current = start;
+        while (current is not null and not System.Windows.Controls.ListBoxItem)
+        {
+            current = VisualTreeHelper.GetParent(current);
+        }
+
+        return current as FrameworkElement;
+    }
+
+    // ---------------- 回归测试用入口 ----------------
+
+    /// <summary>给回归用：当前列表里的行数。</summary>
+    internal int RowCountForTest() => _viewModel.Rows.Count;
+
+    /// <summary>给回归用：已完成条数（走 VM 的完整数据集，不受当前视图过滤影响）。</summary>
+    internal int DoneCountForTest() => _viewModel.CompletedCountForTest;
+
+    /// <summary>给回归用：删除第 index 行（走与 UI 相同的入口）。</summary>
+    internal void DeleteRowByIndexForTest(int index)
+    {
+        if (index >= 0 && index < _viewModel.Rows.Count)
+        {
+            _ = _viewModel.DeleteRowAsync(_viewModel.Rows[index]);
+        }
+    }
+
+    /// <summary>给回归用：完成第 index 行。</summary>
+    internal void CompleteRowByIndexForTest(int index)
+    {
+        if (index >= 0 && index < _viewModel.Rows.Count)
+        {
+            _ = _viewModel.MarkDoneAsync(_viewModel.Rows[index]);
         }
     }
 
@@ -345,7 +409,15 @@ public partial class BoardWindow : Window, IStickyWindow
         {
             case Key.Enter:
                 e.Handled = true;
+
+                var before = _viewModel.Rows.Count;
                 await _viewModel.CommitDraftAsync();
+
+                // 新增成功：让新行滑入一下，明确"东西加进去了"
+                if (_viewModel.Rows.Count > before)
+                {
+                    AnimateNewestRow();
+                }
 
                 // 新增后把焦点留在草稿行，方便连续录入
                 _ = Dispatcher.BeginInvoke(() => DraftBox.Focus(), DispatcherPriority.Input);
@@ -356,6 +428,29 @@ public partial class BoardWindow : Window, IStickyWindow
                 _viewModel.DraftTitle = string.Empty;
                 break;
         }
+    }
+
+    /// <summary>把最新加入的那一行做个滑入动画（列表数据刚更新，等一帧拿到容器）。</summary>
+    private void AnimateNewestRow()
+    {
+        if (!Motion.Enabled)
+        {
+            return;
+        }
+
+        _ = Dispatcher.BeginInvoke(() =>
+        {
+            var row = _viewModel.Rows.LastOrDefault();
+            if (row is null)
+            {
+                return;
+            }
+
+            if (TodoList.ItemContainerGenerator.ContainerFromItem(row) is FrameworkElement container)
+            {
+                Motion.SlideInFromTop(container, offset: 10);
+            }
+        }, DispatcherPriority.Loaded);
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

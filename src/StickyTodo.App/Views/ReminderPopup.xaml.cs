@@ -21,7 +21,16 @@ public partial class ReminderPopup : Window
         TitleText.Text = item.Title;
         BoardText.Text = $"来自看板：{boardName}";
 
-        Loaded += (_, _) => MoveToBottomRight();
+        Loaded += (_, _) =>
+        {
+            MoveToBottomRight();
+
+            // 从下方滑入 + 淡入：提醒出现得更"有动静"，不容易被忽略
+            if (Content is FrameworkElement content)
+            {
+                Motion.SlideInFromTop(content, offset: -10);
+            }
+        };
     }
 
     private void MoveToBottomRight()

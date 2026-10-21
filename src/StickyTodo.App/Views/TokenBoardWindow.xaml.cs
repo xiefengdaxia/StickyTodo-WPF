@@ -31,10 +31,31 @@ public partial class TokenBoardWindow : Window, IStickyWindow
 
         Chart.PointPicked += (_, index) => _viewModel.ShowPointDetail(index);
 
+        // 取数时让刷新图标转起来；停下时解除动画（回到静态的 ⟳）
+        IDisposable? spinHandle = null;
+        _viewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName != nameof(TokenBoardViewModel.IsBusy))
+            {
+                return;
+            }
+
+            if (_viewModel.IsBusy)
+            {
+                spinHandle ??= Motion.Spin(RefreshGlyph);
+            }
+            else
+            {
+                spinHandle?.Dispose();
+                spinHandle = null;
+            }
+        };
+
         Loaded += async (_, _) =>
         {
             RestoreGeometry();
             await _viewModel.LoadAsync();
+            Motion.FadeInWindow(this);
         };
 
         Closed += (_, _) => _viewModel.Dispose();

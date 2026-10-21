@@ -85,7 +85,8 @@ $exe = ".\src\StickyTodo.App\bin\Debug\net8.0-windows\StickyTodo.exe"
 & $exe --token-demo --shot D:\shots         # Token 看板回归（假数据源，不读库）
 & $exe --token-demo --live                  # Token 看板回归，读真实的本机 opencode 库
 & $exe --calendar-demo --shot D:\shots      # 日历回归：农历/节气/休班/黄历/年月下拉
-& $exe --pomodoro-demo --shot D:\shots      # 番茄钟回归：整周期、暂停、跳过、今日计数
+&  --pomodoro-demo --shot D:\shots      # 番茄钟回归：整周期、暂停、跳过、今日计数
+&  --motion-demo --shot D:\shots        # 动效回归：入场/脉冲/勾选/删除/完成，读属性验证动画真在跑
 & $exe --manager-menu-demo --shot D:\shots  # 主窗体卡片右键菜单（验证含「重命名」「删除」）
 & $exe --settings-reopen-demo              # 反复打开/关闭设置页 5 轮，验证不会崩（退出码 0 = 通过）
 & $exe --window-opacity-demo --shot D:\shots  # 整窗透明度 100/60/40% 并读回 Window.Opacity 断言
@@ -230,6 +231,20 @@ dotnet run --project tools/IconGen -c Release -- src/StickyTodo.App/Assets/stick
 - `Ctrl+Alt+H` 显示 / 隐藏全部便签
 - `Ctrl+Alt+L` 锁定 / 解锁当前活跃看板
 - 注册失败（被别的程序占用）时静默跳过，不影响启动
+
+**动效（统一的即时反馈）**
+- **窗口入场**：位置定好之后淡入 + 轻微放大（动画作用在内容上而不是 Window 本身，避免透明窗口在动画期间被位图化导致文字发虚）
+- **按钮**：悬停时高亮层淡入（不是硬切颜色）、按下时轻微缩小 4% 再弹回，`Primary` / `Ghost` / 标题栏圆钮 / 标签胶囊都适用
+- **复选框**：勾选时方块先放大到 1.18 再回弹，勾从 40% 放大到 100%（`BackEase`），取消勾选反向收回
+- **滑块**：拖动圆点悬停放大 1.2、拖动中 1.35
+- **待办行**：鼠标移入时行尾按钮淡入；`✓` 完成时该行脉冲一下；`✕` 删除时该行先淡出再真正删除；回车新增后新行从上方滑入
+- **标签胶囊**：选中态加粗变色，悬停有高亮渐变
+- **列表卡片**（管理面板）：悬停放大 1.2%
+- **日历格**：悬停放大 4% 并高亮；点击某天时下方黄历面板淡入
+- **提醒弹窗**：从下方滑入 + 淡入，不容易被忽略
+- **Token 看板**：取数时刷新图标持续旋转；首次加载时按钮变暗，切范围时不闪
+- **番茄钟**：进度圆环以 30fps 补间，走得像"流动"而不是每 250ms 跳一格
+- **尊重系统设置**：Windows「辅助功能 → 视觉效果 → 动画效果」关掉后，所有动效自动跳过（`Motion.Enabled` 读 `SystemParameters.ClientAreaAnimation`）
 
 **其他**
 - 单实例（`Local\StickyTodo.SingleInstance`）

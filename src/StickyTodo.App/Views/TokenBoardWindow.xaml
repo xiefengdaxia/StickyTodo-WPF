@@ -204,7 +204,12 @@
                             Click="Refresh_Click"
                             VerticalAlignment="Center"
                             Margin="6,0,0,0">
-                        <TextBlock Text="⟳" FontSize="15">
+                        <!-- 取数时持续旋转，是最直观的"正在刷新"；空闲时轻轻回正 -->
+                        <TextBlock x:Name="RefreshGlyph" Text="⟳" FontSize="15"
+                                   RenderTransformOrigin="0.5,0.5">
+                            <TextBlock.RenderTransform>
+                                <RotateTransform Angle="0" />
+                            </TextBlock.RenderTransform>
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
                                     <Setter Property="Opacity" Value="1" />

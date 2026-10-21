@@ -71,7 +71,24 @@
                                 <Setter Property="Opacity" Value="0.35" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                                        <Setter Property="Opacity" Value="1" />
+                                        <DataTrigger.EnterActions>
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                     To="1" Duration="{StaticResource Motion.Base}"
+                                                                     EasingFunction="{StaticResource Motion.Ease}" />
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </DataTrigger.EnterActions>
+                                        <DataTrigger.ExitActions>
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                     To="0.35" Duration="{StaticResource Motion.Slow}"
+                                                                     EasingFunction="{StaticResource Motion.Ease}" />
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </DataTrigger.ExitActions>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -157,8 +174,7 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Button Style="{StaticResource Chip}"
-                                        Click="Chip_Click"
+                                <Button Click="Chip_Click"
                                         MouseRightButtonUp="Chip_RightButtonUp"
                                         AllowDrop="True"
                                         DragEnter="Chip_DragEnter"
@@ -174,6 +190,29 @@
                                         <TextBlock Text="{Binding Name}" />
                                         <TextBlock Text="{Binding Count, StringFormat=' {0}'}" Opacity="0.6" />
                                     </StackPanel>
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource Chip}">
+                                            <Style.Triggers>
+                                                <!-- 选中的胶囊：底色渐变成强调色，并轻微"顶"起来一下 -->
+                                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                    <DataTrigger.EnterActions>
+                                                        <BeginStoryboard>
+                                                            <Storyboard>
+                                                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                                 To="1" Duration="{StaticResource Motion.Fast}" />
+                                                            </Storyboard>
+                                                        </BeginStoryboard>
+                                                    </DataTrigger.EnterActions>
+                                                    <Setter Property="Background" Value="{DynamicResource Brush.ChipActive}" />
+                                                    <Setter Property="Foreground" Value="White" />
+                                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsSelected}" Value="False">
+                                                    <Setter Property="Background" Value="{DynamicResource Brush.ChipIdle}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
                                 </Button>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
@@ -391,7 +430,25 @@
                                                 <Setter Property="Opacity" Value="0" />
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
-                                                        <Setter Property="Opacity" Value="1" />
+                                                        <!-- 淡入而不是硬切：鼠标扫过时不会"闪一下" -->
+                                                        <DataTrigger.EnterActions>
+                                                            <BeginStoryboard>
+                                                                <Storyboard>
+                                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                                     To="1" Duration="{StaticResource Motion.Fast}"
+                                                                                     EasingFunction="{StaticResource Motion.Ease}" />
+                                                                </Storyboard>
+                                                            </BeginStoryboard>
+                                                        </DataTrigger.EnterActions>
+                                                        <DataTrigger.ExitActions>
+                                                            <BeginStoryboard>
+                                                                <Storyboard>
+                                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                                     To="0" Duration="{StaticResource Motion.Base}"
+                                                                                     EasingFunction="{StaticResource Motion.Ease}" />
+                                                                </Storyboard>
+                                                            </BeginStoryboard>
+                                                        </DataTrigger.ExitActions>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>

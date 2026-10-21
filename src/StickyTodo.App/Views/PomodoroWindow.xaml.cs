@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
@@ -27,6 +27,13 @@ public partial class PomodoroWindow : Window
     private DateTime _lastTick;
     private bool _geometryRestored;
 
+    /// <summary>圆环的目标进度与实际显示进度（做补间用）。</summary>
+    private double _targetProgress;
+    private double _displayedProgress;
+
+    /// <summary>30fps 的圆环补间计时器。</summary>
+    private readonly DispatcherTimer _ringTimer;
+
     public PomodoroWindow(PomodoroViewModel viewModel, Action<string, string>? notify = null, bool autoTick = true)
     {
         InitializeComponent();
@@ -41,6 +48,12 @@ public partial class PomodoroWindow : Window
         };
         _ticker.Tick += OnTick;
 
+        _ringTimer = new DispatcherTimer(DispatcherPriority.Render)
+        {
+            Interval = TimeSpan.FromMilliseconds(33),
+        };
+        _ringTimer.Tick += (_, _) => StepRingAnimation();
+
         Loaded += (_, _) =>
         {
             RestoreGeometry();
@@ -52,11 +65,14 @@ public partial class PomodoroWindow : Window
             {
                 _ticker.Start();
             }
+
+            Motion.FadeInWindow(this);
         };
 
         Closing += (_, _) =>
         {
             _ticker.Stop();
+            _ringTimer.Stop();
             _viewModel.Flush();
             SaveGeometry();
         };
@@ -121,8 +137,41 @@ public partial class PomodoroWindow : Window
     internal void ApplyFinishedForTest(PomodoroPhase phase) => OnPhaseFinished(phase);
     private void UpdateRing()
     {
-        var progress = Math.Clamp(_viewModel.Progress, 0, 1);
+        // 只记录目标进度；真正的描边由下面 30fps 的补间去逼近目标，
+        // 这样圆环看起来是"连续流走"而不是每 250ms 跳一格。
+        _targetProgress = Math.Clamp(_viewModel.Progress, 0, 1);
+        _displayedProgress = Math.Clamp(_displayedProgress, 0, 1);
+    }
 
+    /// <summary>把显示进度朝目标推进一帧（EaseOut 近似），并刷新描边。</summary>
+    private void StepRingAnimation()
+    {
+        if (!Motion.Enabled)
+        {
+            _displayedProgress = _targetProgress;
+            ApplyRing(_displayedProgress);
+            return;
+        }
+
+        var delta = _targetProgress - _displayedProgress;
+        if (Math.Abs(delta) < 0.0008)
+        {
+            if (_displayedProgress != _targetProgress)
+            {
+                _displayedProgress = _targetProgress;
+                ApplyRing(_displayedProgress);
+            }
+
+            return;
+        }
+
+        // 每帧吃掉剩余差值的 35%，等价于一条收敛很快的缓出曲线
+        _displayedProgress += delta * 0.35;
+        ApplyRing(_displayedProgress);
+    }
+
+    private void ApplyRing(double progress)
+    {
         // 圆周长 = π * 直径（宽高都是 160 → 半径 80）
         const double radius = 80;
         var circumference = 2 * Math.PI * radius;
@@ -264,6 +313,7 @@ public partial class PomodoroWindow : Window
     protected override void OnClosing(CancelEventArgs e)
     {
         _ticker.Stop();
+        _ringTimer.Stop();
         base.OnClosing(e);
     }
 }

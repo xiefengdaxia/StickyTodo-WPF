@@ -1,5 +1,6 @@
 ﻿using System.Windows;
 using System.Windows.Input;
+using StickyTodo.App.Services;
 using StickyTodo.App.ViewModels;
 
 namespace StickyTodo.App.Views;
@@ -15,7 +16,11 @@ public partial class SettingsWindow : Window
         _viewModel = viewModel;
         DataContext = viewModel;
 
-        Loaded += async (_, _) => await _viewModel.RefreshStatsAsync();
+        Loaded += async (_, _) =>
+        {
+            await _viewModel.RefreshStatsAsync();
+            Motion.FadeInWindow(this);
+        };
     }
 
     private void Skin_Click(object sender, RoutedEventArgs e)

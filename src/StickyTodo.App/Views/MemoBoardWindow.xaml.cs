@@ -46,6 +46,8 @@ public partial class MemoBoardWindow : Window, IStickyWindow
             {
                 Editor.Focus();
             }
+
+            Motion.FadeInWindow(this);
         };
 
         Closing += async (_, _) =>

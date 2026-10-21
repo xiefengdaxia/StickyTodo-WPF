@@ -1,4 +1,4 @@
-<Window x:Class="StickyTodo.App.Views.CalendarWindow"
+﻿<Window x:Class="StickyTodo.App.Views.CalendarWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="{Binding BoardName}"
@@ -61,7 +61,25 @@
                                 <Setter Property="Opacity" Value="0.35" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                                        <Setter Property="Opacity" Value="1" />
+                                        <!-- 标题栏按钮淡入：鼠标进窗口时不会"啪"地一下全亮 -->
+                                        <DataTrigger.EnterActions>
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                     To="1" Duration="{StaticResource Motion.Base}"
+                                                                     EasingFunction="{StaticResource Motion.Ease}" />
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </DataTrigger.EnterActions>
+                                        <DataTrigger.ExitActions>
+                                            <BeginStoryboard>
+                                                <Storyboard>
+                                                    <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                     To="0.35" Duration="{StaticResource Motion.Slow}"
+                                                                     EasingFunction="{StaticResource Motion.Ease}" />
+                                                </Storyboard>
+                                            </BeginStoryboard>
+                                        </DataTrigger.ExitActions>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -178,6 +196,10 @@
                                     DragOver="Cell_DragOver"
                                     Drop="Cell_Drop"
                                     Cursor="Hand">
+                                <Border.RenderTransform>
+                                    <ScaleTransform ScaleX="1" ScaleY="1" />
+                                </Border.RenderTransform>
+                                <Border.RenderTransformOrigin>0.5,0.5</Border.RenderTransformOrigin>
                                 <StackPanel Margin="4,2">
                                     <Grid>
                                         <TextBlock x:Name="DayNumber"
@@ -222,6 +244,37 @@
                                 </StackPanel>
                             </Border>
                             <DataTemplate.Triggers>
+                                <Trigger SourceName="Cell" Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Cell" Property="Background" Value="#1FB27F0A" />
+                                    <Trigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="Cell"
+                                                                 Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                                 To="1.04" Duration="{StaticResource Motion.Fast}"
+                                                                 EasingFunction="{StaticResource Motion.Ease}" />
+                                                <DoubleAnimation Storyboard.TargetName="Cell"
+                                                                 Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                                                 To="1.04" Duration="{StaticResource Motion.Fast}"
+                                                                 EasingFunction="{StaticResource Motion.Ease}" />
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.EnterActions>
+                                    <Trigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="Cell"
+                                                                 Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                                 To="1" Duration="{StaticResource Motion.Base}"
+                                                                 EasingFunction="{StaticResource Motion.Ease}" />
+                                                <DoubleAnimation Storyboard.TargetName="Cell"
+                                                                 Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                                                 To="1" Duration="{StaticResource Motion.Base}"
+                                                                 EasingFunction="{StaticResource Motion.Ease}" />
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </Trigger.ExitActions>
+                                </Trigger>
                                 <DataTrigger Binding="{Binding IsCurrentMonth}" Value="False">
                                     <Setter TargetName="DayNumber" Property="Opacity" Value="0.3" />
                                     <Setter TargetName="LunarLabel" Property="Opacity" Value="0.35" />
@@ -273,7 +326,8 @@
                                TextWrapping="Wrap" />
 
                     <!-- 黄历：干支 / 建除十二神 / 宜 / 忌 -->
-                    <Border Grid.Row="1"
+                    <Border x:Name="AlmanacPanel"
+                            Grid.Row="1"
                             Margin="0,0,0,6"
                             Padding="8,5"
                             CornerRadius="6"

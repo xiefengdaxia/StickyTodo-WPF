@@ -36,6 +36,9 @@ public partial class CalendarWindow : Window, IStickyWindow
             await _viewModel.LoadAsync();
             SyncMonthBoxes();
             _loaded = true;
+
+            // 位置与内容都就绪后再淡入，避免看到"先跳位再显示"
+            Motion.FadeInWindow(this);
         };
 
         StateChanged += (_, _) =>
@@ -121,6 +124,9 @@ public partial class CalendarWindow : Window, IStickyWindow
         if (sender is FrameworkElement { DataContext: CalendarDayViewModel day })
         {
             _viewModel.SelectDay(day);
+
+            // 黄历内容整体换了一批，淡入一下让人注意到"下面变了"
+            Motion.FadeInElement(AlmanacPanel, fromScale: 1, duration: Motion.Fast);
         }
     }
 

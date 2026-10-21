@@ -28,6 +28,7 @@ public partial class ManagerWindow : Window
         {
             _rendered = true;
             await _viewModel.LoadAsync();
+            Motion.FadeInWindow(this);
         };
 
         // 管理面板常驻，里面的"待办/已完成"计数必须跟着数据变化刷新。

@@ -364,6 +364,9 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
 
     private TagChipViewModel SelectedChip => Chips.FirstOrDefault(c => c.IsSelected) ?? Chips[0];
 
+    /// <summary>给回归用：已完成总数（全量，不做标签/视图过滤）。</summary>
+    internal int CompletedCountForTest => _all.Count(t => t.IsDone);
+
     private void RebuildRows()
     {
         var chip = SelectedChip;

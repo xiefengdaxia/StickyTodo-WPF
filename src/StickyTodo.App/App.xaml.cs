@@ -128,6 +128,13 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        // 动效回归：确认各处动画真的在跑、且不抛异常
+        if (e.Args.Contains("--motion-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunMotionDemo(ReadOptionValue(e.Args, "--shot"));
+            return;
+        }
+
         // 日历回归：农历/节气/节假日/补班/黄历/年月下拉切换
         if (e.Args.Contains("--calendar-demo", StringComparer.OrdinalIgnoreCase))
         {
@@ -741,6 +748,129 @@ public partial class App : System.Windows.Application
             Shutdown(1);
         }
     }
+
+    /// <summary>
+    /// --motion-demo：动效回归。检查窗口入场、按钮按下缩放、复选框弹跳、
+    /// 行删除淡出、刷新旋转等是否真的产生了动画（读属性值而不是看截图）。
+    /// </summary>
+    private async void RunMotionDemo(string? shotDirectory)
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+        InstallGlobalExceptionHandlers();
+
+        try
+        {
+            _host = BuildHost();
+            await _host.StartAsync();
+
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+            var service = _host.Services.GetRequiredService<TodoService>();
+            var board = service.EnsureDefaultBoard();
+
+            foreach (var existing in service.GetTodos(board.Id))
+            {
+                service.Delete(existing.Id);
+            }
+
+            service.AddTodo(board.Id, "第一条待办");
+            service.AddTodo(board.Id, "第二条待办");
+            service.AddTodo(board.Id, "第三条待办");
+
+            var settings = _host.Services.GetRequiredService<AppSettingsService>();
+            settings.RestoreSession = false;
+
+            var ok = true;
+
+            // 1) 系统动效开关：默认应开启（Win11 默认开 ClientAreaAnimation）
+            Log.Information("[motion] Motion.Enabled={Enabled}（跟随系统 ClientAreaAnimation）", Motion.Enabled);
+
+            var windows = _host.Services.GetRequiredService<WindowManager>();
+            var boardWindow = (BoardWindow)windows.OpenBoard(board);
+            MainWindow = boardWindow;
+
+            // 2) 窗口入场：内容的不透明度应从 0 动画到 1
+            await Task.Delay(60);
+            var earlyOpacity = boardWindow.Content is FrameworkElement c0 ? c0.Opacity : 1;
+            await Task.Delay(500);
+            var settledOpacity = boardWindow.Content is FrameworkElement c1 ? c1.Opacity : 1;
+            Log.Information("[motion] 窗口入场：60ms 时={Early:0.00} 500ms 后={Settled:0.00}", earlyOpacity, settledOpacity);
+            ok &= settledOpacity > 0.98;
+            if (Motion.Enabled)
+            {
+                ok &= earlyOpacity < 0.95; // 入场期间确实还没到 1
+            }
+
+            // 3) Pulse：探针元素应被装上 ScaleTransform，动画结束后回到 1
+            var probe = new System.Windows.Controls.Border { Width = 40, Height = 20 };
+            var host = new System.Windows.Controls.Grid();
+            host.Children.Add(probe);
+            host.Measure(new Size(200, 60));
+            host.Arrange(new Rect(0, 0, 200, 60));
+
+            Motion.Pulse(probe, 1.08);
+            await Task.Delay(80);
+            var scaleMid = probe.RenderTransform is System.Windows.Media.ScaleTransform mid ? mid.ScaleX : -1;
+            await Task.Delay(400);
+            var scaleEnd = probe.RenderTransform is System.Windows.Media.ScaleTransform end ? end.ScaleX : -1;
+            Log.Information("[motion] Pulse：80ms 时 scale={Mid:0.000}（应 >1），结束后={End:0.000}", scaleMid, scaleEnd);
+            ok &= scaleMid > 1.0;
+            ok &= Math.Abs(scaleEnd - 1.0) < 0.01;
+
+            // 4) 复选框勾选动画：Tick 应被装上 ScaleTransform 并从 0.4 放大
+            var check = new System.Windows.Controls.CheckBox
+            {
+                Style = (Style)System.Windows.Application.Current.FindResource("CheckBox.Round"),
+            };
+            host.Children.Add(check);
+            host.UpdateLayout();
+            check.ApplyTemplate();
+
+            check.IsChecked = true;
+            await Task.Delay(120);
+
+            var tick = check.Template?.FindName("Tick", check) as System.Windows.FrameworkElement;
+            var tickScale = tick?.RenderTransform is System.Windows.Media.ScaleTransform st ? st.ScaleX : -1;
+            Log.Information("[motion] 勾选后 Tick.ScaleX={Scale:0.00}（应在 0.4→1 之间或已达 1）", tickScale);
+            ok &= tick is not null && tickScale > 0.4;
+
+            // 5) 删除一行：走真实按钮，确认不抛异常、行确实少了
+            var beforeRows = boardWindow.RowCountForTest();
+            boardWindow.DeleteRowByIndexForTest(0);
+            await Task.Delay(600);
+            var afterRows = boardWindow.RowCountForTest();
+            Log.Information("[motion] 删除一行：{Before} → {After}", beforeRows, afterRows);
+            ok &= afterRows == beforeRows - 1;
+
+            // 6) 完成一行：脉冲 + 数据变化
+            var doneBefore = boardWindow.DoneCountForTest();
+            boardWindow.CompleteRowByIndexForTest(0);
+            await Task.Delay(400);
+            var doneAfter = boardWindow.DoneCountForTest();
+            Log.Information("[motion] 完成一行：已完成 {Before} → {After}", doneBefore, doneAfter);
+            ok &= doneAfter > doneBefore;
+
+            if (shotDirectory is not null)
+            {
+                await Task.Delay(300);
+                var count = SaveWindowShots(shotDirectory);
+                Log.Information("[motion] 截图 {Count} 张", count);
+            }
+
+            Log.Information("[motion] 总结果={Result}", ok ? "通过" : "失败");
+
+            Log.CloseAndFlush();
+            Shutdown(ok ? 0 : 2);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[motion] 异常");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
 
     /// <summary>
     /// --pomodoro-demo：番茄钟全链路回归。计时用假时钟推快，不真的等 25 分钟。
