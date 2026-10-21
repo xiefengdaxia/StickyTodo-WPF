@@ -401,3 +401,12 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 - Token 统计的是**消息级用量累加**，与 opencode 自己按会话累加的 `session_v2.tokens_*` 在口径上可能有细微差别（消息级更细，也更能按时间分桶）。
 - 重复待办的完成历史目前只记录、未展示（将来用在「本月完成了多少次」这类统计上）。
 - UI 层没有自动化测试，靠 `--selftest` / `--recurrence-demo` / `--shot` 做回归。
+
+---
+
+## 许可证
+
+[MIT](LICENSE) © 2026 xiefengdaxia
+
+代码、UI、文案、配色全部为本项目原创实现，没有复制任何第三方程序的反编译产物、资源文件或私有接口。
+渲染用的系统字体（如「Microsoft YaHei UI」）需遵守其各自的授权，不属于本项目分发内容。
