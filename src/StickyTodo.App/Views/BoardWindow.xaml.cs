@@ -546,6 +546,34 @@ public partial class BoardWindow : Window, IStickyWindow
         return false;
     }
 
+    /// <summary>给回归脚本用：删除第 N 行。</summary>
+    public Task DeleteRowForTestAsync(int rowIndex)
+    {
+        var row = rowIndex >= 0 && rowIndex < _viewModel.Rows.Count ? _viewModel.Rows[rowIndex] : null;
+        return row is null ? Task.CompletedTask : _viewModel.DeleteRowAsync(row);
+    }
+
+    /// <summary>给回归脚本用：重新加载（模拟外部改了数据）。</summary>
+    public Task ReloadForTestAsync() => _viewModel.LoadAsync();
+
+    /// <summary>给回归脚本读：各标签胶囊的「名称 计数」，用来验证计数是否随标签变化更新。</summary>
+    public IReadOnlyList<string> ChipCounts() =>
+        _viewModel.Chips.Select(c => $"{c.Name} {c.Count}").ToList();
+
+    /// <summary>给回归脚本用：给第 N 行加标签。</summary>
+    public Task AddTagForTestAsync(int rowIndex, string tagId)
+    {
+        var row = rowIndex >= 0 && rowIndex < _viewModel.Rows.Count ? _viewModel.Rows[rowIndex] : null;
+        return row is null ? Task.CompletedTask : _viewModel.AddTagAsync(row, tagId);
+    }
+
+    /// <summary>给回归脚本用：清空第 N 行的标签。</summary>
+    public Task ClearTagsForTestAsync(int rowIndex)
+    {
+        var row = rowIndex >= 0 && rowIndex < _viewModel.Rows.Count ? _viewModel.Rows[rowIndex] : null;
+        return row is null ? Task.CompletedTask : _viewModel.ClearTagsAsync(row);
+    }
+
     /// <summary>给回归脚本读：某条待办当前挂了哪些标签（用来断言拖动结果）。</summary>
     public string TagTextOfRow(int index) =>
         index >= 0 && index < _viewModel.Rows.Count ? _viewModel.Rows[index].TagText : string.Empty;

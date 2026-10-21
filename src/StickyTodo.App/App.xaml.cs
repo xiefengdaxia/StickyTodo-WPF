@@ -108,6 +108,13 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        // 标签计数回归：加/删标签后检查胶囊计数是否跟着变
+        if (e.Args.Contains("--chip-count-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunChipCountDemo();
+            return;
+        }
+
         // 会话恢复回归：打开若干看板 → 重启 → 验证窗口数量与位置都回来了
         if (e.Args.Contains("--session-demo", StringComparer.OrdinalIgnoreCase))
         {
@@ -208,7 +215,16 @@ public partial class App : System.Windows.Application
 
             var manager = _host.Services.GetRequiredService<ManagerWindow>();
             MainWindow = manager;
-            manager.Show();
+
+            // --autostart（开机自启拉起）：不弹管理面板，只把上次的看板摆出来。
+            // 若根本没恢复出窗口（比如首次开机、或上次全关了），才退化成显示管理面板，
+            // 否则用户会以为程序没启动。
+            var launchedByAutoStart = e.Args.Contains("--autostart", StringComparer.OrdinalIgnoreCase);
+
+            if (!launchedByAutoStart)
+            {
+                manager.Show();
+            }
 
             var tray = _host.Services.GetRequiredService<TrayService>();
             tray.Start();
@@ -226,6 +242,15 @@ public partial class App : System.Windows.Application
                 if (restored > 0)
                 {
                     Log.Information("已恢复上次会话的 {Count} 个看板窗口", restored);
+                }
+                else if (launchedByAutoStart)
+                {
+                    // 没有可恢复的窗口，兜底把管理面板显示出来
+                    manager.Show();
+                }
+                else
+                {
+                    manager.Show();
                 }
             }
 
@@ -459,6 +484,104 @@ public partial class App : System.Windows.Application
         catch (Exception ex)
         {
             Log.Fatal(ex, "[skin] 失败");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
+    /// --chip-count-demo：验证「给待办加/删标签后，标签胶囊上的计数是否跟着变」。
+    /// </summary>
+    private async void RunChipCountDemo()
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+            _host = BuildHost();
+            await _host.StartAsync();
+
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+            var service = _host.Services.GetRequiredService<TodoService>();
+            var board = service.EnsureDefaultBoard();
+
+            foreach (var existing in service.GetTodos(board.Id))
+            {
+                service.Delete(existing.Id);
+            }
+
+            foreach (var tag in service.GetTags())
+            {
+                service.DeleteTag(tag.Id);
+            }
+
+            var important = service.CreateTag("重要");
+            var first = service.AddTodo(board.Id, "第一条");
+            service.AddTodo(board.Id, "第二条");
+
+            var windows = _host.Services.GetRequiredService<WindowManager>();
+            var window = (BoardWindow)windows.OpenBoard(board);
+            MainWindow = window;
+            await Task.Delay(900);
+
+            string Dump() => string.Join(" | ", window.ChipCounts());
+
+            Log.Information("[chip] 初始计数：{Counts}", Dump());
+
+            // 1) 加标签
+            await window.AddTagForTestAsync(0, important.Id);
+            await Task.Delay(400);
+            var afterAdd = Dump();
+            Log.Information("[chip] 给第一条加「重要」后：{Counts}", afterAdd);
+
+            // 2) 再给第二条加
+            await window.AddTagForTestAsync(1, important.Id);
+            await Task.Delay(400);
+            var afterAdd2 = Dump();
+            Log.Information("[chip] 给第二条也加后：{Counts}", afterAdd2);
+
+            // 3) 清空第一条
+            await window.ClearTagsForTestAsync(0);
+            await Task.Delay(400);
+            var afterClear = Dump();
+            Log.Information("[chip] 清空第一条后：{Counts}", afterClear);
+
+            var ok = afterAdd.Contains("重要 1")
+                     && afterAdd2.Contains("重要 2")
+                     && afterClear.Contains("重要 1");
+
+            // 4) 删除带标签的待办：计数应下降
+            var rowToDelete = window.CurrentRowSnapshot().ToList();
+            await window.DeleteRowForTestAsync(1); // 第二条（挂着「重要」）
+            await Task.Delay(400);
+            var afterDeleteTodo = Dump();
+            Log.Information("[chip] 删除挂了标签的待办后：{Counts}", afterDeleteTodo);
+            ok &= afterDeleteTodo.Contains("重要 0");
+
+            // 5) 删除标签本身：胶囊应消失
+            var tag2 = service.CreateTag("临时");
+            service.SetTodoTags(service.GetTodos(board.Id).First().Id, [tag2.Id]);
+            await window.ReloadForTestAsync();
+            var withTag2 = Dump();
+            service.DeleteTag(tag2.Id);
+            await window.ReloadForTestAsync();
+            var afterDeleteTag = Dump();
+            Log.Information("[chip] 建「临时」并挂上：{Before}；删除该标签后：{After}", withTag2, afterDeleteTag);
+            ok &= withTag2.Contains("临时 1") && !afterDeleteTag.Contains("临时");
+
+            // 同时截一张图，确认 UI 上真的显示了更新后的计数
+            SaveWindowShots(Path.Combine(Path.GetTempPath(), "chip-shots"));
+
+            Log.Information("[chip] 总结果={Result}", ok ? "通过" : "失败");
+
+            Log.CloseAndFlush();
+            Shutdown(ok ? 0 : 2);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[chip] 异常");
             Log.CloseAndFlush();
             Shutdown(1);
         }
@@ -1946,6 +2069,23 @@ public partial class App : System.Windows.Application
             Log.Fatal(ex, "[selftest] 失败");
             Log.CloseAndFlush();
             Shutdown(1);
+        }
+    }
+
+    /// <summary>
+    /// 退出前固化会话（谁要调 Shutdown 就先调这个）。
+    /// WPF 的 Shutdown 会先逐个关闭窗口、之后才走 OnExit，
+    /// 那时窗口已经没了，只能记成空列表。
+    /// </summary>
+    public void BeginShutdownForExit()
+    {
+        try
+        {
+            _host?.Services.GetService<WindowManager>()?.BeginShutdown();
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "固化会话失败");
         }
     }
 

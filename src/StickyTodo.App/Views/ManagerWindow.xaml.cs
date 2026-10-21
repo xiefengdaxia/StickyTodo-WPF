@@ -24,11 +24,36 @@ public partial class ManagerWindow : Window
         _windows = windows;
         DataContext = viewModel;
 
-        Loaded += async (_, _) => await _viewModel.LoadAsync();
+        Loaded += async (_, _) =>
+        {
+            _rendered = true;
+            await _viewModel.LoadAsync();
+        };
+
+        // 管理面板常驻，里面的"待办/已完成"计数必须跟着数据变化刷新。
+        // 之前只在 Loaded 里算一次，改了待办后数字一直停在旧值。
+        Activated += async (_, _) =>
+        {
+            if (_rendered)
+            {
+                await _viewModel.LoadAsync();
+            }
+        };
+
+        // 便签窗口打开/关闭时也刷新一次
+        _windows.BoardsChanged += async (_, _) =>
+        {
+            if (_rendered)
+            {
+                await _viewModel.LoadAsync();
+            }
+        };
 
         // 整个窗口都能拖（含圆角外的那圈边距），只要不是点在交互控件上
         PreviewMouseLeftButtonDown += Window_PreviewMouseLeftButtonDown;
     }
+
+    private bool _rendered;
 
     private void Window_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
@@ -237,7 +262,13 @@ public partial class ManagerWindow : Window
 
     private static void ExitApp()
     {
-        System.Windows.Application.Current?.Shutdown();
+        var app = System.Windows.Application.Current;
+        app?.Dispatcher.Invoke(() =>
+        {
+            // 先固化会话再退出（Shutdown 会先关窗口，晚了就记成空）
+            (app as App)?.BeginShutdownForExit();
+            app.Shutdown();
+        });
     }
 
     private void Exit_Click(object sender, RoutedEventArgs e) => ExitApp();

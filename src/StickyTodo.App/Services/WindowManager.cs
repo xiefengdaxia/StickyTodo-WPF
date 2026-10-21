@@ -204,6 +204,13 @@ public sealed class WindowManager
     /// <summary>标记即将退出：之后的关窗不再覆盖会话记录。</summary>
     public void BeginShutdown()
     {
+        // 只固化一次。App.OnExit 里还会再调一次，那时窗口已经关完了，
+        // 若照常写入就会把刚才记录的有效值覆盖成空列表。
+        if (_shuttingDown)
+        {
+            return;
+        }
+
         _shuttingDown = true;
 
         // 退出前把当前开着的看板固化下来，之后关窗一律不再改它

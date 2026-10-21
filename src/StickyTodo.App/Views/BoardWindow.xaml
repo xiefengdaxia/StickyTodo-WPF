@@ -220,7 +220,7 @@
                                     <Setter.Value>
                                         <ControlTemplate TargetType="ListBoxItem">
                                             <Border x:Name="Row"
-                                                    Padding="6,3,8,3"
+                                                    Padding="6,1,8,1"
                                                     Margin="6,0"
                                                     CornerRadius="7"
                                                     BorderBrush="{DynamicResource Brush.Line}"
@@ -253,9 +253,11 @@
                                     <Grid.ColumnDefinitions>
                                         <!-- 拖动把手 -->
                                         <ColumnDefinition Width="Auto" />
-                                        <!-- 内容：标题 + 徽标 + 标签，全部左对齐 -->
+                                        <!-- 标题：占据剩余宽度，文本框本身按内容自适应 -->
                                         <ColumnDefinition Width="*" />
-                                        <!-- 悬停操作按钮（最右侧，固定宽度，避免悬停时文字跳动） -->
+                                        <!-- 标签：始终固定在内容区最右侧 -->
+                                        <ColumnDefinition Width="Auto" />
+                                        <!-- 悬停操作按钮 -->
                                         <ColumnDefinition Width="64" />
                                     </Grid.ColumnDefinitions>
                                     <Grid.RowDefinitions>
@@ -263,12 +265,10 @@
                                         <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
 
-                                    <!-- 拖动把手：按住这里拖可调整顺序 / 拖到标签胶囊上改标签 -->
+                                    <!-- 拖动把手 -->
                                     <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="0"
                                             x:Name="DragHandle"
-                                            Width="18"
-                                            Margin="0,0,0,0"
-                                            Padding="0,1,0,0"
+                                            Width="16"
                                             VerticalAlignment="Center"
                                             Background="Transparent"
                                             Cursor="SizeAll"
@@ -276,60 +276,58 @@
                                             PreviewMouseLeftButtonDown="DragHandle_PreviewMouseLeftButtonDown"
                                             PreviewMouseMove="DragHandle_PreviewMouseMove">
                                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                            <Ellipse Width="2.5" Height="2.5" Fill="{DynamicResource Brush.InkSoft}" Opacity="0.45" />
-                                            <Ellipse Width="2.5" Height="2.5" Fill="{DynamicResource Brush.InkSoft}" Opacity="0.45" Margin="0,2" />
-                                            <Ellipse Width="2.5" Height="2.5" Fill="{DynamicResource Brush.InkSoft}" Opacity="0.45" />
+                                            <Ellipse Width="2" Height="2" Fill="{DynamicResource Brush.InkSoft}" Opacity="0.45" />
+                                            <Ellipse Width="2" Height="2" Fill="{DynamicResource Brush.InkSoft}" Opacity="0.45" Margin="0,1.5" />
+                                            <Ellipse Width="2" Height="2" Fill="{DynamicResource Brush.InkSoft}" Opacity="0.45" />
                                         </StackPanel>
                                     </Border>
 
-                                    <!-- 标题 + 标签名同一行；标签紧跟在标题右侧，不额外占一行高 -->
-                                    <StackPanel Grid.Row="0" Grid.Column="1"
-                                                Orientation="Horizontal"
-                                                VerticalAlignment="Center">
-                                        <!-- 标题：行内直接编辑，回车/失焦提交 -->
-                                        <TextBox Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}"
-                                                 GotKeyboardFocus="RowTitle_GotFocus"
-                                                 LostKeyboardFocus="RowTitle_LostFocus"
-                                                 PreviewKeyDown="RowTitle_PreviewKeyDown"
-                                                 VerticalAlignment="Center">
-                                            <TextBox.Style>
-                                                <Style TargetType="TextBox" BasedOn="{StaticResource TextBox.Inline}">
-                                                    <Setter Property="MinWidth" Value="40" />
-                                                    <Setter Property="MaxWidth" Value="250" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding IsDone}" Value="True">
-                                                            <Setter Property="TextDecorations" Value="Strikethrough" />
-                                                            <Setter Property="Opacity" Value="0.55" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </TextBox.Style>
-                                        </TextBox>
+                                    <!-- 标题：宽度随内容自适应（MaxWidth 防超长），点行内任意位置都能编辑 -->
+                                    <TextBox Grid.Row="0" Grid.Column="1"
+                                             Text="{Binding Title, UpdateSourceTrigger=PropertyChanged}"
+                                             GotKeyboardFocus="RowTitle_GotFocus"
+                                             LostKeyboardFocus="RowTitle_LostFocus"
+                                             PreviewKeyDown="RowTitle_PreviewKeyDown"
+                                             HorizontalAlignment="Stretch"
+                                             VerticalAlignment="Center">
+                                        <TextBox.Style>
+                                            <Style TargetType="TextBox" BasedOn="{StaticResource TextBox.Inline}">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsDone}" Value="True">
+                                                        <Setter Property="TextDecorations" Value="Strikethrough" />
+                                                        <Setter Property="Opacity" Value="0.55" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBox.Style>
+                                    </TextBox>
 
-                                        <!-- 标签名：紧跟标题右侧，超长省略 -->
-                                        <TextBlock Text="{Binding TagText}"
-                                                   FontSize="10"
-                                                   Margin="7,0,0,0"
-                                                   MaxWidth="100"
-                                                   VerticalAlignment="Center"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   ToolTip="{Binding TagText}"
-                                                   Foreground="{DynamicResource Brush.Accent}"
-                                                   Opacity="0.85"
-                                                   Visibility="{Binding HasTags, Converter={StaticResource BoolToVis}}" />
+                                    <!-- 标签：固定在右侧，不会被长标题挤走 -->
+                                    <TextBlock Grid.Row="0" Grid.Column="2"
+                                               Text="{Binding TagText}"
+                                               FontSize="10"
+                                               Margin="6,0,6,0"
+                                               MaxWidth="96"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip="{Binding TagText}"
+                                               Foreground="{DynamicResource Brush.Accent}"
+                                               Opacity="0.85"
+                                               Visibility="{Binding HasTags, Converter={StaticResource BoolToVis}}" />
 
-                                        <!-- 编辑错误提示 -->
-                                        <TextBlock Text="{Binding EditError}"
-                                                   FontSize="10"
-                                                   Margin="7,0,0,0"
-                                                   VerticalAlignment="Center"
-                                                   Foreground="#FFC0392B"
-                                                   Visibility="{Binding EditError, Converter={StaticResource NullToCollapsed}}" />
-                                    </StackPanel>
+                                    <!-- 编辑错误提示 -->
+                                    <TextBlock Grid.Row="0" Grid.Column="3"
+                                               Text="{Binding EditError}"
+                                               FontSize="10"
+                                               Margin="0,0,4,0"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"
+                                               Foreground="#FFC0392B"
+                                               Visibility="{Binding EditError, Converter={StaticResource NullToCollapsed}}" />
 
                                     <!-- 第二行：只在有徽标时才出现（完成时间/倒数日/提醒/重复） -->
-                                    <WrapPanel Grid.Row="1" Grid.Column="1"
-                                               Margin="-5,2,6,0"
+                                    <WrapPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
+                                               Margin="-5,1,0,0"
                                                Orientation="Horizontal"
                                                VerticalAlignment="Center"
                                                Visibility="{Binding HasMeta, Converter={StaticResource BoolToVis}}">
@@ -384,7 +382,7 @@
                                     </WrapPanel>
 
                                     <!-- 悬停操作区（最右侧）：平时不可见，鼠标移入本行才出现 -->
-                                    <StackPanel Grid.Row="0" Grid.RowSpan="2" Grid.Column="2"
+                                    <StackPanel Grid.Row="0" Grid.RowSpan="2" Grid.Column="3"
                                                 Orientation="Horizontal"
                                                 HorizontalAlignment="Right"
                                                 VerticalAlignment="Center">

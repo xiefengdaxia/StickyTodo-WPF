@@ -66,8 +66,8 @@ public sealed class AutoStartService
                     return false;
                 }
 
-                // 带引号，防止路径里有空格
-                key.SetValue(ValueName, $"\"{exe}\"", RegistryValueKind.String);
+                // 带引号，防止路径里有空格；带 --autostart 让程序启动时只恢复看板、不弹管理面板
+                key.SetValue(ValueName, $"\"{exe}\" --autostart", RegistryValueKind.String);
             }
             else
             {
@@ -90,7 +90,7 @@ public sealed class AutoStartService
     {
         var current = CurrentCommand();
         var exe = ExecutablePath();
-        var expected = string.IsNullOrWhiteSpace(exe) ? null : $"\"{exe}\"";
+        var expected = string.IsNullOrWhiteSpace(exe) ? null : $"\"{exe}\" --autostart";
 
         if (!desired)
         {

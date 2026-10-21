@@ -140,10 +140,16 @@ public sealed class TrayService : IDisposable
         });
     }
 
-    private static void ExitApplication()
+    private void ExitApplication()
     {
         var app = System.Windows.Application.Current;
-        app?.Dispatcher.Invoke(() => app.Shutdown());
+        app?.Dispatcher.Invoke(() =>
+        {
+            // 先固化"当前开着哪些看板"，再 Shutdown。
+            // WPF 的 Shutdown 会先逐个关窗口、之后才走 OnExit，那时再记就只剩空列表了。
+            (_services.GetService(typeof(WindowManager)) as WindowManager)?.BeginShutdown();
+            app.Shutdown();
+        });
     }
 
     public void Dispose()
