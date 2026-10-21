@@ -1,4 +1,4 @@
-<Window x:Class="StickyTodo.App.Views.SettingsWindow"
+﻿<Window x:Class="StickyTodo.App.Views.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="设置"
@@ -40,7 +40,7 @@
                 <Grid>
                     <StackPanel>
                         <TextBlock Text="设置" Style="{StaticResource Text.Display}" />
-                        <TextBlock Text="外观与数据都存在本机，不联网"
+                        <TextBlock Text="外观与数据都存在本机（Token 看板按你填的地址取数）"
                                    Style="{StaticResource Text.Caption}"
                                    Margin="0,3,0,0" />
                     </StackPanel>
@@ -200,6 +200,25 @@
                             <TextBlock Text="会重新打开上次关闭前的便签/日历窗口，并回到原来的位置和大小"
                                        Style="{StaticResource Text.Caption}"
                                        Margin="24,5,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ===== Token 用量 ===== -->
+                    <TextBlock Text="Token 用量" Style="{StaticResource Text.Section}" Margin="2,4,0,8" />
+
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                        <StackPanel>
+                            <TextBlock Text="面板地址" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
+                            <TextBox x:Name="TokenEndpointBox"
+                                     Text="{Binding TokenEndpoint, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource TextBox.Flat}"
+                                     Margin="0,6,0,0"
+                                     LostFocus="TokenEndpointBox_LostFocus"
+                                     KeyDown="TokenEndpointBox_KeyDown" />
+                            <TextBlock Text="Token 看板按这个地址取用量数据（只读）。改完回到看板点一下 ⟳ 即生效。"
+                                       Style="{StaticResource Text.Caption}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,5,0,0" />
                         </StackPanel>
                     </Border>
 

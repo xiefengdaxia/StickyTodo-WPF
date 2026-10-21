@@ -89,6 +89,10 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _restoreSession = true;
 
+    /// <summary>Token 用量面板的服务地址（可改，允许局域网/内网地址）。</summary>
+    [ObservableProperty]
+    private string _tokenEndpoint = string.Empty;
+
     private bool _suppressStartupSync;
 
     /// <summary>把存的值读进 UI（构造后调用一次）。</summary>
@@ -100,6 +104,7 @@ public partial class SettingsViewModel : ObservableObject
             // 以注册表实际状态为准：用户可能在别处删过启动项
             LaunchAtStartup = _autoStart.IsEnabled();
             RestoreSession = _settings.RestoreSession;
+            TokenEndpoint = _settings.TokenEndpoint;
             _settings.AutoStart = LaunchAtStartup;
         }
         finally
@@ -142,6 +147,30 @@ public partial class SettingsViewModel : ObservableObject
 
         _settings.RestoreSession = value;
         StatusText = value ? "启动时会恢复上次的看板" : "启动时不再恢复看板";
+    }
+
+    /// <summary>地址失焦/回车时保存；不合法就还原成原来的值。</summary>
+    public void CommitTokenEndpoint()
+    {
+        var text = (TokenEndpoint ?? string.Empty).Trim();
+
+        if (text.Length == 0)
+        {
+            TokenEndpoint = _settings.TokenEndpoint;
+            return;
+        }
+
+        if (!Uri.TryCreate(text, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            ErrorText = "地址要以 http:// 或 https:// 开头";
+            TokenEndpoint = _settings.TokenEndpoint;
+            return;
+        }
+
+        _settings.TokenEndpoint = text;
+        ErrorText = null;
+        StatusText = "Token 面板地址已保存";
     }
 
     [ObservableProperty]

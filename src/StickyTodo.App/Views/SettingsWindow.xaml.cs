@@ -50,6 +50,22 @@ public partial class SettingsWindow : Window
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 
+    /// <summary>地址框失焦时保存。</summary>
+    private void TokenEndpointBox_LostFocus(object sender, RoutedEventArgs e) => _viewModel.CommitTokenEndpoint();
+
+    /// <summary>回车也当保存，顺便把焦点移开。</summary>
+    private void TokenEndpointBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+        {
+            return;
+        }
+
+        _viewModel.CommitTokenEndpoint();
+        Keyboard.ClearFocus();
+        e.Handled = true;
+    }
+
     /// <summary>
     /// 关闭时只隐藏、不销毁。
     /// 之前没拦这一下：窗口被 Close() 后仍是 DI 单例，下次 ShowSettings 再 Show() 会抛
