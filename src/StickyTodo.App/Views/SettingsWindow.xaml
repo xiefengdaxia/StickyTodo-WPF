@@ -216,14 +216,10 @@
                                      ToolTip="留空使用默认位置"
                                      LostFocus="TokenDatabaseBox_LostFocus"
                                      KeyDown="TokenDatabaseBox_KeyDown" />
-                            <TextBlock Text="默认：~/.local/share/opencode/opencode.db"
-                                       Style="{StaticResource Text.Caption}"
-                                       Opacity="0.6"
-                                       Margin="2,3,0,0" />
                             <TextBlock Text="留空 = 默认位置 ~/.local/share/opencode/opencode.db。Token 看板只读这个库，不联网。"
                                        Style="{StaticResource Text.Caption}"
                                        TextWrapping="Wrap"
-                                       Margin="0,5,0,0" />
+                                       Margin="2,5,0,0" />
                         </StackPanel>
                     </Border>
 

@@ -166,9 +166,24 @@ public static class NoteSkins
         Color.FromRgb(0xE8, 0xEE, 0xF7), Color.FromRgb(0x8E, 0x9C, 0xB4),
         Color.FromRgb(0x8A, 0xB4, 0xF8), true);
 
+    /// <summary>暖橙亮色：介于黄与粉之间，偏"日落"。</summary>
+    public static readonly NoteSkin Apricot = new(
+        "apricot", "暖橘杏",
+        Color.FromRgb(0xFF, 0xEC, 0xD6), Color.FromRgb(0xF9, 0xCF, 0xA6),
+        Color.FromRgb(0x43, 0x2C, 0x1B), Color.FromRgb(0x8A, 0x69, 0x4E),
+        Color.FromRgb(0xC2, 0x5E, 0x0E), false);
+
+    /// <summary>暖调暗色：深棕咖，和冷调的两套暗色形成对比。</summary>
+    public static readonly NoteSkin Espresso = new(
+        "espresso", "深棕咖",
+        Color.FromRgb(0x3A, 0x2E, 0x27), Color.FromRgb(0x22, 0x1A, 0x15),
+        Color.FromRgb(0xF2, 0xEA, 0xE2), Color.FromRgb(0xA8, 0x97, 0x89),
+        Color.FromRgb(0xE8, 0xA8, 0x5C), true);
+
     public static readonly IReadOnlyList<NoteSkin> All =
     [
-        ClassicYellow, Paper, Mint, Sky, Violet, Rose, Graphite, Midnight
+        ClassicYellow, Paper, Mint, Sky, Violet, Rose, Apricot,
+        Graphite, Midnight, Espresso,
     ];
 
     public static NoteSkin Resolve(string? key) =>

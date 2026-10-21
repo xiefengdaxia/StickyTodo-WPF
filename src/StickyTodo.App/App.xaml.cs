@@ -484,8 +484,8 @@ public partial class App : System.Windows.Application
     }
 
     /// <summary>
-    /// --skin-check：验证「设置页换皮肤 → 便签窗口真的变」。
-    /// 依次切换两套皮肤并读取便签窗口实际用到的画刷颜色，退出码 0 表示同步生效。
+    /// --skin-check：验证「设置页换皮肤 → 便签窗口真的变」，并检查 10 套皮肤的结构完整性。
+    /// 逐套切换并读取便签窗口实际用到的画刷颜色，退出码 0 表示全部同步生效。
     /// </summary>
     private void RunSkinCheck()
     {
@@ -508,24 +508,68 @@ public partial class App : System.Windows.Application
             var skinService = _host.Services.GetRequiredService<SkinService>();
             var window = windows.OpenBoard(board);
 
-            var results = new List<string>();
             var ok = true;
 
-            foreach (var key in new[] { "graphite", "sticky-yellow" })
+            // 1) 数量与唯一性
+            Log.Information("[skin] 共 {Count} 套皮肤", NoteSkins.All.Count);
+            ok &= NoteSkins.All.Count == 10;
+            ok &= NoteSkins.All.Select(s => s.Key).Distinct(StringComparer.OrdinalIgnoreCase).Count() == NoteSkins.All.Count;
+            ok &= NoteSkins.All.Select(s => s.DisplayName).Distinct().Count() == NoteSkins.All.Count;
+
+            // 2) 每套都要有内容，且文字与纸面有足够对比度（否则暗色皮肤会看不清）
+            foreach (var skin in NoteSkins.All)
             {
-                skinService.SetSkin(key);
-                windows.ApplySkin();
+                var inkOnPaper = ContrastRatio(skin.Ink, skin.BackgroundTop);
+                var accentOnPaper = ContrastRatio(skin.Accent, skin.BackgroundTop);
 
-                var expected = NoteSkins.Resolve(key);
-                var actual = ((SolidColorBrush)System.Windows.Application.Current.Resources["Brush.Ink"]).Color;
-                var match = actual == expected.Ink;
-                ok &= match;
+                // 正文对比度至少 4.5（WCAG AA），强调色至少 2.5（做点缀用，不要求那么高）
+                var textOk = inkOnPaper >= 4.5;
+                var accentOk = accentOnPaper >= 2.5;
 
-                results.Add($"皮肤={key} 期望墨色={expected.Ink} 实际={actual} 一致={match}");
+                ok &= textOk && accentOk;
+                ok &= !string.IsNullOrWhiteSpace(skin.DisplayName);
+
+                Log.Information(
+                    "[skin] {Key,-14} {Name,-8} 暗色={Dark,-5} 正文对比={InkRatio,5:0.00} 强调对比={AccentRatio,5:0.00} {Verdict}",
+                    skin.Key, skin.DisplayName, skin.IsDark, inkOnPaper, accentOnPaper,
+                    textOk && accentOk ? "OK" : "不达标");
             }
 
-            Log.Information("[skin] {Results}", string.Join(" | ", results));
+            // 3) 每套皮肤切过去之后，应用资源里的画刷都要跟着变
+            foreach (var skin in NoteSkins.All)
+            {
+                skinService.SetSkin(skin.Key);
+                windows.ApplySkin();
+
+                var resources = System.Windows.Application.Current.Resources;
+                var ink = ((SolidColorBrush)resources["Brush.Ink"]).Color;
+                var accent = ((SolidColorBrush)resources["Brush.Accent"]).Color;
+                var isDark = (bool)resources["Bool.IsDark"];
+
+                var match = ink == skin.Ink && accent == skin.Accent && isDark == skin.IsDark;
+                ok &= match;
+
+                if (!match)
+                {
+                    Log.Warning("[skin] {Key} 资源未同步：ink={Ink} accent={Accent} dark={Dark}",
+                        skin.Key, ink, accent, isDark);
+                }
+            }
+
+            // 4) 切到新增的两套，确认暗色标记正确
+            foreach (var key in new[] { "apricot", "espresso" })
+            {
+                var skin = NoteSkins.Resolve(key);
+                ok &= skin.Key == key;
+                Log.Information("[skin] 新增皮肤 {Key} 解析正确，暗色={Dark}", skin.Key, skin.IsDark);
+            }
+
+            // 收尾切回默认
+            skinService.SetSkin(NoteSkins.ClassicYellow.Key);
+            windows.ApplySkin();
+
             Log.Information("[skin] 便签窗口类型={Type} 标题={Title}", window.GetType().Name, window.Title);
+            Log.Information("[skin] 总结果={Result}", ok ? "通过" : "失败");
 
             Log.CloseAndFlush();
             Shutdown(ok ? 0 : 2);
@@ -536,6 +580,28 @@ public partial class App : System.Windows.Application
             Log.CloseAndFlush();
             Shutdown(1);
         }
+    }
+
+    /// <summary>WCAG 相对亮度对比度。用来判断"这套配色的字能不能看清"。</summary>
+    private static double ContrastRatio(Color a, Color b)
+    {
+        static double Luminance(Color c)
+        {
+            static double Channel(byte v)
+            {
+                var s = v / 255.0;
+                return s <= 0.03928 ? s / 12.92 : Math.Pow((s + 0.055) / 1.055, 2.4);
+            }
+
+            return (0.2126 * Channel(c.R)) + (0.7152 * Channel(c.G)) + (0.0722 * Channel(c.B));
+        }
+
+        var l1 = Luminance(a);
+        var l2 = Luminance(b);
+        var lighter = Math.Max(l1, l2);
+        var darker = Math.Min(l1, l2);
+
+        return (lighter + 0.05) / (darker + 0.05);
     }
 
     /// <summary>
