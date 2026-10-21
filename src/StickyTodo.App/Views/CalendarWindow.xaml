@@ -113,10 +113,37 @@
                 <Grid Grid.Row="0" Margin="2,0,2,6">
                     <StackPanel Orientation="Horizontal">
                         <Button Content="‹" Style="{StaticResource Button.Ghost}" Padding="10,2" Click="PrevMonth_Click" ToolTip="上个月" />
-                        <TextBlock Text="{Binding MonthTitle}" FontSize="14" FontWeight="SemiBold"
-                                   VerticalAlignment="Center" Margin="10,0"
-                                   Foreground="{DynamicResource Brush.Ink}" />
-                        <Button Content="›" Style="{StaticResource Button.Ghost}" Padding="10,2" Click="NextMonth_Click" ToolTip="下个月" />
+
+                        <!-- 年月下拉框：选完直接跳过去 -->
+                        <ComboBox x:Name="YearBox"
+                                  Width="86"
+                                  Margin="8,0,0,0"
+                                  VerticalAlignment="Center"
+                                  ItemsSource="{Binding Years}"
+                                  SelectedItem="{Binding Year, Mode=OneWay}"
+                                  SelectionChanged="YearBox_SelectionChanged">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding StringFormat={}{0} 年}" FontSize="11" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+
+                        <ComboBox x:Name="MonthBox"
+                                  Width="62"
+                                  Margin="4,0,0,0"
+                                  VerticalAlignment="Center"
+                                  ItemsSource="{Binding Months}"
+                                  SelectedItem="{Binding Month, Mode=OneWay}"
+                                  SelectionChanged="MonthBox_SelectionChanged">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding StringFormat={}{0} 月}" FontSize="11" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+
+                        <Button Content="›" Style="{StaticResource Button.Ghost}" Padding="10,2" Margin="4,0,0,0" Click="NextMonth_Click" ToolTip="下个月" />
                     </StackPanel>
                     <Button Content="今天" HorizontalAlignment="Right" Style="{StaticResource Button.Ghost}"
                             Padding="10,2" FontSize="11" Click="Today_Click" />
@@ -151,15 +178,37 @@
                                     DragOver="Cell_DragOver"
                                     Drop="Cell_Drop"
                                     Cursor="Hand">
-                                <StackPanel Margin="4,3">
-                                    <TextBlock x:Name="DayNumber"
-                                               Text="{Binding DayText}"
-                                               FontSize="11"
+                                <StackPanel Margin="4,2">
+                                    <Grid>
+                                        <TextBlock x:Name="DayNumber"
+                                                   Text="{Binding DayText}"
+                                                   FontSize="11"
+                                                   HorizontalAlignment="Left"
+                                                   Foreground="{DynamicResource Brush.Ink}" />
+                                        <Border x:Name="BadgeChip"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Top"
+                                                CornerRadius="2"
+                                                Padding="2,0"
+                                                Background="#FFC0392B"
+                                                Visibility="Collapsed">
+                                            <TextBlock x:Name="BadgeText"
+                                                       Text="{Binding Badge}"
+                                                       FontSize="8"
+                                                       Foreground="White" />
+                                        </Border>
+                                    </Grid>
+                                    <TextBlock x:Name="LunarLabel"
+                                               Text="{Binding SubText}"
+                                               FontSize="8.5"
+                                               Margin="0,1,0,0"
                                                HorizontalAlignment="Left"
-                                               Foreground="{DynamicResource Brush.Ink}" />
+                                               TextTrimming="CharacterEllipsis"
+                                               Foreground="{DynamicResource Brush.InkSoft}"
+                                               Opacity="0.8" />
                                     <StackPanel x:Name="EntryHint"
                                                 Orientation="Horizontal"
-                                                Margin="0,3,0,0"
+                                                Margin="0,2,0,0"
                                                 Visibility="Collapsed">
                                         <Ellipse Width="5" Height="5" VerticalAlignment="Center"
                                                  Fill="{DynamicResource Brush.Accent}" />
@@ -175,10 +224,20 @@
                             <DataTemplate.Triggers>
                                 <DataTrigger Binding="{Binding IsCurrentMonth}" Value="False">
                                     <Setter TargetName="DayNumber" Property="Opacity" Value="0.3" />
+                                    <Setter TargetName="LunarLabel" Property="Opacity" Value="0.35" />
                                     <Setter TargetName="EntryHint" Property="Opacity" Value="0.4" />
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding IsWeekend}" Value="True">
                                     <Setter TargetName="DayNumber" Property="Foreground" Value="#FFC0392B" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsHoliday}" Value="True">
+                                    <Setter TargetName="DayNumber" Property="Foreground" Value="#FFC0392B" />
+                                    <Setter TargetName="BadgeChip" Property="Visibility" Value="Visible" />
+                                    <Setter TargetName="BadgeChip" Property="Background" Value="#FFC0392B" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsMakeup}" Value="True">
+                                    <Setter TargetName="BadgeChip" Property="Visibility" Value="Visible" />
+                                    <Setter TargetName="BadgeChip" Property="Background" Value="#FF6B7280" />
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding IsToday}" Value="True">
                                     <Setter TargetName="Cell" Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
@@ -194,7 +253,7 @@
                 </ItemsControl>
             </Grid>
 
-            <!-- 当日日程 -->
+            <!-- 当日日程 + 黄历 -->
             <Border Grid.Row="2"
                     BorderBrush="{DynamicResource Brush.Line}"
                     BorderThickness="0,1,0,0"
@@ -205,12 +264,55 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <TextBlock Grid.Row="0" Text="{Binding SelectedDateText}" FontSize="12" FontWeight="SemiBold"
-                               Foreground="{DynamicResource Brush.Ink}" Margin="2,0,0,4" />
+                               Foreground="{DynamicResource Brush.Ink}" Margin="2,0,0,4"
+                               TextWrapping="Wrap" />
 
-                    <ScrollViewer Grid.Row="1" MaxHeight="120" VerticalScrollBarVisibility="Auto">
+                    <!-- 黄历：干支 / 建除十二神 / 宜 / 忌 -->
+                    <Border Grid.Row="1"
+                            Margin="0,0,0,6"
+                            Padding="8,5"
+                            CornerRadius="6"
+                            Background="#10B27F0A"
+                            Visibility="{Binding ShowAlmanac, Converter={StaticResource BoolToVis}}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding AlmanacDateText}"
+                                       FontSize="10"
+                                       Foreground="{DynamicResource Brush.InkSoft}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding AlmanacMetaText}"
+                                       FontSize="10"
+                                       Margin="0,2,0,0"
+                                       Foreground="{DynamicResource Brush.Accent}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding AlmanacMetaText}" Value="">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <TextBlock Text="{Binding AlmanacYiText}"
+                                       FontSize="10.5"
+                                       Margin="0,4,0,0"
+                                       TextWrapping="Wrap"
+                                       Foreground="#FF2E7D32" />
+                            <TextBlock Text="{Binding AlmanacJiText}"
+                                       FontSize="10.5"
+                                       Margin="0,2,0,0"
+                                       TextWrapping="Wrap"
+                                       Foreground="#FFC0392B" />
+                        </StackPanel>
+                    </Border>
+
+                    <ScrollViewer Grid.Row="2" MaxHeight="110" VerticalScrollBarVisibility="Auto">
                         <ItemsControl x:Name="DayEntryList" ItemsSource="{Binding SelectedDayEntries}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
@@ -261,7 +363,7 @@
                         </ItemsControl>
                     </ScrollViewer>
 
-                    <TextBlock Grid.Row="1" Text="这一天没有日程"
+                    <TextBlock Grid.Row="2" Text="这一天没有日程"
                                HorizontalAlignment="Center"
                                Margin="0,6,0,6"
                                IsHitTestVisible="False">

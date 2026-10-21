@@ -1,0 +1,261 @@
+using System.ComponentModel;
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
+using StickyTodo.App.Services;
+using StickyTodo.App.ViewModels;
+using StickyTodo.Core.Entities;
+
+namespace StickyTodo.App.Views;
+
+/// <summary>
+/// Token 用量看板：按设定的间隔自动向上游面板取数，也可以手动点刷新。
+/// 这是全程序唯一需要联网的界面，其它看板照旧完全本地。
+/// </summary>
+public partial class TokenBoardWindow : Window, IStickyWindow
+{
+    private const double ResizeBorder = 8d;
+    private const int CascadeStep = 28;
+
+    private readonly TokenBoardViewModel _viewModel;
+    private readonly WindowManager _windows;
+    private bool _geometryRestored;
+    private bool _isFullScreen;
+
+    public TokenBoardWindow(TokenBoardViewModel viewModel, WindowManager windows)
+    {
+        InitializeComponent();
+        _viewModel = viewModel;
+        _windows = windows;
+        DataContext = viewModel;
+
+        Chart.PointPicked += (_, index) => _viewModel.ShowPointDetail(index);
+
+        Loaded += async (_, _) =>
+        {
+            RestoreGeometry();
+            await _viewModel.LoadAsync();
+        };
+
+        Closed += (_, _) => _viewModel.Dispose();
+
+        StateChanged += (_, _) =>
+        {
+            _isFullScreen = WindowState == WindowState.Maximized;
+            if (_isFullScreen)
+            {
+                NoteRoot.CornerRadius = new CornerRadius(0);
+                NoteRoot.Effect = null;
+                NoteRoot.Margin = new Thickness(0);
+            }
+        };
+    }
+
+    public string BoardId => _viewModel.BoardId;
+
+    public void ToggleLock() => _viewModel.ToggleLock();
+
+    public void ShowAndActivate()
+    {
+        Show();
+        if (WindowState == WindowState.Minimized)
+        {
+            WindowState = WindowState.Normal;
+        }
+
+        Activate();
+    }
+
+    public void RefreshAppearance() => _viewModel.RefreshAppearance();
+
+    private async void Refresh_Click(object sender, RoutedEventArgs e)
+    {
+        // 手动刷新不重置计时器，点完继续按原间隔跑
+        await _viewModel.RefreshCommand.ExecuteAsync(null);
+    }
+
+    private void HideDetail_Click(object sender, RoutedEventArgs e) => _viewModel.HideDetail();
+
+    private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ButtonState == MouseButtonState.Pressed)
+        {
+            try
+            {
+                DragMove();
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+    }
+
+    private void Close_Click(object sender, RoutedEventArgs e) => Close();
+
+    private void ToggleTopmost_Click(object sender, RoutedEventArgs e) => _viewModel.ToggleTopmost();
+
+    private void ToggleLock_Click(object sender, RoutedEventArgs e) => _viewModel.ToggleLock();
+
+    private void Appearance_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement element)
+        {
+            AppearanceMenu.Show(element, _viewModel, _windows);
+            e.Handled = true;
+        }
+    }
+
+    private void OpenManager_Click(object sender, RoutedEventArgs e) =>
+        (System.Windows.Application.Current.MainWindow as ManagerWindow)?.ShowAndActivate();
+
+    // ---------------- 位置记忆 ----------------
+
+    private void RestoreGeometry()
+    {
+        if (_geometryRestored)
+        {
+            return;
+        }
+
+        _geometryRestored = true;
+
+        if (_viewModel.Board.Window is { IsValid: true } state)
+        {
+            Width = state.Width;
+            Height = state.Height;
+            var (left, top) = ScreenHelper.ClampIntoWorkArea(this, state.Left, state.Top, state.Width, state.Height);
+            Left = left;
+            Top = top;
+            return;
+        }
+
+        var offset = CascadeStep * (_windows.OpenWindowCount + 1);
+        var (cascadeLeft, cascadeTop) = ScreenHelper.ClampIntoWorkArea(this, 90 + offset, 90 + offset, Width, Height);
+        Left = cascadeLeft;
+        Top = cascadeTop;
+    }
+
+    private void SaveGeometry()
+    {
+        if (!_geometryRestored || WindowState != WindowState.Normal)
+        {
+            return;
+        }
+
+        _viewModel.Board.Window = new BoardWindowState(Left, Top, ActualWidth, ActualHeight);
+        _windows.SaveBoardGeometry(_viewModel.Board);
+    }
+
+    // ---------------- 边缘缩放 ----------------
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        if (PresentationSource.FromVisual(this) is System.Windows.Interop.HwndSource source)
+        {
+            source.AddHook(WndProc);
+        }
+    }
+
+    private nint WndProc(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)
+    {
+        if (msg != 0x0084 || _isFullScreen || ResizeMode == ResizeMode.NoResize)
+        {
+            return nint.Zero;
+        }
+
+        long raw = lParam.ToInt64();
+        var point = new NativePoint
+        {
+            X = (int)(short)(raw & 0xFFFF),
+            Y = (int)(short)((raw >> 16) & 0xFFFF),
+        };
+
+        if (!NativeMethods.ScreenToClient(hwnd, ref point))
+        {
+            return nint.Zero;
+        }
+
+        var dpi = VisualTreeHelper.GetDpi(this);
+        var x = point.X / dpi.DpiScaleX;
+        var y = point.Y / dpi.DpiScaleY;
+
+        var onLeft = x <= ResizeBorder;
+        var onRight = x >= ActualWidth - ResizeBorder;
+        var onTop = y <= ResizeBorder;
+        var onBottom = y >= ActualHeight - ResizeBorder;
+
+        var hit = onTop && onLeft ? 13
+            : onTop && onRight ? 14
+            : onBottom && onLeft ? 16
+            : onBottom && onRight ? 17
+            : onLeft ? 10
+            : onRight ? 11
+            : onTop ? 12
+            : onBottom ? 15
+            : 0;
+
+        if (hit == 0)
+        {
+            return nint.Zero;
+        }
+
+        handled = true;
+        return new nint(hit);
+    }
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        SaveGeometry();
+        base.OnClosing(e);
+    }
+
+    // ---------------- 回归测试用入口 ----------------
+
+    /// <summary>给回归用：切换统计范围并等一次刷新完成。</summary>
+    internal async Task SelectRangeForTestAsync(int days)
+    {
+        _viewModel.SelectRange(days);
+        await Task.Delay(150);
+        while (_viewModel.IsBusy)
+        {
+            await Task.Delay(50);
+        }
+    }
+
+    /// <summary>给回归用：切换自动刷新间隔。</summary>
+    internal void SelectIntervalForTest(int seconds) => _viewModel.SelectInterval(seconds);
+
+    /// <summary>给回归用：点一下手动刷新并等待完成。</summary>
+    internal async Task RefreshForTestAsync()
+    {
+        await _viewModel.RefreshCommand.ExecuteAsync(null);
+        while (_viewModel.IsBusy)
+        {
+            await Task.Delay(50);
+        }
+    }
+
+    /// <summary>给回归用：模拟点击趋势图的第 index 个点。</summary>
+    internal void PickPointForTest(int index)
+    {
+        _viewModel.ShowPointDetail(index);
+        Chart.SelectedIndex = index;
+    }
+
+    /// <summary>给回归用：把当前界面状态收成一行日志。</summary>
+    internal string DescribeForTest()
+    {
+        var vm = _viewModel;
+        return $"总数={vm.TotalText} 调用={vm.StepsText} 缓存比={vm.CacheRatioText} " +
+               $"点数={vm.Stats.Series.Count} 模型={vm.Models.Count} " +
+               $"范围={vm.RangeDays} 粒度={vm.Granularity} 间隔={vm.RefreshSeconds}s " +
+               $"取数={vm.FetchCount} 明细={(vm.HasDetail ? vm.DetailTitle : "无")} 错误={vm.ErrorText ?? "无"}";
+    }
+
+    /// <summary>给回归用：累计成功取数次数。</summary>
+    internal int FetchCount => _viewModel.FetchCount;
+
+    /// <summary>给回归用：当前趋势图有多少个点。</summary>
+    internal int PointCountForTest => _viewModel.Stats.Series.Count;
+}

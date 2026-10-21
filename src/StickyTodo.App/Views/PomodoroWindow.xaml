@@ -1,0 +1,159 @@
+<Window x:Class="StickyTodo.App.Views.PomodoroWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="番茄时钟"
+        Icon="/Assets/stickytodo.ico"
+        Width="260" Height="330"
+        MinWidth="240" MinHeight="300"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="CanResizeWithGrip"
+        ShowInTaskbar="False"
+        Topmost="True"
+        FontFamily="Microsoft YaHei UI"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Display">
+
+    <Border x:Name="NoteRoot"
+            Margin="10"
+            CornerRadius="14"
+            Background="{DynamicResource Brush.Paper}"
+            BorderBrush="#59FFFFFF"
+            BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="18" ShadowDepth="3" Opacity="0.30" Color="#FF000000" Direction="270" />
+        </Border.Effect>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- 标题栏 -->
+            <Border Grid.Row="0"
+                    Background="{DynamicResource Brush.PaperDeep}"
+                    CornerRadius="13,13,0,0"
+                    Padding="12,7"
+                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="🍅" FontSize="12" VerticalAlignment="Center" />
+                        <TextBlock Text="番茄时钟" Style="{StaticResource Text.Title}"
+                                   Margin="6,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Button Style="{StaticResource Button.Chrome}" Content="✕" FontSize="11"
+                                ToolTip="关闭" Click="Close_Click" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- 计时区 -->
+            <Grid Grid.Row="1" Margin="14,10,14,6">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- 圆环 + 时间 -->
+                <Grid Grid.Row="0" MinHeight="140">
+                    <Viewbox Stretch="Uniform" MaxWidth="180" MaxHeight="180">
+                        <Canvas Width="180" Height="180">
+                            <!-- 底环 -->
+                            <Ellipse Width="160" Height="160" Canvas.Left="10" Canvas.Top="10"
+                                     Stroke="{DynamicResource Brush.Track}" StrokeThickness="9" />
+
+                            <!-- 进度环：用 DashArray 精确控制扫过比例 -->
+                            <Ellipse x:Name="ProgressRing"
+                                     Width="160" Height="160" Canvas.Left="10" Canvas.Top="10"
+                                     Stroke="{DynamicResource Brush.Accent}"
+                                     StrokeThickness="9"
+                                     StrokeStartLineCap="Round"
+                                     StrokeEndLineCap="Round"
+                                     RenderTransformOrigin="0.5,0.5">
+                                <Ellipse.RenderTransform>
+                                    <RotateTransform Angle="-90" />
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
+
+                            <StackPanel Canvas.Left="0" Canvas.Top="62" Width="180">
+                                <TextBlock x:Name="TimeLabel"
+                                           Text="{Binding TimeText}"
+                                           FontSize="38"
+                                           FontWeight="Light"
+                                           HorizontalAlignment="Center"
+                                           Foreground="{DynamicResource Brush.Ink}" />
+                                <TextBlock Text="{Binding PhaseText}"
+                                           FontSize="12"
+                                           Margin="0,2,0,0"
+                                           HorizontalAlignment="Center"
+                                           Foreground="{DynamicResource Brush.InkSoft}" />
+                            </StackPanel>
+                        </Canvas>
+                    </Viewbox>
+                </Grid>
+
+                <TextBlock Grid.Row="1"
+                           Text="{Binding RoundText}"
+                           Style="{StaticResource Text.Caption}"
+                           HorizontalAlignment="Center"
+                           Margin="0,0,0,2" />
+
+                <TextBlock Grid.Row="2"
+                           Text="{Binding TodayText}"
+                           Style="{StaticResource Text.Caption}"
+                           HorizontalAlignment="Center"
+                           Opacity="0.7" />
+            </Grid>
+
+            <!-- 按钮区 -->
+            <Border Grid.Row="2"
+                    BorderBrush="{DynamicResource Brush.Line}"
+                    BorderThickness="0,1,0,0"
+                    Padding="12,9">
+                <StackPanel>
+                    <Button x:Name="PrimaryButton"
+                            Content="{Binding PrimaryActionText}"
+                            Style="{StaticResource Button.Primary}"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Center"
+                            Padding="0,8"
+                            FontSize="13"
+                            Click="Toggle_Click" />
+
+                    <Grid Margin="0,6,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Button Grid.Column="0"
+                                Content="重置"
+                                Style="{StaticResource Button.Ghost}"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Center"
+                                Padding="0,5"
+                                FontSize="11"
+                                Margin="0,0,3,0"
+                                Click="Reset_Click" />
+
+                        <Button Grid.Column="1"
+                                Content="跳过"
+                                Style="{StaticResource Button.Ghost}"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Center"
+                                Padding="0,5"
+                                FontSize="11"
+                                Margin="3,0,0,0"
+                                Click="Skip_Click" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

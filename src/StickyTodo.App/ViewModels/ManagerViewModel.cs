@@ -29,10 +29,15 @@ public sealed class BoardRowViewModel
     {
         BoardKind.Memo => "✎",
         BoardKind.Calendar => "▦",
+        BoardKind.Token => "◎",
         _ => "✓",
     };
 
     public bool IsMemo => Board.Kind == BoardKind.Memo;
+
+    public bool IsCalendar => Board.Kind == BoardKind.Calendar;
+
+    public bool IsToken => Board.Kind == BoardKind.Token;
 
     public int Pending { get; }
 
@@ -42,9 +47,9 @@ public sealed class BoardRowViewModel
         ? "便签 · 边写边存"
         : IsCalendar
             ? "月视图 · 汇总所有看板的目标日期"
-            : $"{Pending} 待办 · {Done} 已完成";
-
-    public bool IsCalendar => Board.Kind == BoardKind.Calendar;
+            : IsToken
+                ? "Token 用量 · 定时刷新"
+                : $"{Pending} 待办 · {Done} 已完成";
 
     public string WindowHint => Board.Window is null ? string.Empty : "已记住窗口位置";
 }

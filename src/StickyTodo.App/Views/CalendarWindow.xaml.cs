@@ -20,6 +20,9 @@ public partial class CalendarWindow : Window, IStickyWindow
     private bool _geometryRestored;
     private bool _isFullScreen;
 
+    /// <summary>首次加载完成前，下拉框的 SelectionChanged 不该触发跳转。</summary>
+    private bool _loaded;
+
     public CalendarWindow(CalendarViewModel viewModel, WindowManager windows)
     {
         InitializeComponent();
@@ -31,6 +34,8 @@ public partial class CalendarWindow : Window, IStickyWindow
         {
             RestoreGeometry();
             await _viewModel.LoadAsync();
+            SyncMonthBoxes();
+            _loaded = true;
         };
 
         StateChanged += (_, _) =>
@@ -62,13 +67,54 @@ public partial class CalendarWindow : Window, IStickyWindow
 
     public void RefreshAppearance() => _viewModel.RefreshAppearance();
 
+    /// <summary>把下拉框的选中项同步到 ViewModel 当前的年月。</summary>
+    private void SyncMonthBoxes()
+    {
+        YearBox.SelectedItem = _viewModel.Year;
+        MonthBox.SelectedItem = _viewModel.Month;
+    }
+
     // ---------------- 导航 ----------------
 
-    private async void PrevMonth_Click(object sender, RoutedEventArgs e) => await _viewModel.GoToMonthAsync(-1);
+    private async void PrevMonth_Click(object sender, RoutedEventArgs e)
+    {
+        await _viewModel.GoToMonthAsync(-1);
+        SyncMonthBoxes();
+    }
 
-    private async void NextMonth_Click(object sender, RoutedEventArgs e) => await _viewModel.GoToMonthAsync(1);
+    private async void NextMonth_Click(object sender, RoutedEventArgs e)
+    {
+        await _viewModel.GoToMonthAsync(1);
+        SyncMonthBoxes();
+    }
 
-    private async void Today_Click(object sender, RoutedEventArgs e) => await _viewModel.GoToTodayAsync();
+    private async void Today_Click(object sender, RoutedEventArgs e)
+    {
+        await _viewModel.GoToTodayAsync();
+        SyncMonthBoxes();
+    }
+
+    /// <summary>年下拉框：选完跳到该年同月。</summary>
+    private async void YearBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_loaded || YearBox.SelectedItem is not int year)
+        {
+            return;
+        }
+
+        await _viewModel.SelectYearAsync(year);
+    }
+
+    /// <summary>月下拉框。</summary>
+    private async void MonthBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_loaded || MonthBox.SelectedItem is not int month)
+        {
+            return;
+        }
+
+        await _viewModel.SelectMonthAsync(month);
+    }
 
     private void Cell_Click(object sender, MouseButtonEventArgs e)
     {
@@ -331,4 +377,58 @@ public partial class CalendarWindow : Window, IStickyWindow
         SaveGeometry();
         base.OnClosing(e);
     }
+
+    // ---------------- 回归测试用入口 ----------------
+
+    /// <summary>给回归用：跳到指定年月。</summary>
+    internal async Task GoToForTestAsync(int year, int month)
+    {
+        await _viewModel.SelectYearAsync(year);
+        await _viewModel.SelectMonthAsync(month);
+        SyncMonthBoxes();
+    }
+
+    /// <summary>给回归用：切换年下拉。</summary>
+    internal async Task SelectYearForTestAsync(int year)
+    {
+        YearBox.SelectedItem = year;
+        await _viewModel.SelectYearAsync(year);
+        await Task.Delay(50);
+    }
+
+    /// <summary>给回归用：切换月下拉。</summary>
+    internal async Task SelectMonthForTestAsync(int month)
+    {
+        MonthBox.SelectedItem = month;
+        await _viewModel.SelectMonthAsync(month);
+        await Task.Delay(50);
+    }
+
+    /// <summary>给回归用：点某一天。</summary>
+    internal async Task SelectDayForTestAsync(DateOnly date)
+    {
+        var day = _viewModel.Days.FirstOrDefault(d => d.Date == date);
+        if (day is not null)
+        {
+            _viewModel.SelectDay(day);
+        }
+
+        await Task.Delay(100);
+    }
+
+    /// <summary>给回归用：当前月份的格子数据。</summary>
+    internal IReadOnlyList<ViewModels.CalendarDayViewModel> DaysForTest() => _viewModel.Days.ToList();
+
+    /// <summary>给回归用：当前黄历文字。</summary>
+    internal string AlmanacForTest() =>
+        $"{_viewModel.SelectedDateText} | {_viewModel.AlmanacDateText} | {_viewModel.AlmanacMetaText} | " +
+        $"{_viewModel.AlmanacYiText} | {_viewModel.AlmanacJiText}";
+
+    /// <summary>给回归用：当前年月与状态。</summary>
+    internal string DescribeForTest() =>
+        $"{_viewModel.Year} 年 {_viewModel.Month} 月 · {_viewModel.MonthTitle} · {_viewModel.StatusText} " +
+        $"· 格子={_viewModel.Days.Count} · 选中={_viewModel.SelectedDateText}";
+
+    /// <summary>给回归用：当前选中的日期。</summary>
+    internal DateOnly SelectedDateForTest => _viewModel.SelectedDate;
 }

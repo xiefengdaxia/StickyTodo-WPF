@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Threading;
 using System.Windows;
 using System.Windows.Media;
@@ -26,6 +26,12 @@ public partial class App : System.Windows.Application
 
     private Mutex? _mutex;
     private IHost? _host;
+
+    /// <summary>
+    /// 回归演示里替换掉真实的 HTTP 数据源（见 <c>--token-demo</c>）。
+    /// 正式运行时为 null，走真实的 <see cref="HttpTokenStatsProvider"/>。
+    /// </summary>
+    private static Core.Abstractions.ITokenStatsProvider? TokenProviderOverride { get; set; }
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -112,6 +118,27 @@ public partial class App : System.Windows.Application
         if (e.Args.Contains("--chip-count-demo", StringComparer.OrdinalIgnoreCase))
         {
             RunChipCountDemo();
+            return;
+        }
+
+        // 番茄时钟回归：走完整番茄周期，验证计时/暂停/跳过/休息
+        if (e.Args.Contains("--pomodoro-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunPomodoroDemo(ReadOptionValue(e.Args, "--shot"));
+            return;
+        }
+
+        // 日历回归：农历/节气/节假日/补班/黄历/年月下拉切换
+        if (e.Args.Contains("--calendar-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunCalendarDemo(ReadOptionValue(e.Args, "--shot"));
+            return;
+        }
+
+        // Token 便签回归：假数据源 + 范围/间隔/手动刷新/点击看明细
+        if (e.Args.Contains("--token-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunTokenDemo(ReadOptionValue(e.Args, "--shot"), e.Args.Contains("--live", StringComparer.OrdinalIgnoreCase));
             return;
         }
 
@@ -370,6 +397,10 @@ public partial class App : System.Windows.Application
                 services.AddSingleton<ReminderPump>();
                 services.AddSingleton<HotKeyService>();
                 services.AddSingleton<AutoStartService>();
+                services.AddSingleton<Core.Abstractions.ITokenStatsProvider>(_ =>
+                    TokenProviderOverride ?? new HttpTokenStatsProvider());
+                services.AddSingleton<Core.Pomodoro.PomodoroEngine>();
+                services.AddSingleton<ViewModels.PomodoroViewModel>();
                 services.AddSingleton<ManagerViewModel>();
                 services.AddSingleton<ManagerWindow>();
                 services.AddSingleton<SettingsViewModel>();
@@ -582,6 +613,349 @@ public partial class App : System.Windows.Application
         catch (Exception ex)
         {
             Log.Fatal(ex, "[chip] 异常");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
+    /// --calendar-demo：日历回归。检查农历/节气/休班标记/黄历宜忌，以及年月下拉切换。
+    /// </summary>
+    private async void RunCalendarDemo(string? shotDirectory)
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+        InstallGlobalExceptionHandlers();
+
+        try
+        {
+            _host = BuildHost();
+            await _host.StartAsync();
+
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+            var service = _host.Services.GetRequiredService<TodoService>();
+
+            var board = service.CreateBoard("日历", BoardKind.Calendar);
+            var windows = _host.Services.GetRequiredService<WindowManager>();
+            var window = (CalendarWindow)windows.OpenBoard(board);
+            MainWindow = window;
+            await Task.Delay(1200);
+
+            // 跳到 2026 年 10 月（国庆 + 中秋 + 补班都在这段）
+            await window.GoToForTestAsync(2026, 10);
+            await Task.Delay(400);
+
+            var summary = window.DescribeForTest();
+            Log.Information("[calendar] 2026-10：{Summary}", summary);
+
+            var days = window.DaysForTest();
+            var ok = days.Count == 42; // 6 行 × 7 列
+
+            // 1) 每天都要有农历
+            ok &= days.All(d => !string.IsNullOrEmpty(d.LunarText));
+            Log.Information("[calendar] 农历覆盖 {Filled}/{Total}", days.Count(d => !string.IsNullOrEmpty(d.LunarText)), days.Count);
+
+            // 2) 国庆 1–7 号都要有「休」
+            var national = days.Where(d => d.Date.Year == 2026 && d.Date.Month == 10 && d.Date.Day <= 7).ToList();
+            ok &= national.Count == 7 && national.All(d => d.Badge == "休");
+            Log.Information("[calendar] 国庆 1–7 休标记：{Info}",
+                string.Join(" ", national.Select(d => $"{d.Date.Day}{d.Badge}")));
+
+            // 3) 补班日 10-10 要有「班」
+            var makeup = days.FirstOrDefault(d => d.Date == new DateOnly(2026, 10, 10));
+            ok &= makeup is not null && makeup.Badge == "班";
+            Log.Information("[calendar] 10-10 标记：{Badge}（假日名={Name}）", makeup?.Badge, makeup?.SubText);
+
+            // 4) 节气：10-08 寒露、10-23 霜降
+            var hanlu = days.FirstOrDefault(d => d.Date == new DateOnly(2026, 10, 8));
+            var shuangjiang = days.FirstOrDefault(d => d.Date == new DateOnly(2026, 10, 23));
+            ok &= hanlu?.SubText == "寒露";
+            ok &= shuangjiang?.SubText == "霜降";
+            Log.Information("[calendar] 节气：10-08={A} 10-23={B}", hanlu?.SubText, shuangjiang?.SubText);
+
+            // 5) 中秋 9-25 ~ 9-27 也是假期（在上一屏，切到 9 月验证）
+            await window.GoToForTestAsync(2026, 9);
+            await Task.Delay(300);
+            var sepDays = window.DaysForTest();
+            var moon = sepDays.Where(d => d.Date.Year == 2026 && d.Date.Month == 9 && d.Date.Day is >= 25 and <= 27).ToList();
+            ok &= moon.Count == 3 && moon.All(d => d.Badge == "休");
+            Log.Information("[calendar] 中秋 9-25~27：{Info}",
+                string.Join(" ", moon.Select(d => $"{d.Date.Day}{d.Badge}/{d.SubText}")));
+
+            // 6) 黄历：点某一天应给出宜/忌
+            await window.SelectDayForTestAsync(new DateOnly(2026, 9, 25));
+            var almanac = window.AlmanacForTest();
+            Log.Information("[calendar] 9-25 黄历：{Info}", almanac);
+            ok &= almanac.Contains("宜") && almanac.Contains("忌") && almanac.Contains("中秋");
+
+            // 7) 年月下拉切换：选 2027 年 2 月，应跳到该月并重算
+            await window.SelectYearForTestAsync(2027);
+            await window.SelectMonthForTestAsync(2);
+            await Task.Delay(400);
+            var spring = window.DescribeForTest();
+            Log.Information("[calendar] 切到 2027-02：{Summary}", spring);
+            ok &= spring.Contains("2027") && spring.Contains("2 月");
+
+            // 春节 2027-02-06 那天应是农历正月初一
+            var springDays = window.DaysForTest();
+            var newYear = springDays.FirstOrDefault(d => d.Date == new DateOnly(2027, 2, 6));
+            ok &= newYear?.LunarFullText == "正月初一";
+            Log.Information("[calendar] 2027-02-06：{Info}", $"{newYear?.LunarFullText}/{newYear?.SubText}");
+
+            // 7b) 选中的日期应随着切月回到该月内的今天/1 号，不能还停在旧月份
+            ok &= window.SelectedDateForTest.Year == 2027 && window.SelectedDateForTest.Month == 2;
+            Log.Information("[calendar] 切月后选中日期：{Date}", window.SelectedDateForTest);
+
+            // 8) 截图：回到 2026-10 当前日期视图
+            await window.GoToForTestAsync(2026, 10);
+            await window.SelectDayForTestAsync(new DateOnly(2026, 10, 21));
+            await Task.Delay(400);
+
+            if (shotDirectory is not null)
+            {
+                var count = SaveWindowShots(shotDirectory);
+                Log.Information("[calendar] 截图 {Count} 张", count);
+            }
+
+            Log.Information("[calendar] 总结果={Result}", ok ? "通过" : "失败");
+
+            Log.CloseAndFlush();
+            Shutdown(ok ? 0 : 2);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[calendar] 异常");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
+    /// --pomodoro-demo：番茄钟全链路回归。计时用假时钟推快，不真的等 25 分钟。
+    /// 验证：开始/暂停/继续、专注结束自动进休息、4 个番茄后长休息、跳过不计完成数、今日计数落库。
+    /// </summary>
+    private async void RunPomodoroDemo(string? shotDirectory)
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+        InstallGlobalExceptionHandlers();
+
+        try
+        {
+            _host = BuildHost();
+            await _host.StartAsync();
+
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+
+            var settings = _host.Services.GetRequiredService<AppSettingsService>();
+            settings.PomodoroCountToday = 0;
+            settings.PomodoroCountDate = DateOnly.FromDateTime(DateTime.Today);
+
+            var engine = new Core.Pomodoro.PomodoroEngine(
+                focus: TimeSpan.FromSeconds(6),
+                shortBreak: TimeSpan.FromSeconds(3),
+                longBreak: TimeSpan.FromSeconds(4),
+                roundsPerCycle: 2);
+
+            var viewModel = new PomodoroViewModel(settings, engine);
+
+            // autoTick=false：回归里由脚本手动推时钟，避免和窗口自己的计时器叠加
+            var window = new PomodoroWindow(viewModel, (title, text) => Log.Information("[pomodoro] 通知：{Title} - {Text}", title, text), autoTick: false);
+            window.Show();
+            MainWindow = window;
+            await Task.Delay(300);
+
+            string Dump() =>
+                $"{viewModel.TimeText} {viewModel.PhaseText} 运行={viewModel.IsRunning} " +
+                $"第{viewModel.Engine.RoundInCycle}/{viewModel.Engine.RoundsPerCycle} " +
+                $"今日={viewModel.Engine.CompletedToday} 按钮={viewModel.PrimaryActionText}";
+
+            var initial = Dump();
+            Log.Information("[pomodoro] 初始：{State}", initial);
+            var ok = initial.Contains("06") && initial.Contains("专注") && initial.Contains("运行=False")
+                     && initial.Contains("今日=0") && initial.Contains("按钮=开始");
+
+            // 1) 开始 → 走完一个专注段
+            viewModel.Toggle();
+            Log.Information("[pomodoro] 开始后：{State}", Dump());
+            ok &= viewModel.IsRunning && viewModel.PrimaryActionText == "暂停";
+
+            var finished = viewModel.Advance(TimeSpan.FromSeconds(6));
+            Log.Information("[pomodoro] 专注走完：{State} 事件={Event}", Dump(), finished);
+            ok &= finished == Core.Pomodoro.PomodoroPhase.Focus;
+            ok &= viewModel.PhaseText == "短休息" && viewModel.Engine.CompletedToday == 1;
+
+            // 2) 暂停后时间不再走
+            viewModel.Toggle(); // 暂停
+            var beforePause = viewModel.TimeText;
+            viewModel.Advance(TimeSpan.FromSeconds(5));
+            Log.Information("[pomodoro] 暂停中：{Before} → {After}", beforePause, viewModel.TimeText);
+            ok &= beforePause == viewModel.TimeText && !viewModel.IsRunning;
+
+            // 3) 重置回到当前段（短休息 3 秒）起点
+            viewModel.Reset();
+            Log.Information("[pomodoro] 重置后：{State}", Dump());
+            ok &= viewModel.TimeText == Core.Pomodoro.PomodoroEngine.Format(TimeSpan.FromSeconds(3));
+
+            // 4) 跳过当前短休息 → 回到专注，不计完成数
+            var completedBefore = viewModel.Engine.CompletedToday;
+            viewModel.Skip();
+            Log.Information("[pomodoro] 跳过休息后：{State}", Dump());
+            ok &= viewModel.PhaseText == "专注" && viewModel.Engine.CompletedToday == completedBefore;
+            ok &= viewModel.Engine.RoundInCycle == 2;
+
+            // 5) 再走完一个专注段：这一串已到第 2 个（周期=2），应进长休息
+            viewModel.Toggle();
+            var second = viewModel.Advance(TimeSpan.FromSeconds(6));
+            Log.Information("[pomodoro] 走满一个周期：{State} 事件={Event}", Dump(), second);
+            ok &= second == Core.Pomodoro.PomodoroPhase.Focus;
+            ok &= viewModel.PhaseText == "长休息" && viewModel.Engine.CompletedToday == 2;
+            ok &= viewModel.Engine.RoundInCycle == 1;
+
+            // 5b) 走完长休息（4 秒）→ 回到专注；再走窗口真实的"一段结束"处理
+            var third = viewModel.Advance(TimeSpan.FromSeconds(4));
+            Log.Information("[pomodoro] 长休息走完：{State} 事件={Event}", Dump(), third);
+            ok &= third == Core.Pomodoro.PomodoroPhase.LongBreak;
+            ok &= viewModel.PhaseText == "专注";
+
+            // 6) 今日计数已落库
+            var persistedCount = settings.PomodoroCountToday;
+            Log.Information("[pomodoro] 落库计数={Count}", persistedCount);
+            ok &= persistedCount == viewModel.Engine.CompletedToday;
+            ok &= settings.PomodoroCountDate == DateOnly.FromDateTime(DateTime.Today);
+
+            // 7) 统一同步一次给界面 + 截图
+            viewModel.Sync();
+            if (shotDirectory is not null)
+            {
+                await Task.Delay(400);
+                var count = SaveWindowShots(shotDirectory);
+                Log.Information("[pomodoro] 截图 {Count} 张", count);
+            }
+
+            // 清理，别把演示计数留在真实设置里
+            settings.PomodoroCountToday = 0;
+
+            Log.Information("[pomodoro] 总结果={Result}", ok ? "通过" : "失败");
+
+            Log.CloseAndFlush();
+            Shutdown(ok ? 0 : 2);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[pomodoro] 异常");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
+    /// --token-demo：Token 便签全链路回归。用假数据源（不联网），验证
+    /// 首屏取数、切范围（含粒度变化）、切间隔、手动刷新、点击趋势点看明细。
+    /// </summary>
+    private async void RunTokenDemo(string? shotDirectory, bool live)
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+        InstallGlobalExceptionHandlers();
+
+        // 默认用假数据源，保证回归不依赖网络；--live 才打真实接口
+        var demoProvider = live ? null : new DemoTokenStatsProvider();
+        TokenProviderOverride = demoProvider;
+
+        try
+        {
+            _host = BuildHost();
+            await _host.StartAsync();
+
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+            var service = _host.Services.GetRequiredService<TodoService>();
+
+            // 只留一个 Token 看板，避免默认待办看板混进来
+            var board = service.CreateBoard("Token 用量", BoardKind.Token);
+            var windows = _host.Services.GetRequiredService<WindowManager>();
+            var window = (TokenBoardWindow)windows.OpenBoard(board);
+            MainWindow = window;
+
+            await Task.Delay(1200);
+            var initial = window.DescribeForTest();
+            Log.Information("[token] 首屏：{State}", initial);
+            var ok = initial.Contains("总数=")
+                     && !initial.Contains("总数=0")
+                     && initial.Contains("间隔=15s")
+                     && initial.Contains("粒度=hour")
+                     && window.FetchCount >= 1;
+
+            // 1) 切到近 7 天：粒度应变 day，且要重新取数
+            var before = window.FetchCount;
+            await window.SelectRangeForTestAsync(7);
+            var week = window.DescribeForTest();
+            Log.Information("[token] 切到近7天：{State}（取数 +{Calls}）", week, window.FetchCount - before);
+            ok &= week.Contains("范围=7") && week.Contains("粒度=day") && window.FetchCount > before;
+
+            // 2) 切回今天：粒度回 hour
+            await window.SelectRangeForTestAsync(0);
+            var today = window.DescribeForTest();
+            Log.Information("[token] 切回今天：{State}", today);
+            ok &= today.Contains("范围=0") && today.Contains("粒度=hour");
+
+            // 3) 手动刷新
+            before = window.FetchCount;
+            await window.RefreshForTestAsync();
+            Log.Information("[token] 手动刷新：取数 +{Calls}", window.FetchCount - before);
+            ok &= window.FetchCount > before;
+
+            // 4) 点趋势图的点看明细（取当前序列的最后一个点，真实数据的点数随当天时间变化）
+            var pickIndex = Math.Max(0, window.PointCountForTest - 1);
+            window.PickPointForTest(pickIndex);
+            await Task.Delay(150);
+            var picked = window.DescribeForTest();
+            Log.Information("[token] 点击趋势点 #{Index}：{State}", pickIndex, picked);
+            ok &= picked.Contains("明细=") && !picked.Contains("明细=无");
+
+            // 4b) 再刷新一次，明细应该还在（自动刷新不该把用户点开的明细冲掉）
+            await window.RefreshForTestAsync();
+            var afterRefresh = window.DescribeForTest();
+            Log.Information("[token] 刷新后明细保留：{State}", afterRefresh);
+            ok &= afterRefresh.Contains("明细=") && !afterRefresh.Contains("明细=无");
+
+            // 5) 切间隔 5s / 30s
+            window.SelectIntervalForTest(5);
+            var five = window.DescribeForTest();
+            window.SelectIntervalForTest(30);
+            var thirty = window.DescribeForTest();
+            Log.Information("[token] 间隔切换：{Five} / {Thirty}", five, thirty);
+            ok &= five.Contains("间隔=5s") && thirty.Contains("间隔=30s");
+
+            // 6) 自动刷新：把间隔设成 5s，等一个周期，确认计时器真的在跑
+            before = window.FetchCount;
+            window.SelectIntervalForTest(5);
+            await Task.Delay(6000);
+            var auto = window.FetchCount - before;
+            Log.Information("[token] 自动刷新：5.5s 内又取数 {Calls} 次", auto);
+            ok &= auto >= 1;
+
+            // 恢复到默认间隔，免得把演示数据留成 5s
+            window.SelectIntervalForTest(15);
+
+            if (shotDirectory is not null)
+            {
+                await Task.Delay(300);
+                var count = SaveWindowShots(shotDirectory);
+                Log.Information("[token] 截图 {Count} 张", count);
+            }
+
+            Log.Information("[token] 总结果={Result}", ok ? "通过" : "失败");
+
+            Log.CloseAndFlush();
+            Shutdown(ok ? 0 : 2);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[token] 异常");
             Log.CloseAndFlush();
             Shutdown(1);
         }

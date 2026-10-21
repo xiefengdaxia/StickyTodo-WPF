@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using StickyTodo.Core.Calendar;
-
 namespace StickyTodo.App.ViewModels;
 
 /// <summary>日历里的一天。</summary>
@@ -13,6 +12,23 @@ public partial class CalendarDayViewModel : ObservableObject
         IsCurrentMonth = cell.IsCurrentMonth;
         IsWeekend = cell.IsWeekend;
         IsToday = cell.Date == DateOnly.FromDateTime(DateTime.Now);
+
+        var lunar = LunarCalendar.SolarToLunar(Date);
+        LunarText = lunar.IsValid ? lunar.ShortText : string.Empty;
+        LunarFullText = lunar.IsValid ? lunar.FullText : string.Empty;
+
+        var solarTerm = SolarTerms.NameOn(Date);
+        Kind = ChineseHolidays.KindOf(Date);
+        Badge = ChineseHolidays.BadgeOf(Date);
+
+        // 格子里那行小字：节气 > 放假日名 > 传统节日 > 农历日
+        SubText = solarTerm
+                  ?? ChineseHolidays.HolidayNameOf(Date)
+                  ?? Festivals.NameOn(Date)
+                  ?? LunarText;
+
+        IsHoliday = Kind == DayKind.Holiday;
+        IsMakeup = Kind == DayKind.MakeupWorkday;
     }
 
     public DateOnly Date { get; }
@@ -22,6 +38,24 @@ public partial class CalendarDayViewModel : ObservableObject
     public bool IsWeekend { get; }
 
     public bool IsToday { get; }
+
+    /// <summary>农历日（初一显示月份）。</summary>
+    public string LunarText { get; }
+
+    /// <summary>完整农历写法，例如「正月初一」。</summary>
+    public string LunarFullText { get; }
+
+    /// <summary>格子第二行的小字。</summary>
+    public string SubText { get; }
+
+    /// <summary>「休」或「班」，没有则为空。</summary>
+    public string Badge { get; }
+
+    public bool IsHoliday { get; }
+
+    public bool IsMakeup { get; }
+
+    public DayKind Kind { get; }
 
     public string DayText => Date.Day.ToString();
 

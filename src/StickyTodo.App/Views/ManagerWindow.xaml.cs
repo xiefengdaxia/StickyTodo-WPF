@@ -287,12 +287,16 @@ public partial class ManagerWindow : Window
     private async void CreateCalendar_Click(object sender, RoutedEventArgs e) =>
         await CreateBoardAsync(BoardKind.Calendar);
 
+    private async void CreateToken_Click(object sender, RoutedEventArgs e) =>
+        await CreateBoardAsync(BoardKind.Token);
+
     private async Task CreateBoardAsync(BoardKind kind)
     {
         var (title, initial) = kind switch
         {
             BoardKind.Memo => ("新建便签看板", "新便签"),
             BoardKind.Calendar => ("新建日历看板", "日历"),
+            BoardKind.Token => ("新建 Token 看板", "Token 用量"),
             _ => ("新建待办看板", "新看板"),
         };
 

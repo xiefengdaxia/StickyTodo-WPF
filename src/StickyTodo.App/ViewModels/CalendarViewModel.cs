@@ -34,6 +34,49 @@ public partial class CalendarViewModel : ObservableObject, IAppearanceHost
         _year = today.Year;
         _month = today.Month;
         _selectedDate = DateOnly.FromDateTime(today);
+
+        BuildYearOptions();
+    }
+
+    /// <summary>年月下拉框的候选：前 60 年到后 30 年。</summary>
+    private void BuildYearOptions()
+    {
+        Years.Clear();
+        var thisYear = DateTime.Today.Year;
+        for (var year = thisYear - 60; year <= thisYear + 30; year++)
+        {
+            Years.Add(year);
+        }
+    }
+
+    public ObservableCollection<int> Years { get; } = new();
+
+    public IReadOnlyList<int> Months { get; } = Enumerable.Range(1, 12).ToList();
+
+    /// <summary>下拉框选年：直接跳到那一年同月。</summary>
+    public async Task SelectYearAsync(int year)
+    {
+        if (year == Year || year < 1 || year > 9999)
+        {
+            return;
+        }
+
+        Year = year;
+        ClampSelectedIntoMonth();
+        await LoadAsync();
+    }
+
+    /// <summary>下拉框选月。</summary>
+    public async Task SelectMonthAsync(int month)
+    {
+        if (month == Month || month is < 1 or > 12)
+        {
+            return;
+        }
+
+        Month = month;
+        ClampSelectedIntoMonth();
+        await LoadAsync();
     }
 
     public Board Board { get; }
@@ -69,6 +112,22 @@ public partial class CalendarViewModel : ObservableObject, IAppearanceHost
 
     [ObservableProperty]
     private string? _errorText;
+
+    /// <summary>选中日期的黄历信息（宜忌等）。</summary>
+    [ObservableProperty]
+    private string _almanacDateText = string.Empty;
+
+    [ObservableProperty]
+    private string _almanacYiText = string.Empty;
+
+    [ObservableProperty]
+    private string _almanacJiText = string.Empty;
+
+    [ObservableProperty]
+    private string _almanacMetaText = string.Empty;
+
+    [ObservableProperty]
+    private bool _showAlmanac;
 
     [ObservableProperty]
     private bool _isTopmost;
@@ -108,7 +167,40 @@ public partial class CalendarViewModel : ObservableObject, IAppearanceHost
 
     private void UpdateSelectedDay()
     {
-        SelectedDateText = $"{SelectedDate.Month} 月 {SelectedDate.Day} 日 · {WeekdayName(SelectedDate.DayOfWeek)}";
+        var almanac = Almanac.Describe(SelectedDate);
+        var lunar = almanac.Lunar;
+
+        var week = WeekdayName(SelectedDate.DayOfWeek);
+        SelectedDateText = lunar.IsValid
+            ? $"{SelectedDate.Month} 月 {SelectedDate.Day} 日 · {week} · 农历{lunar.FullText}"
+            : $"{SelectedDate.Month} 月 {SelectedDate.Day} 日 · {week}";
+
+        // 黄历：日期信息 + 建除十二神 + 宜/忌
+        AlmanacDateText = lunar.IsValid
+            ? $"农历{lunar.FullText} · {LunarCalendar.YearGanZhi(lunar.Year)}年（{LunarCalendar.YearZodiac(lunar.Year)}）· {almanac.GanZhi}日 · {almanac.Officer}日"
+            : $"{almanac.GanZhi}日 · {almanac.Officer}日";
+
+        var extras = new List<string>();
+        if (!string.IsNullOrEmpty(almanac.SolarTerm))
+        {
+            extras.Add($"节气 {almanac.SolarTerm}");
+        }
+
+        if (!string.IsNullOrEmpty(almanac.HolidayName))
+        {
+            extras.Add($"节假日 {almanac.HolidayName}");
+        }
+
+        if (almanac.Kind == DayKind.MakeupWorkday)
+        {
+            extras.Add("调休补班");
+        }
+
+        AlmanacMetaText = string.Join(" · ", extras);
+
+        AlmanacYiText = "宜 " + string.Join(" ", almanac.Yi);
+        AlmanacJiText = "忌 " + string.Join(" ", almanac.Ji);
+        ShowAlmanac = true;
 
         SelectedDayEntries.Clear();
         foreach (var entry in _monthEntries.Where(e => e.Entry.Day == SelectedDate))
@@ -131,6 +223,7 @@ public partial class CalendarViewModel : ObservableObject, IAppearanceHost
     public async Task GoToMonthAsync(int delta)
     {
         (Year, Month) = MonthGrid.Shift(Year, Month, delta);
+        ClampSelectedIntoMonth();
         await LoadAsync();
     }
 
@@ -141,6 +234,23 @@ public partial class CalendarViewModel : ObservableObject, IAppearanceHost
         Month = today.Month;
         SelectedDate = DateOnly.FromDateTime(today);
         await LoadAsync();
+    }
+
+    /// <summary>
+    /// 切到别的月份时，把选中日期挪到该月内：
+    /// 有今天就用今天，否则用 1 号。否则下方黄历会一直停在上个月。
+    /// </summary>
+    private void ClampSelectedIntoMonth()
+    {
+        if (SelectedDate.Year == Year && SelectedDate.Month == Month)
+        {
+            return;
+        }
+
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        SelectedDate = today.Year == Year && today.Month == Month
+            ? today
+            : new DateOnly(Year, Month, 1);
     }
 
     public void SelectDay(CalendarDayViewModel day)

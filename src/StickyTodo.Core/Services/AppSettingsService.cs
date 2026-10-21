@@ -46,6 +46,21 @@ public sealed class AppSettingsService
     /// <summary>启动时是否恢复上次会话。</summary>
     public const string RestoreSessionKey = "session.restore";
 
+    /// <summary>Token 面板地址。</summary>
+    public const string TokenEndpointKey = "token.endpoint";
+
+    /// <summary>Token 面板自动刷新间隔（秒），只允许 5 / 15 / 30。</summary>
+    public const string TokenRefreshSecondsKey = "token.refreshSeconds";
+
+    /// <summary>Token 面板上次选的统计范围（天）。</summary>
+    public const string TokenRangeDaysKey = "token.rangeDays";
+
+    /// <summary>番茄钟今日完成个数。</summary>
+    public const string PomodoroCountTodayKey = "pomodoro.count";
+
+    /// <summary>番茄钟计数对应的日期（用来跨天清零）。</summary>
+    public const string PomodoroCountDateKey = "pomodoro.countDate";
+
     /// <summary>背景色方案。</summary>
     public string Skin
     {
@@ -112,6 +127,71 @@ public sealed class AppSettingsService
     {
         get => GetBool(RestoreSessionKey, true);
         set => _repository.SetSetting(RestoreSessionKey, value ? "1" : "0");
+    }
+
+    /// <summary>Token 面板地址。</summary>
+    public string TokenEndpoint
+    {
+        get
+        {
+            var raw = GetString(TokenEndpointKey, null);
+            return string.IsNullOrWhiteSpace(raw) ? "http://100.113.121.18:8199" : raw;
+        }
+        set => _repository.SetSetting(TokenEndpointKey, value.Trim());
+    }
+
+    /// <summary>Token 面板自动刷新间隔（秒）。只允许 5 / 15 / 30，其它值归一到 15。</summary>
+    public int TokenRefreshSeconds
+    {
+        get
+        {
+            var raw = GetString(TokenRefreshSecondsKey, null);
+            if (!int.TryParse(raw, out var seconds))
+            {
+                return 15;
+            }
+
+            return seconds is 5 or 15 or 30 ? seconds : 15;
+        }
+        set => _repository.SetSetting(TokenRefreshSecondsKey, (value is 5 or 15 or 30 ? value : 15).ToString());
+    }
+
+    /// <summary>Token 面板上次选的统计范围（天）：0=今天，3/7/30。</summary>
+    public int TokenRangeDays
+    {
+        get
+        {
+            var raw = GetString(TokenRangeDaysKey, null);
+            if (!int.TryParse(raw, out var days))
+            {
+                return 0;
+            }
+
+            return days is 0 or 3 or 7 or 30 ? days : 0;
+        }
+        set => _repository.SetSetting(TokenRangeDaysKey, (value is 0 or 3 or 7 or 30 ? value : 0).ToString());
+    }
+
+    /// <summary>番茄钟今天完成几个（跨天自动归零）。</summary>
+    public int PomodoroCountToday
+    {
+        get
+        {
+            var raw = GetString(PomodoroCountTodayKey, null);
+            return int.TryParse(raw, out var count) && count > 0 ? count : 0;
+        }
+        set => _repository.SetSetting(PomodoroCountTodayKey, Math.Max(0, value).ToString());
+    }
+
+    /// <summary>番茄钟计数对应的日期。</summary>
+    public DateOnly? PomodoroCountDate
+    {
+        get
+        {
+            var raw = GetString(PomodoroCountDateKey, null);
+            return DateOnly.TryParse(raw, out var date) ? date : null;
+        }
+        set => _repository.SetSetting(PomodoroCountDateKey, value?.ToString("yyyy-MM-dd") ?? string.Empty);
     }
 
     /// <summary>上次开着哪些看板。用逗号拼接，看板数量很少，不需要建表。</summary>

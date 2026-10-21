@@ -1,5 +1,6 @@
 using System;
 using System.Windows;
+using System.Windows.Controls;
 using Microsoft.Extensions.DependencyInjection;
 using StickyTodo.App.Views;
 using StickyTodo.Core.Entities;
@@ -20,12 +21,28 @@ public sealed class TrayService : IDisposable
 
     private WinForms.NotifyIcon? _notifyIcon;
     private WinForms.ToolStripMenuItem? _boardsMenu;
+    private PomodoroWindow? _pomodoroWindow;
 
     public TrayService(TodoService todoService, WindowManager windows, IServiceProvider services)
     {
         _todoService = todoService;
         _windows = windows;
         _services = services;
+    }
+
+    /// <summary>打开番茄时钟（已经开着就激活）。</summary>
+    public void ShowPomodoro()
+    {
+        if (_pomodoroWindow is { IsLoaded: true })
+        {
+            _pomodoroWindow.ShowAndActivate();
+            return;
+        }
+
+        var viewModel = _services.GetRequiredService<ViewModels.PomodoroViewModel>();
+        _pomodoroWindow = new PomodoroWindow(viewModel, Notify);
+        _pomodoroWindow.Closed += (_, _) => _pomodoroWindow = null;
+        _pomodoroWindow.Show();
     }
 
     public void Start()
@@ -44,6 +61,10 @@ public sealed class TrayService : IDisposable
         var settings = new WinForms.ToolStripMenuItem("设置");
         settings.Click += (_, _) => (System.Windows.Application.Current as App)?.ShowSettings();
         menu.Items.Add(settings);
+
+        var pomodoro = new WinForms.ToolStripMenuItem("番茄时钟");
+        pomodoro.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(ShowPomodoro);
+        menu.Items.Add(pomodoro);
 
         _boardsMenu = new WinForms.ToolStripMenuItem("看板");
         menu.Items.Add(_boardsMenu);

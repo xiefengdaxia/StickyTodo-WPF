@@ -26,6 +26,7 @@ public sealed class WindowManager
     private readonly TodoService _todoService;
     private readonly AppSettingsService _settings;
     private readonly SkinService _skinService;
+    private readonly Core.Abstractions.ITokenStatsProvider _tokenProvider;
     private readonly Dictionary<string, Window> _windows = new();
 
     private string? _activeBoardId;
@@ -43,11 +44,16 @@ public sealed class WindowManager
     /// </summary>
     private readonly List<string> _sessionBoards = new();
 
-    public WindowManager(TodoService todoService, AppSettingsService settings, SkinService skinService)
+    public WindowManager(
+        TodoService todoService,
+        AppSettingsService settings,
+        SkinService skinService,
+        Core.Abstractions.ITokenStatsProvider tokenProvider)
     {
         _todoService = todoService;
         _settings = settings;
         _skinService = skinService;
+        _tokenProvider = tokenProvider;
     }
 
     /// <summary>打开的窗口数变化时触发（托盘菜单据此刷新）。</summary>
@@ -72,6 +78,8 @@ public sealed class WindowManager
                 new MemoBoardViewModel(_todoService, board, _settings, _skinService), this),
             BoardKind.Calendar => new CalendarWindow(
                 new CalendarViewModel(_todoService, board, _settings, _skinService), this),
+            BoardKind.Token => new TokenBoardWindow(
+                new TokenBoardViewModel(_tokenProvider, _todoService, board, _settings, _skinService), this),
             _ => new BoardWindow(new BoardViewModel(_todoService, board, _settings, _skinService), this),
         };
 
