@@ -70,6 +70,29 @@ TODO / Done 보기 전환:
 
 ---
 
+## 0. 다운로드해서 바로 사용(포터블 버전)
+
+.NET 런타임을 설치하고 싶지 않다면 포터블 버전을 받으세요:
+
+**[⬇ 최신 StickyTodo-x.x.x-win-x64-portable.zip 다운로드](https://github.com/xiefengdaxia/StickyTodo-WPF/releases/latest)**
+
+압축을 풀고 `StickyTodo.exe`를 더블클릭하면 끝. **.NET 8 런타임이 포함된 70MB 단일 exe, 의존성 없음**.
+
+- 압축 파일에 `portable.marker`가 들어 있어 데이터(`sticky.db`와 로그)가 exe 옆 `data\` 폴더에 저장됩니다 —— **폴더째 복사하면 데이터도 함께 이동**하므로 USB 메모리에 적합
+- `portable.marker`를 삭제하면 일반 모드(`%LOCALAPPDATA%\StickyTodo`)로 돌아갑니다
+- 첫 실행 시 SmartScreen 경고가 나올 수 있습니다(서명 없음). 「추가 정보」→「그래도 실행」을 선택하세요
+- 요구 사항: Windows 10 1809 (x64) 이상
+
+직접 빌드하려면:
+
+```powershell
+.\tools\publish-portable.ps1 -Version 1.0.0                    # 패키징만
+.\tools\publish-portable.ps1 -Version 1.0.0 -CreateRelease     # 패키징 후 GitHub Release 게시
+```
+
+스크립트는 테스트 → 단일 파일 게시 → 포터블 마커 추가 → ZIP 생성 → **스모크 테스트**(`--portable-check`로 실제 프로세스를 띄워 데이터가 exe 옆에 생성되는지 확인) → 선택적 Release 업로드 순으로 실행합니다.
+
+---
 ## 1. 빠른 시작
 
 ```powershell
@@ -107,6 +130,7 @@ $exe = ".\src\StickyTodo.App\bin\Debug\net8.0-windows\StickyTodo.exe"
 & $exe --pomodoro-demo --shot D:\shots      # 뽀모도로 회귀: 전체 사이클, 일시정지, 건너뛰기, 오늘 개수
 & $exe --motion-demo --shot D:\shots        # 모션 회귀: 입장/펄스/체크/삭제/완료를 속성값으로 검증
 & $exe --i18n-demo --shot D:\shots          # 다국어 회귀: 4개 언어를 차례로 전환하고 UI 문구 검증
+& $exe --portable-check                      # 포터블 모드 자체 점검: 데이터 폴더를 출력하고 DB 위치 확인
 & $exe --manager-menu-demo --shot D:\shots  # 메인 창 카드 우클릭 메뉴(이름 바꾸기·삭제 포함 검증)
 & $exe --settings-reopen-demo              # 설정 창을 5회 열고 닫아 크래시가 없는지 검증(종료 코드 0 = 통과)
 & $exe --window-opacity-demo --shot D:\shots  # 창 불투명도 100/60/40% 설정 후 Window.Opacity를 읽어 단언

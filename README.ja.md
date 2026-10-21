@@ -70,6 +70,29 @@ TODO / Done ビュー切り替え：
 
 ---
 
+## 0. ダウンロードしてすぐ使う（ポータブル版）
+
+.NET ランタイムを入れたくない場合はポータブル版をどうぞ：
+
+**[⬇ 最新の StickyTodo-x.x.x-win-x64-portable.zip をダウンロード](https://github.com/xiefengdaxia/StickyTodo-WPF/releases/latest)**
+
+解凍して `StickyTodo.exe` をダブルクリックするだけ。**70 MB の単一 exe に .NET 8 ランタイムを同梱、依存なし**。
+
+- アーカイブに `portable.marker` が入っているため、データ（`sticky.db` とログ）は exe 隣の `data\` に保存されます —— **フォルダごとコピーすればデータも一緒に移動**でき、USB メモリに最適
+- `portable.marker` を削除すれば通常モード（`%LOCALAPPDATA%\StickyTodo`）に戻ります
+- 初回起動時に SmartScreen の警告が出る場合があります（未署名）。「詳細情報」→「実行」を選んでください
+- 対応 OS：Windows 10 1809 (x64) 以降
+
+自分でビルドする場合：
+
+```powershell
+.\tools\publish-portable.ps1 -Version 1.0.0                    # パッケージのみ
+.\tools\publish-portable.ps1 -Version 1.0.0 -CreateRelease     # パッケージして GitHub Release へ公開
+```
+
+スクリプトは テスト → 単一ファイル発行 → ポータブルマーカー配置 → ZIP 作成 → **スモークテスト**（`--portable-check` で実プロセスを起動し、データが exe 隣に作られることを確認）→ 必要なら Release へアップロード、を順に実行します。
+
+---
 ## 1. クイックスタート
 
 ```powershell
@@ -107,6 +130,7 @@ $exe = ".\src\StickyTodo.App\bin\Debug\net8.0-windows\StickyTodo.exe"
 & $exe --pomodoro-demo --shot D:\shots      # ポモドーロ回帰：1 サイクル、一時停止、スキップ、今日の回数
 & $exe --motion-demo --shot D:\shots        # モーション回帰：入場／パルス／チェック／削除／完了をプロパティで検証
 & $exe --i18n-demo --shot D:\shots          # 多言語回帰：4 言語を順に切り替え UI 文言を検証
+& $exe --portable-check                      # ポータブルモード自検：データディレクトリを表示し DB の位置を確認
 & $exe --manager-menu-demo --shot D:\shots  # メイン画面カードの右クリックメニュー（「名前を変更」「削除」を検証）
 & $exe --settings-reopen-demo              # 設定画面を 5 回開閉してクラッシュしないことを検証（終了コード 0 = 合格）
 & $exe --window-opacity-demo --shot D:\shots  # ウィンドウ不透明度 100/60/40% を設定し Window.Opacity を読み戻して検証

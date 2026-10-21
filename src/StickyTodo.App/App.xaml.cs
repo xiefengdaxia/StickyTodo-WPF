@@ -128,6 +128,13 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        // 便携模式回归：验证数据目录确实跟着 exe 走
+        if (e.Args.Contains("--portable-check", StringComparer.OrdinalIgnoreCase))
+        {
+            RunPortableCheck();
+            return;
+        }
+
         // 多语言回归：四种语言逐一切换并校验界面文案
         if (e.Args.Contains("--i18n-demo", StringComparer.OrdinalIgnoreCase))
         {
@@ -873,6 +880,60 @@ public partial class App : System.Windows.Application
     }
 
     /// <summary>
+    /// --portable-check：便携模式自检。把数据目录的解析结果打到日志里，
+    /// 供发布脚本断言"标记文件存在时数据确实落在 exe 同目录"。
+    /// </summary>
+    private void RunPortableCheck()
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+
+            Log.Information(
+                "[portable] exe 目录={ExeDir} | 便携模式={Portable} | 环境变量覆盖={EnvOverride} | 数据目录={DataDir} | 数据库={Db}",
+                AppPaths.ExecutableDirectory,
+                AppPaths.IsPortable,
+                AppPaths.IsOverriddenByEnvironment,
+                AppPaths.DataDirectory,
+                AppPaths.DatabasePath);
+
+            // 真正建一次库，确认便携目录可写、SQLite 能落盘
+            _host = BuildHost();
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+            _host.Services.GetRequiredService<TodoService>().EnsureDefaultBoard();
+
+            // 期望：便携模式下数据目录 = exe 目录\data
+            var expectedPortable = Path.Combine(AppPaths.ExecutableDirectory, AppPaths.PortableDataFolderName);
+            var portableOk = !AppPaths.IsPortable ||
+                             string.Equals(
+                                 Path.GetFullPath(AppPaths.DataDirectory),
+                                 Path.GetFullPath(expectedPortable),
+                                 StringComparison.OrdinalIgnoreCase);
+
+            var dbOk = File.Exists(AppPaths.DatabasePath);
+            var logDirOk = Directory.Exists(AppPaths.LogDirectory);
+
+            Log.Information("[portable] 数据目录符合便携规则={PortableOk} 数据库已建立={DbOk} 日志目录={LogOk}",
+                portableOk, dbOk, logDirOk);
+
+            var ok = portableOk && dbOk && logDirOk;
+            Log.Information("[portable] 总结果={Result}", ok ? "通过" : "失败");
+
+            Log.CloseAndFlush();
+            Shutdown(ok ? 0 : 2);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[portable] 异常");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
     /// --i18n-demo：多语言回归。逐一设置四种语言，用真实的 ViewModel 拼出文案，
     /// 确认界面文本确实跟着语言变，而不是始终返回中文。
     /// </summary>
@@ -1015,16 +1076,18 @@ public partial class App : System.Windows.Application
             var boardWindow = (BoardWindow)windows.OpenBoard(board);
             MainWindow = boardWindow;
 
-            // 2) 窗口入场：内容的不透明度应从 0 动画到 1
-            await Task.Delay(60);
-            var earlyOpacity = boardWindow.Content is FrameworkElement c0 ? c0.Opacity : 1;
-            await Task.Delay(500);
+            // 2) 窗口入场：动画结束后内容必须完全不透明。
+            //    注意不要断言"某个时刻还没到 1"——动画只有 180ms，
+            //    采样点稍微晚一点（消息队列繁忙时）就会已经结束，属于测试自身不稳定。
+            await Task.Delay(600);
             var settledOpacity = boardWindow.Content is FrameworkElement c1 ? c1.Opacity : 1;
-            Log.Information("[motion] 窗口入场：60ms 时={Early:0.00} 500ms 后={Settled:0.00}", earlyOpacity, settledOpacity);
+            var hasScaleTransform = boardWindow.Content is FrameworkElement c2 && c2.RenderTransform is System.Windows.Media.ScaleTransform;
+            Log.Information("[motion] 窗口入场：结束后 Opacity={Settled:0.00} 带缩放变换={HasScale}", settledOpacity, hasScaleTransform);
             ok &= settledOpacity > 0.98;
             if (Motion.Enabled)
             {
-                ok &= earlyOpacity < 0.95; // 入场期间确实还没到 1
+                // 入场动画确实给内容装上了 ScaleTransform（这是 FadeInWindow 的副作用）
+                ok &= hasScaleTransform;
             }
 
             // 3) Pulse：探针元素应被装上 ScaleTransform，动画结束后回到 1

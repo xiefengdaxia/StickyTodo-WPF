@@ -70,6 +70,29 @@ The language can also be switched from Settings (Japanese shown below):
 
 ---
 
+## 0. Download and run (portable)
+
+Don't want to install the .NET runtime? Grab the portable build:
+
+**[⬇ Download the latest StickyTodo-x.x.x-win-x64-portable.zip](https://github.com/xiefengdaxia/StickyTodo-WPF/releases/latest)**
+
+Unzip and double-click `StickyTodo.exe` — **a single 70 MB exe with the .NET 8 runtime bundled, zero dependencies**.
+
+- The archive ships with `portable.marker`, so data (`sticky.db` and logs) lives in a `data\` folder next to the exe — **copy the whole folder to carry all your data**, perfect for a USB stick
+- Delete `portable.marker` to fall back to normal mode (data in `%LOCALAPPDATA%\StickyTodo`)
+- SmartScreen may warn on first run (unsigned): click "More info" → "Run anyway"
+- Requires Windows 10 1809 (x64) or later
+
+Build it yourself:
+
+```powershell
+.\tools\publish-portable.ps1 -Version 1.0.0                    # package only
+.\tools\publish-portable.ps1 -Version 1.0.0 -CreateRelease     # package and publish a GitHub Release
+```
+
+The script runs tests → single-file publish → adds the portable marker → zips → **smoke test** (launches a real process with `--portable-check` to confirm data really lands next to the exe) → optionally uploads the release.
+
+---
 ## 1. Quick start
 
 ```powershell
@@ -107,6 +130,7 @@ $exe = ".\src\StickyTodo.App\bin\Debug\net8.0-windows\StickyTodo.exe"
 & $exe --pomodoro-demo --shot D:\shots      # Pomodoro regression: full cycle, pause, skip, today's count
 & $exe --motion-demo --shot D:\shots        # motion regression: entrance / pulse / check / delete / done, verified by reading properties
 & $exe --i18n-demo --shot D:\shots          # i18n regression: switch all four languages and verify UI text
+& $exe --portable-check                      # portable mode self-check: prints the data directory and verifies the DB location
 & $exe --manager-menu-demo --shot D:\shots  # manager card context menu (verifies Rename and Delete are present)
 & $exe --settings-reopen-demo              # open/close Settings 5 times to verify it does not crash (exit 0 = pass)
 & $exe --window-opacity-demo --shot D:\shots  # window opacity 100/60/40% and read back Window.Opacity

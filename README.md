@@ -70,6 +70,29 @@ TODO / Done 视图切换：
 
 ---
 
+## 0. 下载即用（便携版）
+
+不想装 .NET 运行时？直接下便携版：
+
+**[⬇ 下载最新版 StickyTodo-x.x.x-win-x64-portable.zip](https://github.com/xiefengdaxia/StickyTodo-WPF/releases/latest)**
+
+解压后双击 `StickyTodo.exe` 即可，**单文件 70 MB，内含 .NET 8 运行时，零依赖**。
+
+- 压缩包里带了 `portable.marker`，所以数据（`sticky.db` + 日志）存在 exe 旁边的 `data\` 里 —— **拷走整个文件夹就能带走全部数据**，适合放 U 盘
+- 删掉 `portable.marker` 就切回常规模式（数据存到 `%LOCALAPPDATA%\StickyTodo`）
+- 首次运行可能被 SmartScreen 拦（未签名），点「更多信息」→「仍要运行」
+- 系统要求：Windows 10 1809 (x64) 或更高
+
+自己打包：
+
+```powershell
+.\tools\publish-portable.ps1 -Version 1.0.0                    # 只打包
+.\tools\publish-portable.ps1 -Version 1.0.0 -CreateRelease     # 打包并发布到 GitHub Release
+```
+
+脚本会依次做：跑单测 → 单文件发布 → 放便携标记 → 打 ZIP → **冒烟测试**（用 `--portable-check` 起一次真实进程，确认数据确实落在 exe 旁边）→ 可选上传 Release。
+
+---
 ## 1. 快速开始
 
 ```powershell
@@ -107,6 +130,7 @@ $exe = ".\src\StickyTodo.App\bin\Debug\net8.0-windows\StickyTodo.exe"
 & $exe --pomodoro-demo --shot D:\shots      # 番茄钟回归：整周期、暂停、跳过、今日计数
 & $exe --motion-demo --shot D:\shots        # 动效回归：入场/脉冲/勾选/删除/完成，读属性验证动画真在跑
 & $exe --i18n-demo --shot D:\shots          # 多语言回归：四种语言逐一切换并校验界面文案
+& $exe --portable-check                      # 便携模式自检：打印数据目录并确认数据库落在正确位置
 & $exe --manager-menu-demo --shot D:\shots  # 主窗体卡片右键菜单（验证含「重命名」「删除」）
 & $exe --settings-reopen-demo              # 反复打开/关闭设置页 5 轮，验证不会崩（退出码 0 = 通过）
 & $exe --window-opacity-demo --shot D:\shots  # 整窗透明度 100/60/40% 并读回 Window.Opacity 断言

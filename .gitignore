@@ -1,4 +1,4 @@
-# 构建产物
+﻿# 构建产物
 bin/
 obj/
 [Dd]ebug/
@@ -18,3 +18,5 @@ artifacts/*.tmp
 # 操作系统
 Thumbs.db
 .DS_Store
+# 打包产物（单文件便携版）
+publish/

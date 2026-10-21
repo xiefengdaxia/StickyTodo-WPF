@@ -75,7 +75,7 @@ public partial class SettingsViewModel : ObservableObject
                 Languages.Add(info);
             }
 
-            _selectedLanguage = AppLanguages.Resolve(_settings.Language);
+            SelectedLanguage = AppLanguages.Resolve(_settings.Language);
         }
         finally
         {
