@@ -1,4 +1,4 @@
-﻿# StickyTodo
+# StickyTodo
 
 [简体中文](README.md) | [English](README.en.md) | [日本語](README.ja.md) | **한국어**
 
@@ -81,7 +81,22 @@ TODO / Done 보기 전환:
 - 압축 파일에 `portable.marker`가 들어 있어 데이터(`sticky.db`와 로그)가 exe 옆 `data\` 폴더에 저장됩니다 —— **폴더째 복사하면 데이터도 함께 이동**하므로 USB 메모리에 적합
 - `portable.marker`를 삭제하면 일반 모드(`%LOCALAPPDATA%\StickyTodo`)로 돌아갑니다
 - 첫 실행 시 SmartScreen 경고가 나올 수 있습니다(서명 없음). 「추가 정보」→「그래도 실행」을 선택하세요
-- 요구 사항: Windows 10 1809 (x64) 이상
+- 시스템 요구 사항은 아래 「실행 환경」 참조
+
+**실행 환경**
+
+| 항목 | 요구 사항 |
+|---|---|
+| OS | **Windows 10 1809(x64) 이상**, Windows 11 모든 버전 |
+| CPU | **x64** (ARM64 기기는 x64 에뮬레이션으로 동작할 수 있으나 미검증) |
+| .NET 런타임 | **불필요**(.NET 8 자체 포함) |
+| 기타 의존성 | **없음**. WPF 그래픽 스택, SQLite 네이티브 라이브러리, VC++ 런타임 모두 내장 |
+| 디스크 | 약 71MB(exe 자체), 데이터는 수 MB부터 |
+| 권한 | 일반 사용자 권한으로 충분. **관리자 권한 불필요**(자동 시작은 HKCU만 기록) |
+
+미지원: Windows 7/8/8.1(.NET 8과 WPF의 새 DPI API 미지원), 32비트 시스템, Linux/macOS.
+
+**임시 폴더 관련**: 단일 파일 빌드는 첫 실행 시 네이티브 라이브러리(wpfgfx_cor3.dll, e_sqlite3.dll 등 약 10MB)를 %TEMP%\.net\StickyTodo\ 에 압축 해제합니다. 따라서 %TEMP%가 쓰기 가능해야 하며, 임시 폴더 정책이 매우 엄격한 환경에서는 실행되지 않습니다. 압축 해제를 피하려면 PublishSingleFile을 제거한 폴더형 자체 포함 게시를 사용하세요.
 
 직접 빌드하려면:
 

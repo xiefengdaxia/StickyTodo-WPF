@@ -83,6 +83,22 @@ Unzip and double-click `StickyTodo.exe` — **a single 70 MB exe with the .NET 8
 - SmartScreen may warn on first run (unsigned): click "More info" → "Run anyway"
 - Requires Windows 10 1809 (x64) or later
 
+**Runtime requirements**
+
+| Item | Requirement |
+|---|---|
+| OS | **Windows 10 1809 (x64) or later**; all Windows 11 versions |
+| CPU | **x64** (ARM64 devices can emulate x64 but this is untested) |
+| .NET runtime | **Not required** (self-contained .NET 8) |
+| Other dependencies | **None**. The WPF graphics stack, SQLite native library and VC++ runtime are all bundled |
+| Disk | ~71 MB (the exe); data starts at a few MB |
+| Privileges | Standard user; **no admin rights needed** (autostart writes HKCU only) |
+
+Not supported: Windows 7/8/8.1 (.NET 8 and WPF's new DPI APIs are unsupported there), 32-bit systems, Linux/macOS.
+
+**About the temp folder**: the single-file build extracts its native libraries (wpfgfx_cor3.dll, e_sqlite3.dll, ~10 MB total) to %TEMP%\.net\StickyTodo\ on first run. %TEMP% must therefore be writable; very restrictive enterprise temp policies will prevent startup. If you need zero extraction, use a directory-based self-contained publish (drop PublishSingleFile) at the cost of a folder with dozens of files.
+
+
 Build it yourself:
 
 ```powershell
