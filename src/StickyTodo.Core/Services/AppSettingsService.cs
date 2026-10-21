@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using StickyTodo.Core.Abstractions;
 
 namespace StickyTodo.Core.Services;
@@ -46,8 +46,9 @@ public sealed class AppSettingsService
     /// <summary>启动时是否恢复上次会话。</summary>
     public const string RestoreSessionKey = "session.restore";
 
-    /// <summary>Token 面板地址。</summary>
-    public const string TokenEndpointKey = "token.endpoint";
+
+    /// <summary>Token 数据源（opencode 数据库）的自定义路径，空=默认位置。</summary>
+    public const string TokenDatabasePathKey = "token.databasePath";
 
     /// <summary>Token 面板自动刷新间隔（秒），只允许 5 / 15 / 30。</summary>
     public const string TokenRefreshSecondsKey = "token.refreshSeconds";
@@ -129,15 +130,17 @@ public sealed class AppSettingsService
         set => _repository.SetSetting(RestoreSessionKey, value ? "1" : "0");
     }
 
-    /// <summary>Token 面板地址。</summary>
-    public string TokenEndpoint
+    /// <summary>
+    /// Token 看板要读的 opencode 数据库路径。空表示用默认位置（~/.local/share/opencode/opencode.db）。
+    /// </summary>
+    public string TokenDatabasePath
     {
         get
         {
-            var raw = GetString(TokenEndpointKey, null);
-            return string.IsNullOrWhiteSpace(raw) ? "http://100.113.121.18:8199" : raw;
+            var raw = GetString(TokenDatabasePathKey, null);
+            return string.IsNullOrWhiteSpace(raw) ? string.Empty : raw.Trim();
         }
-        set => _repository.SetSetting(TokenEndpointKey, value.Trim());
+        set => _repository.SetSetting(TokenDatabasePathKey, value.Trim());
     }
 
     /// <summary>Token 面板自动刷新间隔（秒）。只允许 5 / 15 / 30，其它值归一到 15。</summary>

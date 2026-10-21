@@ -1,4 +1,4 @@
-<Window x:Class="StickyTodo.App.Views.TokenBoardWindow"
+﻿<Window x:Class="StickyTodo.App.Views.TokenBoardWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:StickyTodo.App.Controls"
@@ -230,7 +230,7 @@
             <!-- ============ 趋势 ============ -->
             <StackPanel Grid.Row="4" Margin="12,6,12,0">
                 <Grid Margin="2,0,2,4">
-                    <TextBlock Text="用量趋势 · 柱=token 折线=调用次数"
+                    <TextBlock Text="用量趋势 · 柱=token 折线=调用次数 · 数据来自本机"
                                Style="{StaticResource Text.Caption}"
                                Opacity="0.75" />
                     <Button HorizontalAlignment="Right"
@@ -326,16 +326,33 @@
                     Padding="12,6"
                     Margin="0,8,0,0">
                 <Grid>
-                    <TextBlock Text="{Binding UpdatedText}"
-                               Style="{StaticResource Text.Caption}"
-                               Opacity="0.75"
-                               VerticalAlignment="Center" />
-                    <TextBlock Text="{Binding ErrorText}"
-                               HorizontalAlignment="Right"
-                               FontSize="11"
-                               Foreground="#FFC0392B"
-                               TextTrimming="CharacterEllipsis"
-                               MaxWidth="220" />
+                    <StackPanel>
+                        <TextBlock Text="{Binding UpdatedText}"
+                                   Style="{StaticResource Text.Caption}"
+                                   Opacity="0.75" />
+                        <TextBlock Text="{Binding SourceText}"
+                                   Style="{StaticResource Text.Caption}"
+                                   Opacity="0.5"
+                                   FontSize="9.5"
+                                   TextTrimming="CharacterEllipsis"
+                                   MaxWidth="300"
+                                   Margin="0,1,0,0" />
+                    </StackPanel>
+                    <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding ErrorText}"
+                                   HorizontalAlignment="Right"
+                                   FontSize="11"
+                                   Foreground="#FFC0392B"
+                                   TextTrimming="CharacterEllipsis"
+                                   MaxWidth="220" />
+                        <TextBlock Text="{Binding SourceError}"
+                                   HorizontalAlignment="Right"
+                                   FontSize="10"
+                                   Foreground="#FFC0392B"
+                                   TextWrapping="Wrap"
+                                   MaxWidth="220"
+                                   Visibility="{Binding SourceError, Converter={StaticResource NullToCollapsed}}" />
+                    </StackPanel>
                 </Grid>
             </Border>
         </Grid>

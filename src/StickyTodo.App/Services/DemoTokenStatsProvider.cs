@@ -4,11 +4,14 @@ using StickyTodo.Core.Entities;
 namespace StickyTodo.App.Services;
 
 /// <summary>
-/// 回归演示用的假数据源：不联网，按小时造一天的量，形状和真实面板一致。
-/// 只给 <c>--token-demo</c> 用，正式运行走 <see cref="HttpTokenStatsProvider"/>。
+/// 回归演示用的假数据源：不读库也不联网，按小时造一天的量，形状和真实一致。
+/// 只给 <c>--token-demo</c> 用，正式运行走 <see cref="Infrastructure.Token.OpenCodeTokenStatsProvider"/>。
 /// </summary>
 public sealed class DemoTokenStatsProvider : ITokenStatsProvider
 {
+    public string SourceDescription => "演示数据（不读库）";
+
+    public bool IsAvailable => true;
     private static readonly long[] HourlyInput =
     [
         120, 0, 0, 0, 0, 0, 0, 0, 3400, 12500, 8800, 6400,

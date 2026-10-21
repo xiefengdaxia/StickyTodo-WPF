@@ -82,8 +82,8 @@ $exe = ".\src\StickyTodo.App\bin\Debug\net8.0-windows\StickyTodo.exe"
 & $exe --session-demo                       # 会话恢复第 1 阶段：开 3 个看板并写入会话
 & $exe --session-demo --phase2              # 会话恢复第 2 阶段：模拟重启，验证 3 个窗口与位置都回来
 & $exe --autostart-demo                     # 开机自启回归：写注册表 → 读回 → 删除 → 还原
-& $exe --token-demo --shot D:\shots         # Token 看板回归（假数据源，不需要网络）
-& $exe --token-demo --live                  # Token 看板回归，打真实接口
+& $exe --token-demo --shot D:\shots         # Token 看板回归（假数据源，不读库）
+& $exe --token-demo --live                  # Token 看板回归，读真实的本机 opencode 库
 & $exe --calendar-demo --shot D:\shots      # 日历回归：农历/节气/休班/黄历/年月下拉
 & $exe --pomodoro-demo --shot D:\shots      # 番茄钟回归：整周期、暂停、跳过、今日计数
 & $exe --manager-menu-demo --shot D:\shots  # 主窗体卡片右键菜单（验证含「重命名」「删除」）
@@ -183,7 +183,8 @@ dotnet run --project tools/IconGen -c Release -- src/StickyTodo.App/Assets/stick
 - 数据来自**所有看板**的待办，重复待办会按规则展开成多次显示
 
 **Token 用量看板**
-- 定时向上游用量面板取数（默认 `http://100.113.121.18:8199`，可在设置里改），**这是全程序唯一的联网功能**，只读、不发送任何本机数据
+- **数据来自本机 opencode 数据库**（默认 `~/.local/share/opencode/opencode.db`，可在设置里改路径），**完全不联网**，只读打开、不写别人的库
+- 数据库里 v1（`message`）与 v2（`session_message`）两套消息表并存，**不能相加**（6–9 月会重复）；实现以 v2 为准，再补 v1 里 id 不在 v2 的早期漏迁消息
 - **自动刷新间隔 5 / 15 / 30 秒**可选，也可以随时点 ⟳ 手动刷新
 - **统计范围**：今天（按小时）/ 近 3 天 / 近 7 天 / 近 30 天（7 天以上自动按天聚合）
 - 顶部汇总：总 token、调用次数、缓存比例，下面一行拆开显示输入 / 输出 / 推理 / 缓存读
@@ -263,8 +264,8 @@ setting(key PRIMARY KEY, value)
 
 ## 5. 完全本地化（可验证，不是口号）
 
-- **唯一例外是 Token 用量看板**：它按你的设置去读一个只读的统计接口（默认 `http://100.113.121.18:8199`），不发任何本机数据、不携带账号信息。其它所有功能完全本地。
-- 除上面这一处，没有账号体系、没有云同步、没有埋点、没有版本检查。
+- Token 用量看板读的是**本机 opencode 的 SQLite 数据库**，是本地文件读取，同样不联网、不发送任何数据。
+- 没有账号体系、没有云同步、没有埋点、没有版本检查。
 - 宿主刻意用 `new HostBuilder()` 而不是 `Host.CreateDefaultBuilder()`：后者会去读 `appsettings.json` / 环境变量 / 命令行配置，这里配置来源全部关闭，行为只由代码决定。
 - 可执行的保证：`tests/StickyTodo.Tests/NoNetworkTests.cs` 断言 **Core 与 Infrastructure 程序集的引用列表里没有** `System.Net.Http` / `System.Net.Sockets` / `System.Net.Requests` / `System.Net.WebClient`。一旦有人往这两层加回网络依赖，测试立刻失败。
 
@@ -352,7 +353,7 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 - [x] **开机自启**（注册表 `Run` + `--autostart`）：自启时只恢复上次的看板，不弹管理面板；没有可恢复看板时才回落显示
 
 **M5（已完成）**
-- [x] **Token 用量看板**：5/15/30 秒自动刷新 + 手动刷新、今天/近3/7/30 天范围、趋势图（堆叠柱 + 折线）、点柱子看时段明细、按模型占比
+- [x] **Token 用量看板（读本机 opencode 库）**：5/15/30 秒自动刷新 + 手动刷新、今天/近3/7/30 天范围、趋势图（堆叠柱 + 折线）、点柱子看时段明细、按模型占比；兼容 v1/v2 两套消息表且不重复计数
 - [x] **日历看板升级**：农历日期、二十四节气、传统节日、法定节假日「休」/ 调休补班「班」、点击某天显示黄历宜忌（干支 + 建除十二神 + 宜/忌）、年月下拉框任意跳转
 - [x] **番茄时钟**：25/5/15 分钟三段、圆环进度、开始/暂停/重置/跳过、托盘通知、今日完成数落库跨天归零
 
@@ -373,6 +374,7 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 - **节假日/调休数据是手工录入的**（覆盖 2024–2026 年），国务院每年 11 月左右发布次年安排，届时需要往 `ChineseHolidays` 里补数据；超出范围的年份只有「周末休息」的默认判断。
 - **二十四节气用通用日数公式计算**，个别年份可能与官方历书差一天（公式内的特例表已覆盖已知偏差）。
 - **黄历的宜忌是按建除十二神给的通用条目**，不是逐日通书，只作参考；不涉及择日、神煞、时辰吉凶。
-- **Token 看板是唯一联网功能**，接口不可用时只显示上一次的数据并在页脚提示；不缓存到磁盘，重启后需要重新取一次。
+- **Token 看板依赖 opencode 的库表结构**（`session_message` / `message` 的 JSON 字段）。opencode 改版导致字段变动时读数会变 0，需要跟着调整 SQL；库不存在时页脚会提示去设置里指定路径。
+- Token 统计的是**消息级用量累加**，与 opencode 自己按会话累加的 `session_v2.tokens_*` 在口径上可能有细微差别（消息级更细，也更能按时间分桶）。
 - 重复待办的完成历史目前只记录、未展示（将来用在「本月完成了多少次」这类统计上）。
 - UI 层没有自动化测试，靠 `--selftest` / `--recurrence-demo` / `--shot` 做回归。

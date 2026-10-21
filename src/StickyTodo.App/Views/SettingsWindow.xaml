@@ -40,7 +40,7 @@
                 <Grid>
                     <StackPanel>
                         <TextBlock Text="设置" Style="{StaticResource Text.Display}" />
-                        <TextBlock Text="外观与数据都存在本机（Token 看板按你填的地址取数）"
+                        <TextBlock Text="外观与数据都存在本机，不联网"
                                    Style="{StaticResource Text.Caption}"
                                    Margin="0,3,0,0" />
                     </StackPanel>
@@ -208,14 +208,19 @@
 
                     <Border Style="{StaticResource Card}" Margin="0,0,0,14">
                         <StackPanel>
-                            <TextBlock Text="面板地址" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
-                            <TextBox x:Name="TokenEndpointBox"
-                                     Text="{Binding TokenEndpoint, UpdateSourceTrigger=PropertyChanged}"
+                            <TextBlock Text="opencode 数据库" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
+                            <TextBox x:Name="TokenDatabaseBox"
+                                     Text="{Binding TokenDatabasePath, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource TextBox.Flat}"
                                      Margin="0,6,0,0"
-                                     LostFocus="TokenEndpointBox_LostFocus"
-                                     KeyDown="TokenEndpointBox_KeyDown" />
-                            <TextBlock Text="Token 看板按这个地址取用量数据（只读）。改完回到看板点一下 ⟳ 即生效。"
+                                     ToolTip="留空使用默认位置"
+                                     LostFocus="TokenDatabaseBox_LostFocus"
+                                     KeyDown="TokenDatabaseBox_KeyDown" />
+                            <TextBlock Text="默认：~/.local/share/opencode/opencode.db"
+                                       Style="{StaticResource Text.Caption}"
+                                       Opacity="0.6"
+                                       Margin="2,3,0,0" />
+                            <TextBlock Text="留空 = 默认位置 ~/.local/share/opencode/opencode.db。Token 看板只读这个库，不联网。"
                                        Style="{StaticResource Text.Caption}"
                                        TextWrapping="Wrap"
                                        Margin="0,5,0,0" />

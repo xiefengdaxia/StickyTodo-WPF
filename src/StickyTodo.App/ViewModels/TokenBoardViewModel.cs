@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -44,7 +44,7 @@ public sealed partial class TokenIntervalOption : ObservableObject
 }
 
 /// <summary>
-/// Token 用量看板：定时/手动向上游面板拉数据，展示汇总、趋势和按模型明细。
+/// Token 用量看板：定时/手动读本机 opencode 数据库，展示汇总、趋势和按模型明细。
 /// </summary>
 public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, IDisposable
 {
@@ -52,7 +52,6 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, ID
     private readonly TodoService _service;
     private readonly AppSettingsService _settings;
     private readonly SkinService _skin;
-    private readonly HttpTokenStatsProvider? _httpProvider;
     private readonly DispatcherTimer _timer;
 
     private bool _disposed;
@@ -68,7 +67,6 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, ID
         _service = service;
         _settings = settings;
         _skin = skin;
-        _httpProvider = provider as HttpTokenStatsProvider;
         Board = board;
         _boardName = board.Name;
         _isTopmost = settings.GetBoardTopmost(board.Id);
@@ -89,13 +87,13 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, ID
         SelectRange(_rangeDays, persist: false);
         SelectInterval(_refreshSeconds, persist: false);
 
+        _sourceText = provider.SourceDescription;
+        SourceError = provider.IsAvailable ? null : "找不到 opencode 数据库，请到设置里指定路径";
+
         _timer = new DispatcherTimer();
         _timer.Tick += async (_, _) => await RefreshAsync();
 
-        if (_httpProvider is not null)
-        {
-            _httpProvider.Endpoint = settings.TokenEndpoint;
-        }
+
     }
 
     public Board Board { get; }
@@ -149,8 +147,16 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, ID
     [ObservableProperty]
     private bool _hasDetail;
 
-    /// <summary>成功取数的次数。回归用它判断"是否真的又请求了一次"。</summary>
+    /// <summary>成功取数的次数。回归用它判断"是否真的又读了一次"。</summary>
     public int FetchCount { get; private set; }
+
+    /// <summary>数据源说明（本机数据库路径），显示在页脚。</summary>
+    [ObservableProperty]
+    private string _sourceText = string.Empty;
+
+    /// <summary>数据源不可用时的提示（库不存在/读不了）。</summary>
+    [ObservableProperty]
+    private string? _sourceError;
 
     [ObservableProperty]
     private bool? _isEmptyOrError;
@@ -274,17 +280,13 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, ID
 
         try
         {
-            if (_httpProvider is not null)
-            {
-                _httpProvider.Endpoint = _settings.TokenEndpoint;
-            }
 
             var stats = await _provider.FetchAsync(RangeDays, Granularity);
             Apply(stats);
         }
         catch (Exception ex)
         {
-            ErrorText = $"取数失败：{ex.Message}";
+            ErrorText = $"读取失败：{ex.Message}";
             UpdatedText = $"刷新失败 · {DateTime.Now:HH:mm:ss}";
         }
         finally
@@ -307,7 +309,9 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, ID
 
         RangeText = stats.From == DateTimeOffset.MinValue
             ? string.Empty
-            : $"{stats.From:MM-dd} ~ {stats.To:MM-dd} · 活跃 {stats.ActiveDays} 天";
+            : RangeDays == 0
+                ? $"{stats.From:MM-dd} 今天 · {stats.Series.Count(p => p.Total > 0)} 个时段有用量"
+                : $"{stats.From:MM-dd} ~ {stats.To:MM-dd} · 活跃 {stats.ActiveDays} 天";
 
         UpdatedText = $"更新于 {DateTime.Now:HH:mm:ss}";
 

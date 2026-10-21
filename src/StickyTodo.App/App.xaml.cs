@@ -29,7 +29,7 @@ public partial class App : System.Windows.Application
 
     /// <summary>
     /// 回归演示里替换掉真实的 HTTP 数据源（见 <c>--token-demo</c>）。
-    /// 正式运行时为 null，走真实的 <see cref="HttpTokenStatsProvider"/>。
+    /// 正式运行时为 null，走真实的 <see cref="Infrastructure.Token.OpenCodeTokenStatsProvider"/>。
     /// </summary>
     private static Core.Abstractions.ITokenStatsProvider? TokenProviderOverride { get; set; }
 
@@ -397,8 +397,19 @@ public partial class App : System.Windows.Application
                 services.AddSingleton<ReminderPump>();
                 services.AddSingleton<HotKeyService>();
                 services.AddSingleton<AutoStartService>();
-                services.AddSingleton<Core.Abstractions.ITokenStatsProvider>(_ =>
-                    TokenProviderOverride ?? new HttpTokenStatsProvider());
+                services.AddSingleton<Core.Abstractions.ITokenStatsProvider>(sp =>
+                {
+                    if (TokenProviderOverride is not null)
+                    {
+                        return TokenProviderOverride;
+                    }
+
+                    // 默认读本机 opencode 数据库；设置里填了自定义路径就用它
+                    var settings = sp.GetRequiredService<AppSettingsService>();
+                    var custom = settings.TokenDatabasePath;
+                    return new Infrastructure.Token.OpenCodeTokenStatsProvider(
+                        string.IsNullOrWhiteSpace(custom) ? null : custom);
+                });
                 services.AddSingleton<Core.Pomodoro.PomodoroEngine>();
                 services.AddSingleton<ViewModels.PomodoroViewModel>();
                 services.AddSingleton<ManagerViewModel>();

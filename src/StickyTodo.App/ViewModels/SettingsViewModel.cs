@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using StickyTodo.App.Services;
@@ -89,9 +89,9 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _restoreSession = true;
 
-    /// <summary>Token 用量面板的服务地址（可改，允许局域网/内网地址）。</summary>
+    /// <summary>Token 看板要读的 opencode 数据库路径（空=默认位置）。</summary>
     [ObservableProperty]
-    private string _tokenEndpoint = string.Empty;
+    private string _tokenDatabasePath = string.Empty;
 
     private bool _suppressStartupSync;
 
@@ -104,7 +104,7 @@ public partial class SettingsViewModel : ObservableObject
             // 以注册表实际状态为准：用户可能在别处删过启动项
             LaunchAtStartup = _autoStart.IsEnabled();
             RestoreSession = _settings.RestoreSession;
-            TokenEndpoint = _settings.TokenEndpoint;
+            TokenDatabasePath = _settings.TokenDatabasePath;
             _settings.AutoStart = LaunchAtStartup;
         }
         finally
@@ -149,28 +149,30 @@ public partial class SettingsViewModel : ObservableObject
         StatusText = value ? "启动时会恢复上次的看板" : "启动时不再恢复看板";
     }
 
-    /// <summary>地址失焦/回车时保存；不合法就还原成原来的值。</summary>
-    public void CommitTokenEndpoint()
+    /// <summary>路径失焦/回车时保存；留空表示回到默认位置。</summary>
+    public void CommitTokenDatabasePath()
     {
-        var text = (TokenEndpoint ?? string.Empty).Trim();
+        var text = (TokenDatabasePath ?? string.Empty).Trim();
 
         if (text.Length == 0)
         {
-            TokenEndpoint = _settings.TokenEndpoint;
+            _settings.TokenDatabasePath = string.Empty;
+            TokenDatabasePath = string.Empty;
+            ErrorText = null;
+            StatusText = "Token 数据源已恢复默认位置";
             return;
         }
 
-        if (!Uri.TryCreate(text, UriKind.Absolute, out var uri)
-            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        if (!System.IO.File.Exists(text))
         {
-            ErrorText = "地址要以 http:// 或 https:// 开头";
-            TokenEndpoint = _settings.TokenEndpoint;
+            ErrorText = "找不到这个数据库文件";
+            TokenDatabasePath = _settings.TokenDatabasePath;
             return;
         }
 
-        _settings.TokenEndpoint = text;
+        _settings.TokenDatabasePath = text;
         ErrorText = null;
-        StatusText = "Token 面板地址已保存";
+        StatusText = "Token 数据源已保存";
     }
 
     [ObservableProperty]

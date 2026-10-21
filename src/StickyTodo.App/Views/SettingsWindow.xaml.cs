@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Input;
 using StickyTodo.App.ViewModels;
 
@@ -51,17 +51,17 @@ public partial class SettingsWindow : Window
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 
     /// <summary>地址框失焦时保存。</summary>
-    private void TokenEndpointBox_LostFocus(object sender, RoutedEventArgs e) => _viewModel.CommitTokenEndpoint();
+    private void TokenDatabaseBox_LostFocus(object sender, RoutedEventArgs e) => _viewModel.CommitTokenDatabasePath();
 
     /// <summary>回车也当保存，顺便把焦点移开。</summary>
-    private void TokenEndpointBox_KeyDown(object sender, KeyEventArgs e)
+    private void TokenDatabaseBox_KeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter)
         {
             return;
         }
 
-        _viewModel.CommitTokenEndpoint();
+        _viewModel.CommitTokenDatabasePath();
         Keyboard.ClearFocus();
         e.Handled = true;
     }
