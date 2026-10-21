@@ -209,9 +209,14 @@
                                 <Style TargetType="TextBlock">
                                     <Setter Property="Opacity" Value="1" />
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                        <!-- 只有首次取数（还没有任何数据）才变暗，切范围时不闪 -->
+                                        <MultiDataTrigger>
+                                            <MultiDataTrigger.Conditions>
+                                                <Condition Binding="{Binding IsBusy}" Value="True" />
+                                                <Condition Binding="{Binding HasData}" Value="False" />
+                                            </MultiDataTrigger.Conditions>
                                             <Setter Property="Opacity" Value="0.35" />
-                                        </DataTrigger>
+                                        </MultiDataTrigger>
                                     </Style.Triggers>
                                 </Style>
                             </TextBlock.Style>

@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -212,15 +212,28 @@ public partial class TokenBoardWindow : Window, IStickyWindow
 
     // ---------------- 回归测试用入口 ----------------
 
-    /// <summary>给回归用：切换统计范围并等一次刷新完成。</summary>
-    internal async Task SelectRangeForTestAsync(int days)
+    /// <summary>给回归用：切换统计范围并等一次刷新完成。返回耗时。</summary>
+    internal async Task<long> SelectRangeForTestAsync(int days)
     {
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var before = _viewModel.FetchCount;
+
         _viewModel.SelectRange(days);
-        await Task.Delay(150);
-        while (_viewModel.IsBusy)
+
+        // 等这次刷新真的完成（取数次数增加且不再 busy）
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        while (DateTime.UtcNow < deadline)
         {
-            await Task.Delay(50);
+            if (_viewModel.FetchCount > before && !_viewModel.IsBusy)
+            {
+                break;
+            }
+
+            await Task.Delay(20);
         }
+
+        watch.Stop();
+        return watch.ElapsedMilliseconds;
     }
 
     /// <summary>给回归用：切换自动刷新间隔。</summary>
@@ -255,6 +268,15 @@ public partial class TokenBoardWindow : Window, IStickyWindow
 
     /// <summary>给回归用：累计成功取数次数。</summary>
     internal int FetchCount => _viewModel.FetchCount;
+
+    /// <summary>给回归用：切到一个范围，只测"界面多久出数据"（不等后台刷新）。</summary>
+    internal long SelectRangeImmediate(int days)
+    {
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        _viewModel.SelectRange(days);
+        watch.Stop();
+        return watch.ElapsedMilliseconds;
+    }
 
     /// <summary>给回归用：当前趋势图有多少个点。</summary>
     internal int PointCountForTest => _viewModel.Stats.Series.Count;

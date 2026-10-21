@@ -56,6 +56,21 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, ID
 
     private bool _disposed;
 
+    /// <summary>刷新代际号：切换范围时递增，用来丢弃过期的查询结果。</summary>
+    private int _fetchGeneration;
+
+    /// <summary>忙的时候被挡下的 silent 刷新，等这次结束后补跑。</summary>
+    private bool _pendingSilentRefresh;
+
+    /// <summary>窗口关闭时取消正在跑的查询。</summary>
+    private readonly CancellationTokenSource _lifetime = new();
+
+    /// <summary>
+    /// 每个统计范围的最近一次结果。切回看过的范围时先秒开旧数据，
+    /// 再在后台刷新——大范围（近 30 天要扫 100MB+）才不会每次切换都干等。
+    /// </summary>
+    private readonly Dictionary<int, TokenStats> _cache = new();
+
     public TokenBoardViewModel(
         ITokenStatsProvider provider,
         TodoService service,
@@ -158,6 +173,10 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, ID
     [ObservableProperty]
     private string? _sourceError;
 
+    /// <summary>当前是否有内容可显示（有缓存或已取过一次）。</summary>
+    [ObservableProperty]
+    private bool _hasData;
+
     [ObservableProperty]
     private bool? _isEmptyOrError;
 
@@ -211,6 +230,15 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, ID
         if (persist)
         {
             _settings.TokenRangeDays = days;
+
+            // 有缓存就先铺上，让人立刻看到内容；随后再静默刷新
+            if (_cache.TryGetValue(days, out var cached))
+            {
+                Apply(cached);
+                _ = RefreshCoreAsync(silent: true);
+                return;
+            }
+
             _ = RefreshAsync();
         }
     }
@@ -268,30 +296,79 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, ID
     }
 
     [RelayCommand]
-    private async Task RefreshAsync()
+    private Task RefreshAsync() => RefreshCoreAsync(silent: false);
+
+    /// <summary>
+    /// 取数并应用到界面。
+    /// <paramref name="silent"/> = true 用于"已有缓存先显示、后台刷新"的场景：
+    /// 不显示忙碌态、失败也不弹错误，避免闪一下。
+    /// </summary>
+    private async Task RefreshCoreAsync(bool silent)
     {
         if (IsBusy)
         {
+            // 正在取数时又来了 silent 请求（切范围先铺缓存那种），
+            // 记一笔，等当前这次结束后补一次，别把刷新丢掉。
+            if (silent)
+            {
+                _pendingSilentRefresh = true;
+            }
+
             return;
         }
 
         IsBusy = true;
-        ErrorText = null;
+
+        if (!silent)
+        {
+            ErrorText = null;
+        }
+
+        // 每次刷新都带一个新的代际号：切范围时旧查询可能还在跑，
+        // 回来晚了就直接丢掉，避免把用户已经切走的范围的结果盖到界面上。
+        var generation = ++_fetchGeneration;
 
         try
         {
+            // Microsoft.Data.Sqlite 的 async 其实是同步执行，直接 await 会卡住 UI 线程，
+            // 所以显式丢到线程池上跑。
+            var days = RangeDays;
+            var granularity = Granularity;
+            var stats = await Task.Run(() => _provider.FetchAsync(days, granularity), _lifetime.Token)
+                .ConfigureAwait(true);
 
-            var stats = await _provider.FetchAsync(RangeDays, Granularity);
+            if (generation != _fetchGeneration)
+            {
+                return;
+            }
+
+            _cache[days] = stats;
             Apply(stats);
+        }
+        catch (OperationCanceledException)
+        {
+            // 窗口关了，忽略
         }
         catch (Exception ex)
         {
-            ErrorText = $"读取失败：{ex.Message}";
-            UpdatedText = $"刷新失败 · {DateTime.Now:HH:mm:ss}";
+            if (generation == _fetchGeneration && !silent)
+            {
+                ErrorText = $"读取失败：{ex.Message}";
+                UpdatedText = $"刷新失败 · {DateTime.Now:HH:mm:ss}";
+            }
         }
         finally
         {
-            IsBusy = false;
+            if (generation == _fetchGeneration)
+            {
+                IsBusy = false;
+
+                if (_pendingSilentRefresh && !_disposed)
+                {
+                    _pendingSilentRefresh = false;
+                    _ = RefreshCoreAsync(silent: true);
+                }
+            }
         }
     }
 
@@ -299,6 +376,7 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, ID
     {
         Stats = stats;
         FetchCount++;
+        HasData = true;
 
         TotalText = FormatTokens(stats.Total.Total);
         StepsText = $"{stats.Steps} 次";
@@ -454,8 +532,22 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, ID
 
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         _disposed = true;
         _timer.Stop();
+
+        try
+        {
+            _lifetime.Cancel();
+            _lifetime.Dispose();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
     }
 }
 

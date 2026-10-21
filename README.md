@@ -184,7 +184,8 @@ dotnet run --project tools/IconGen -c Release -- src/StickyTodo.App/Assets/stick
 
 **Token 用量看板**
 - **数据来自本机 opencode 数据库**（默认 `~/.local/share/opencode/opencode.db`，可在设置里改路径），**完全不联网**，只读打开、不写别人的库
-- 数据库里 v1（`message`）与 v2（`session_message`）两套消息表并存，**不能相加**（6–9 月会重复）；实现以 v2 为准，再补 v1 里 id 不在 v2 的早期漏迁消息
+- 只读 `session_message`（v2）一张表；旧版 `message`（v1）内容已全部迁入 v2、官方不再写它，代码里完全忽略
+- **切换范围不卡**：整段 JSON 每行只解析一次（多路径 `json_extract`）、时间条件下推进 WHERE、一条 SQL 同时算汇总/趋势/模型；历史日期按天缓存在内存里，只有"今天"每次重算
 - **自动刷新间隔 5 / 15 / 30 秒**可选，也可以随时点 ⟳ 手动刷新
 - **统计范围**：今天（按小时）/ 近 3 天 / 近 7 天 / 近 30 天（7 天以上自动按天聚合）
 - 顶部汇总：总 token、调用次数、缓存比例，下面一行拆开显示输入 / 输出 / 推理 / 缓存读
@@ -374,7 +375,8 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 - **节假日/调休数据是手工录入的**（覆盖 2024–2026 年），国务院每年 11 月左右发布次年安排，届时需要往 `ChineseHolidays` 里补数据；超出范围的年份只有「周末休息」的默认判断。
 - **二十四节气用通用日数公式计算**，个别年份可能与官方历书差一天（公式内的特例表已覆盖已知偏差）。
 - **黄历的宜忌是按建除十二神给的通用条目**，不是逐日通书，只作参考；不涉及择日、神煞、时辰吉凶。
-- **Token 看板依赖 opencode 的库表结构**（`session_message` / `message` 的 JSON 字段）。opencode 改版导致字段变动时读数会变 0，需要跟着调整 SQL；库不存在时页脚会提示去设置里指定路径。
+- **Token 看板依赖 opencode 的库表结构**（`session_message.data` 里的 `tokens` / `model` 字段）。opencode 改版导致字段变动时读数会变 0，需要跟着调整 SQL；库不存在时页脚会提示去设置里指定路径。
+- Token 看板的**首次**打开某个大范围（近 30 天要读 100MB+）仍需 1 秒左右，之后同一范围是毫秒级；历史日期的缓存只存在内存里，重启程序后第一次进入需要重算。
 - Token 统计的是**消息级用量累加**，与 opencode 自己按会话累加的 `session_v2.tokens_*` 在口径上可能有细微差别（消息级更细，也更能按时间分桶）。
 - 重复待办的完成历史目前只记录、未展示（将来用在「本月完成了多少次」这类统计上）。
 - UI 层没有自动化测试，靠 `--selftest` / `--recurrence-demo` / `--shot` 做回归。

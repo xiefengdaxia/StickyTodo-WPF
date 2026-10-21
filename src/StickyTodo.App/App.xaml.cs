@@ -902,16 +902,40 @@ public partial class App : System.Windows.Application
 
             // 1) 切到近 7 天：粒度应变 day，且要重新取数
             var before = window.FetchCount;
-            await window.SelectRangeForTestAsync(7);
+            var msWeek = await window.SelectRangeForTestAsync(7);
             var week = window.DescribeForTest();
-            Log.Information("[token] 切到近7天：{State}（取数 +{Calls}）", week, window.FetchCount - before);
+            Log.Information("[token] 切到近7天：耗时 {Ms}ms，{State}", msWeek, week);
             ok &= week.Contains("范围=7") && week.Contains("粒度=day") && window.FetchCount > before;
 
             // 2) 切回今天：粒度回 hour
-            await window.SelectRangeForTestAsync(0);
+            var msToday = await window.SelectRangeForTestAsync(0);
             var today = window.DescribeForTest();
-            Log.Information("[token] 切回今天：{State}", today);
+            Log.Information("[token] 切回今天：耗时 {Ms}ms，{State}", msToday, today);
             ok &= today.Contains("范围=0") && today.Contains("粒度=hour");
+
+            // 2b) 近 30 天（会跨到 v1 表，是最慢的一档）
+            var ms30 = await window.SelectRangeForTestAsync(30);
+            Log.Information("[token] 切到近30天：耗时 {Ms}ms，{State}", ms30, window.DescribeForTest());
+
+            // 各档位耗时都要在可接受范围内（切换不该有明显卡顿）
+            var slowest = Math.Max(msWeek, Math.Max(msToday, ms30));
+            Log.Information("[token] 最慢一档 {Ms}ms（阈值 3000ms）", slowest);
+            ok &= slowest < 3000;
+
+            // 2b2) 再切一次近 30 天：历史日期已按天缓存，这次只重算今天，应该很快
+            var ms30Again = await window.SelectRangeForTestAsync(30);
+            Log.Information("[token] 再次切到近30天（历史已缓存）：{Ms}ms", ms30Again);
+            ok &= ms30Again < 400;
+
+            // 2c) 切回看过的范围应"秒开"：有缓存就直接铺上，不等数据库
+            var msCached = window.SelectRangeImmediate(7);
+            await Task.Delay(200);
+            Log.Information("[token] 切回近7天（有缓存）：{Ms}ms 出数据，界面={State}",
+                msCached, window.DescribeForTest());
+            ok &= msCached < 100 && window.DescribeForTest().Contains("范围=7");
+
+            // 回到今天，后面的断言按小时粒度走
+            await window.SelectRangeForTestAsync(0);
 
             // 3) 手动刷新
             before = window.FetchCount;

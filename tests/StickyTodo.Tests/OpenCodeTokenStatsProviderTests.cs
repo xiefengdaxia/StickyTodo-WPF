@@ -5,10 +5,10 @@ namespace StickyTodo.Tests;
 
 /// <summary>
 /// 本机 opencode 读库逻辑的测试。
-/// 用临时库按真实表结构建最小数据集，重点验证三件容易错的事：
-///   1. v1/v2 两套消息表不能重复计数；
-///   2. 按小时/按天聚合必须限定在时间窗口内；
-///   3. 模型取自 JSON 的 model.id / modelID 两种写法。
+/// 用临时库按真实表结构建最小数据集，重点验证：
+///   1. 按小时/按天聚合必须限定在时间窗口内（曾出过"23 点包含全历史"的 bug）；
+///   2. 模型取自 JSON 的 model.id / modelID 两种写法；
+///   3. v1 表（message）即使存在也不再被读取。
 /// </summary>
 public sealed class OpenCodeTokenStatsProviderTests : IDisposable
 {
@@ -90,7 +90,7 @@ public sealed class OpenCodeTokenStatsProviderTests : IDisposable
         command.Parameters.AddWithValue("$id", id);
         command.Parameters.AddWithValue("$ts", at.ToUnixTimeMilliseconds());
         command.Parameters.AddWithValue("$data",
-            $"{{\"role\":\"assistant\",\"modelID\":\"old-model\",\"providerID\":\"p\",\"tokens\":{{\"input\":{input},\"output\":10,\"reasoning\":5,\"cache\":{{\"read\":100,\"write\":2}}}}}}");
+            $"{{\"role\":\"assistant\",\"modelID\":\"v1-model\",\"providerID\":\"p\",\"tokens\":{{\"input\":{input},\"output\":10,\"reasoning\":5,\"cache\":{{\"read\":100,\"write\":2}}}}}}");
         command.ExecuteNonQuery();
     }
 
@@ -118,41 +118,24 @@ public sealed class OpenCodeTokenStatsProviderTests : IDisposable
     }
 
     [Fact]
-    public async Task SameIdInBothTables_IsCountedOnce()
+    public async Task V1Table_IsIgnored()
     {
         var now = DateTimeOffset.Now;
 
         using (var connection = new SqliteConnection(_connectionString))
         {
             connection.Open();
-            // 同一个 id 在两套表里各一条 → 只算一次
-            InsertV2(connection, "msg_same", now, 1000, """{"id":"m1","providerID":"p"}""");
-            InsertV1(connection, "msg_same", now, 1000);
+            InsertV2(connection, "msg_v2", now, 1000, """{"id":"m1","providerID":"p"}""");
+            // v1 里塞一条 v2 没有的记录：不应被读到（内容已全部迁到 v2，v1 不再使用）
+            InsertV1(connection, "msg_v1_only", now, 999_999);
         }
 
         var stats = await CreateProvider().FetchAsync(0, "hour");
 
-        // 1000 输入 + 10 输出 + 5 推理 + 100 缓存读 + 2 缓存写
-        Assert.Equal(1117, stats.Total.Total);
         Assert.Equal(1, stats.Steps);
-    }
-
-    [Fact]
-    public async Task V1OnlyMessages_AreIncluded()
-    {
-        var now = DateTimeOffset.Now;
-
-        using (var connection = new SqliteConnection(_connectionString))
-        {
-            connection.Open();
-            InsertV2(connection, "msg_a", now, 1000, """{"id":"m1","providerID":"p"}""");
-            InsertV1(connection, "msg_legacy", now, 200); // v2 里没有 → 要补上
-        }
-
-        var stats = await CreateProvider().FetchAsync(0, "hour");
-
-        Assert.Equal(2, stats.Steps);
-        Assert.Equal(1117 + 317, stats.Total.Total);
+        // 1000 + 10 + 5 + 100 + 2
+        Assert.Equal(1117, stats.Total.Total);
+        Assert.DoesNotContain(stats.Models, m => m.ModelId == "v1-model");
     }
 
     [Fact]
@@ -160,8 +143,8 @@ public sealed class OpenCodeTokenStatsProviderTests : IDisposable
     {
         var today = DateTimeOffset.Now.Date;
         var yesterday = today.AddDays(-1);
-        var todayMorning = new DateTimeOffset(today.AddHours(9));
-        var yesterdayMorning = new DateTimeOffset(yesterday.AddHours(9));
+        var todayMorning = new DateTimeOffset(today.AddHours(0).AddMinutes(30));
+        var yesterdayMorning = new DateTimeOffset(yesterday.AddHours(0).AddMinutes(30));
 
         using (var connection = new SqliteConnection(_connectionString))
         {
@@ -174,21 +157,17 @@ public sealed class OpenCodeTokenStatsProviderTests : IDisposable
 
         Assert.Equal(24, stats.Series.Count);
 
-        // 9 点只应包含今天的量，不能被昨天的同小时污染
-        var nine = stats.Series[9];
-        Assert.Equal(1, nine.Steps);
-        Assert.Equal(500 + 10 + 5 + 100 + 2, nine.Total);
+        // 0 点只应包含今天的量，不能被昨天的同小时污染
+        Assert.Equal(1, stats.Series[0].Steps);
+        Assert.Equal(500 + 10 + 5 + 100 + 2, stats.Series[0].Total);
 
-        // 其余时段为空
-        Assert.All(stats.Series.Where(p => p.Label != "09:00"), p => Assert.Equal(0, p.Total));
+        Assert.All(stats.Series.Skip(1), p => Assert.Equal(0, p.Total));
     }
 
     [Fact]
     public async Task DailyBuckets_CoverWholeRangeAndIgnoreOutside()
     {
         var today = DateTimeOffset.Now.Date;
-
-        // 全部用"已经过去"的时刻：今天 00:30、昨天 10:00；另塞一条 20 天前的
         var todayEarly = new DateTimeOffset(today.AddMinutes(30));
         var yesterdayTen = new DateTimeOffset(today.AddDays(-1).AddHours(10));
 
@@ -206,8 +185,7 @@ public sealed class OpenCodeTokenStatsProviderTests : IDisposable
         Assert.Equal(today.AddDays(-2).ToString("yyyy-MM-dd"), stats.Series[0].Key);
         Assert.Equal(today.ToString("yyyy-MM-dd"), stats.Series[2].Key);
 
-        // 每条消息 = input + 10 输出 + 5 推理 + 100 缓存读 + 2 缓存写
-        // 昨天 100 → 217，今天 200 → 317；20 天前那条在窗口外，不能算进来
+        // 每条 = input + 10 输出 + 5 推理 + 100 缓存读 + 2 缓存写
         Assert.Equal(217, stats.Series[1].Total);
         Assert.Equal(317, stats.Series[2].Total);
         Assert.Equal(534, stats.Series.Sum(p => p.Total));
@@ -215,7 +193,7 @@ public sealed class OpenCodeTokenStatsProviderTests : IDisposable
     }
 
     [Fact]
-    public async Task Models_AreReadFromBothJsonShapes()
+    public async Task Models_AreReadFromNestedAndFlatJson()
     {
         var now = DateTimeOffset.Now;
 
@@ -223,14 +201,23 @@ public sealed class OpenCodeTokenStatsProviderTests : IDisposable
         {
             connection.Open();
             InsertV2(connection, "msg_v2", now, 1000, """{"id":"new-model","providerID":"magpie"}""");
-            InsertV1(connection, "msg_v1", now, 100); // 扁平 modelID / providerID
+
+            // 另一种写法：扁平 modelID / providerID
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                INSERT INTO session_message (id, session_id, type, seq, time_created, time_updated, data)
+                VALUES ('msg_flat', 'ses_1', 'assistant', 2, $ts, $ts,
+                        '{"role":"assistant","modelID":"flat-model","providerID":"prov","tokens":{"input":100,"output":10,"reasoning":5,"cache":{"read":100,"write":2}}}')
+                """;
+            command.Parameters.AddWithValue("$ts", now.ToUnixTimeMilliseconds());
+            command.ExecuteNonQuery();
         }
 
         var stats = await CreateProvider().FetchAsync(0, "hour");
 
         Assert.Equal(2, stats.Models.Count);
         Assert.Contains(stats.Models, m => m.ModelId == "new-model" && m.ProviderId == "magpie");
-        Assert.Contains(stats.Models, m => m.ModelId == "old-model" && m.ProviderId == "p");
+        Assert.Contains(stats.Models, m => m.ModelId == "flat-model" && m.ProviderId == "prov");
     }
 
     [Fact]
@@ -285,5 +272,23 @@ public sealed class OpenCodeTokenStatsProviderTests : IDisposable
         Assert.All(stats.Series, p => Assert.Equal(0, p.Total));
         Assert.Equal(0, stats.Steps);
         Assert.Empty(stats.Models);
+    }
+
+    [Fact]
+    public async Task RowsWithZeroTokens_DoNotBreakAggregation()
+    {
+        var now = DateTimeOffset.Now;
+
+        using (var connection = new SqliteConnection(_connectionString))
+        {
+            connection.Open();
+            InsertV2(connection, "msg_zero", now, 0, """{"id":"m1","providerID":"p"}""");
+        }
+
+        var stats = await CreateProvider().FetchAsync(0, "hour");
+
+        // 只有 10 输出 + 5 推理 + 100 缓存读 + 2 缓存写
+        Assert.Equal(117, stats.Total.Total);
+        Assert.Equal(1, stats.Steps);
     }
 }
