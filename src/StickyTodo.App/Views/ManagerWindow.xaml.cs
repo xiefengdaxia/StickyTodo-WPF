@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
 using StickyTodo.App.Services;
@@ -291,6 +291,24 @@ public partial class ManagerWindow : Window
 
     private async void CreateToken_Click(object sender, RoutedEventArgs e) =>
         await CreateBoardAsync(BoardKind.Token);
+
+    private void CreateWeather_Click(object sender, RoutedEventArgs e) =>
+        _ = OpenToolWindowAsync(ToolWindowKind.Weather);
+
+    private void CreateWorldClock_Click(object sender, RoutedEventArgs e) =>
+        _ = OpenToolWindowAsync(ToolWindowKind.WorldClock);
+
+    private void CreateDesktopClock_Click(object sender, RoutedEventArgs e) =>
+        _ = OpenToolWindowAsync(ToolWindowKind.DesktopClock);
+
+    /// <summary>打开工具型窗口（天气/世界时钟/桌面时钟）。这些窗口不对应看板数据。</summary>
+    private async Task OpenToolWindowAsync(ToolWindowKind kind)
+    {
+        if (Application.Current is App app)
+        {
+            await app.OpenToolWindowAsync(kind);
+        }
+    }
 
     private async Task CreateBoardAsync(BoardKind kind)
     {

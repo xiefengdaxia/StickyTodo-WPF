@@ -1,0 +1,58 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:StickyTodo.Notes.Localization"
+        xmlns:vm="using:StickyTodo.Notes.ViewModels"
+        x:Class="StickyTodo.Notes.Views.WorldClockBoardWindow"
+        Title="世界时钟"
+        Width="520" Height="640"
+        MinWidth="420" MinHeight="520"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent"
+        CanResize="True"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterScreen"
+        FontFamily="Microsoft YaHei UI, Segoe UI"
+        UseLayoutRounding="True">
+
+  <Border Name="NoteRoot" Classes="note">
+    <Grid RowDefinitions="Auto,*">
+
+      <Border Name="TitleBar" Classes="header" CornerRadius="11,11,0,0" Padding="12,8">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="🌍" FontSize="12" VerticalAlignment="Center" />
+            <TextBlock Text="世界时钟" Classes="title" Margin="6,0,0,0" VerticalAlignment="Center" />
+          </StackPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+            <Button Classes="chrome" Content="🎨" FontSize="11" ToolTip.Tip="{loc:Loc chrome.appearance}"
+                    Click="Appearance_Click" />
+            <Button Classes="chrome" Content="✕" FontSize="11" ToolTip.Tip="{loc:Loc chrome.close}" Click="Close_Click" />
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="10,8,10,10">
+        <ItemsControl ItemsSource="{Binding Clocks}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:WorldClockRow">
+              <Border Margin="2,3" Padding="14,9" CornerRadius="9" Background="{DynamicResource Brush.Surface}">
+                <Grid ColumnDefinitions="*,Auto,Auto">
+                  <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding CityName}" FontSize="14" FontWeight="SemiBold"
+                               Foreground="{DynamicResource Brush.Ink}" />
+                    <TextBlock Text="{Binding CountryName}" Classes="caption" />
+                  </StackPanel>
+                  <TextBlock Grid.Column="1" Text="{Binding DateText}" Classes="caption"
+                             VerticalAlignment="Center" Margin="0,0,14,0" />
+                  <TextBlock Grid.Column="2" Text="{Binding TimeText}" FontSize="22" FontWeight="Light"
+                             Foreground="{DynamicResource Brush.Ink}" VerticalAlignment="Center" />
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Grid>
+  </Border>
+</Window>

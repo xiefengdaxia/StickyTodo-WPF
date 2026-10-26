@@ -6,6 +6,7 @@ using Avalonia.Threading;
 using StickyTodo.Core.Localization;
 using StickyTodo.Infrastructure;
 using StickyTodo.Notes.Services;
+using StickyTodo.Notes.ViewModels;
 using StickyTodo.Notes.Views;
 
 namespace StickyTodo.Notes;
@@ -146,6 +147,20 @@ public partial class App : Application
 
             services.ShowSettings();
             services.ShowPomodoro();
+
+            // 工具窗口演示：--weather-demo / --worldclock-demo / --desktopclock-demo
+            if (HasFlag(args, "--weather-demo"))
+            {
+                services.OpenToolWindow(ToolWindowKind.Weather);
+            }
+            if (HasFlag(args, "--worldclock-demo"))
+            {
+                services.OpenToolWindow(ToolWindowKind.WorldClock);
+            }
+            if (HasFlag(args, "--desktopclock-demo"))
+            {
+                services.OpenToolWindow(ToolWindowKind.DesktopClock);
+            }
         }
 
         // 退出回归：验证托盘图标与快捷键被正确清理（--exit-trial）

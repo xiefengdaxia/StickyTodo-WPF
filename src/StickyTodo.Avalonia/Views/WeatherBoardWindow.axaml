@@ -1,0 +1,186 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:StickyTodo.Notes.Localization"
+        xmlns:vm="using:StickyTodo.Notes.ViewModels"
+        x:Class="StickyTodo.Notes.Views.WeatherBoardWindow"
+        Title="天气"
+        Width="880" Height="960"
+        MinWidth="720" MinHeight="760"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent"
+        CanResize="True"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterScreen"
+        FontFamily="Microsoft YaHei UI, Segoe UI"
+        UseLayoutRounding="True">
+
+  <Window.Styles>
+    <Style Selector="TextBlock.h2">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.InkSoft}" />
+    </Style>
+    <Style Selector="Button.cityTab">
+      <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
+      <Setter Property="Padding" Value="18,5" />
+      <Setter Property="Margin" Value="0,0,8,8" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="Root" CornerRadius="4" Background="{TemplateBinding Background}">
+            <ContentPresenter Name="PART_ContentPresenter"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                              Margin="{TemplateBinding Padding}" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="Button.cityTab:selected">
+      <Setter Property="Background" Value="#FF2C3E50" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="Border.metric">
+      <Setter Property="Padding" Value="14,10" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Background" Value="#11FFFFFF" />
+      <Setter Property="Margin" Value="4,0" />
+    </Style>
+  </Window.Styles>
+
+  <Border Name="NoteRoot" Classes="note">
+    <Grid RowDefinitions="Auto,*">
+
+      <Border Name="TitleBar" Classes="header" CornerRadius="11,11,0,0" Padding="12,8">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="🌤" FontSize="12" VerticalAlignment="Center" />
+            <TextBlock Text="天气" Classes="title" Margin="6,0,0,0" VerticalAlignment="Center" />
+          </StackPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+            <Button Classes="chrome" Content="🎨" FontSize="11" ToolTip.Tip="{loc:Loc chrome.appearance}"
+                    Click="Appearance_Click" />
+            <Button Classes="chrome" Content="✕" FontSize="11" ToolTip.Tip="{loc:Loc chrome.close}" Click="Close_Click" />
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <Grid Grid.Row="1" Margin="18,12,18,14" RowDefinitions="Auto,Auto,Auto,*">
+
+        <Grid Grid.Row="0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0" Text="所有城市" Classes="h2" VerticalAlignment="Top" Margin="0,8,10,0" />
+          <ItemsControl Grid.Column="1" ItemsSource="{Binding Cities}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:WeatherCityRow">
+                <Button Classes="cityTab" Classes.selected="{Binding IsSelected}"
+                        Content="{Binding Name}" Click="City_Click" Tag="{Binding}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Grid>
+
+        <Grid Grid.Row="1" Margin="2,4,2,10" ColumnDefinitions="*,Auto">
+          <StackPanel Grid.Column="0" Orientation="Horizontal">
+            <TextBlock Text="📍" FontSize="13" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding CurrentCity}" FontSize="13" FontWeight="SemiBold"
+                       Foreground="{DynamicResource Brush.Ink}" Margin="6,0,0,0" />
+            <TextBlock Text="（默认城市）" Classes="caption" Margin="4,0,0,0" />
+          </StackPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal">
+            <TextBlock Text="{Binding UpdatedText}" Classes="caption" VerticalAlignment="Center" />
+            <Button Classes="chrome" Content="⟳" FontSize="13" VerticalAlignment="Center"
+                    Margin="6,0,0,0" Command="{Binding LoadCommand}" />
+          </StackPanel>
+        </Grid>
+
+        <StackPanel Grid.Row="2" Margin="2,0,2,16">
+          <TextBlock Text="实时天气" Classes="h2" Margin="0,0,0,10" />
+          <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+            <TextBlock Text="{Binding CurrentIcon}" FontSize="46" VerticalAlignment="Center"
+                       Margin="0,0,14,0" Foreground="#FFFFB300" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+              <TextBlock Text="{Binding CurrentTempText}" FontSize="40" FontWeight="Light"
+                         Foreground="{DynamicResource Brush.Ink}" VerticalAlignment="Center" />
+              <TextBlock Text="{Binding CurrentText}" FontSize="14"
+                         Foreground="{DynamicResource Brush.InkSoft}"
+                         VerticalAlignment="Bottom" Margin="10,0,0,10" />
+            </StackPanel>
+            <UniformGrid Grid.Column="2" Columns="4" VerticalAlignment="Center">
+              <Border Classes="metric">
+                <StackPanel>
+                  <TextBlock Text="空气质量" Classes="caption" HorizontalAlignment="Center" />
+                  <TextBlock Text="{Binding AirQualityText}" FontSize="15" HorizontalAlignment="Center"
+                             Foreground="{DynamicResource Brush.Ink}" Margin="0,6,0,0" />
+                </StackPanel>
+              </Border>
+              <Border Classes="metric">
+                <StackPanel>
+                  <TextBlock Text="空气指数" Classes="caption" HorizontalAlignment="Center" />
+                  <TextBlock Text="{Binding AirQualityIndexText}" FontSize="15" HorizontalAlignment="Center"
+                             Foreground="{DynamicResource Brush.Ink}" Margin="0,6,0,0" />
+                </StackPanel>
+              </Border>
+              <Border Classes="metric">
+                <StackPanel>
+                  <TextBlock Text="风力" Classes="caption" HorizontalAlignment="Center" />
+                  <TextBlock Text="{Binding CurrentWind}" FontSize="15" HorizontalAlignment="Center"
+                             Foreground="{DynamicResource Brush.Ink}" Margin="0,6,0,0" />
+                </StackPanel>
+              </Border>
+              <Border Classes="metric">
+                <StackPanel>
+                  <TextBlock Text="湿度" Classes="caption" HorizontalAlignment="Center" />
+                  <TextBlock Text="{Binding HumidityText}" FontSize="15" HorizontalAlignment="Center"
+                             Foreground="{DynamicResource Brush.Ink}" Margin="0,6,0,0" />
+                </StackPanel>
+              </Border>
+            </UniformGrid>
+          </Grid>
+        </StackPanel>
+
+        <StackPanel Grid.Row="3">
+          <TextBlock Text="天气预报" Classes="h2" Margin="0,0,0,10" />
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Days}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><UniformGrid Columns="7" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:WeatherDayRow">
+                  <StackPanel Margin="2,0" HorizontalAlignment="Center">
+                    <TextBlock Text="{Binding DayLabel}" FontSize="14" HorizontalAlignment="Center"
+                               Foreground="{DynamicResource Brush.Ink}" />
+                    <TextBlock Text="{Binding DateLabel}" Classes="caption" HorizontalAlignment="Center" Margin="0,2,0,8" />
+                    <TextBlock Text="{Binding IconGlyph}" FontSize="26" HorizontalAlignment="Center" Foreground="#FFFFB300" />
+                    <TextBlock Text="{Binding Text}" FontSize="12" HorizontalAlignment="Center"
+                               Foreground="{DynamicResource Brush.Ink}" Margin="0,6,0,0" />
+                    <TextBlock Text="{Binding TempMaxText}" FontSize="13" HorizontalAlignment="Center"
+                               Foreground="#FFE67E22" Margin="0,14,0,0" />
+                    <TextBlock Text="{Binding TempMinText}" FontSize="13" HorizontalAlignment="Center"
+                               Foreground="#FF3498DB" Margin="0,18,0,0" />
+                    <TextBlock Text="{Binding IconGlyph2}" FontSize="26" HorizontalAlignment="Center"
+                               Foreground="#FFFFB300" Margin="0,14,0,0" />
+                    <TextBlock Text="{Binding Text}" FontSize="12" HorizontalAlignment="Center"
+                               Foreground="{DynamicResource Brush.Ink}" Margin="0,6,0,0" />
+                    <TextBlock Text="{Binding Wind}" Classes="caption" HorizontalAlignment="Center" Margin="0,4,0,0" />
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </StackPanel>
+      </Grid>
+    </Grid>
+  </Border>
+</Window>

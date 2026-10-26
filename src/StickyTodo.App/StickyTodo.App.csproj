@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -32,6 +32,7 @@
   <ItemGroup>
     <ProjectReference Include="..\StickyTodo.Core\StickyTodo.Core.csproj" />
     <ProjectReference Include="..\StickyTodo.Infrastructure\StickyTodo.Infrastructure.csproj" />
+    <ProjectReference Include="..\StickyTodo.Weather\StickyTodo.Weather.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,0 +1,55 @@
+<Window x:Class="StickyTodo.App.Views.DesktopClockWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="桌面时钟"
+        Width="300"
+        SizeToContent="Height"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Topmost="True"
+        FontFamily="Microsoft YaHei UI"
+        UseLayoutRounding="True">
+
+    <Border x:Name="NoteRoot"
+            Margin="8"
+            CornerRadius="12"
+            Background="#F02F2A26"
+            BorderBrush="#59FFFFFF"
+            BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="16" ShadowDepth="3" Opacity="0.35" Color="#FF000000" Direction="270" />
+        </Border.Effect>
+
+        <StackPanel Margin="16,12,16,14" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+
+            <!-- 日期与星期 -->
+            <Grid>
+                <TextBlock Text="{Binding SolarDateText}" FontSize="15" FontWeight="SemiBold"
+                           Foreground="#FFF0E6D8" />
+                <TextBlock Text="{Binding WeekdayText}" FontSize="13"
+                           Foreground="#FFCFC3B4" HorizontalAlignment="Right" />
+            </Grid>
+
+            <!-- 农历 -->
+            <TextBlock Text="{Binding LunarText}" FontSize="11.5"
+                       Foreground="#FF9E9284" Margin="0,4,0,0" />
+
+            <!-- 时间 -->
+            <TextBlock Text="{Binding TimeText}" FontSize="38" FontWeight="Light"
+                       Foreground="#FFF6EFE4" Margin="0,4,0,0" />
+
+            <!-- 天气（就绪后轮播） -->
+            <Border Height="1" Background="#26FFFFFF" Margin="0,10,0,8" />
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding WeatherLine}" FontSize="12.5"
+                           Foreground="#FFE8A85C" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding WeatherDetail}" FontSize="11"
+                           Foreground="#FF9E9284" Margin="8,0,0,0"
+                           VerticalAlignment="Center" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

@@ -1,12 +1,13 @@
 namespace StickyTodo.Core.Entities;
 
-/// <summary>看板类型：待办清单、便签/随笔、日历、Token 用量。</summary>
+/// <summary>看板类型：待办清单、便签/随笔、日历、Token 用量、天气。</summary>
 public enum BoardKind
 {
     Todo = 0,
     Memo = 1,
     Calendar = 2,
     Token = 3,
+    Weather = 4,
 }
 
 public static class BoardKinds
@@ -15,12 +16,14 @@ public static class BoardKinds
     public const string Memo = "memo";
     public const string Calendar = "calendar";
     public const string Token = "token";
+    public const string Weather = "weather";
 
     public static string ToStorage(BoardKind kind) => kind switch
     {
         BoardKind.Memo => Memo,
         BoardKind.Calendar => Calendar,
         BoardKind.Token => Token,
+        BoardKind.Weather => Weather,
         _ => Todo,
     };
 
@@ -29,6 +32,7 @@ public static class BoardKinds
         Memo => BoardKind.Memo,
         Calendar => BoardKind.Calendar,
         Token => BoardKind.Token,
+        Weather => BoardKind.Weather,
         _ => BoardKind.Todo,
     };
 
@@ -37,6 +41,7 @@ public static class BoardKinds
         BoardKind.Memo => "便签看板",
         BoardKind.Calendar => "日历看板",
         BoardKind.Token => "Token 看板",
+        BoardKind.Weather => "天气看板",
         _ => "待办看板",
     };
 }

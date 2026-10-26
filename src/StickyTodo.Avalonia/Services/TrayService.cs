@@ -88,6 +88,9 @@ public sealed class TrayService : IDisposable
         menu.Add(Item(Loc.T("tray.manager"), () => ShowManager()));
         menu.Add(Item(Loc.T("common.settings"), () => _services.ShowSettings()));
         menu.Add(Item(Loc.T("tray.pomodoro"), () => _services.ShowPomodoro()));
+        menu.Add(Item("天气", () => _services.OpenToolWindow(ToolWindowKind.Weather)));
+        menu.Add(Item("世界时钟", () => _services.OpenToolWindow(ToolWindowKind.WorldClock)));
+        menu.Add(Item("桌面时钟", () => _services.OpenToolWindow(ToolWindowKind.DesktopClock)));
 
         _boardsMenu = new NativeMenu();
         menu.Add(new NativeMenuItem { Header = Loc.T("tray.boards"), Menu = _boardsMenu });

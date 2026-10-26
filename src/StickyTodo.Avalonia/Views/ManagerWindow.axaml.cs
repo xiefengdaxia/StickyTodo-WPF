@@ -128,6 +128,15 @@ public partial class ManagerWindow : Window
     private async void CreateToken_Click(object? sender, RoutedEventArgs e) =>
         await CreateBoardAsync(BoardKind.Token, Loc.T("manager.newToken"), "Token");
 
+    private void CreateWeather_Click(object? sender, RoutedEventArgs e) =>
+        App.Services?.OpenToolWindow(ToolWindowKind.Weather);
+
+    private void CreateWorldClock_Click(object? sender, RoutedEventArgs e) =>
+        App.Services?.OpenToolWindow(ToolWindowKind.WorldClock);
+
+    private void CreateDesktopClock_Click(object? sender, RoutedEventArgs e) =>
+        App.Services?.OpenToolWindow(ToolWindowKind.DesktopClock);
+
     private async Task CreateBoardAsync(BoardKind kind, string title, string initial)
     {
         var name = await PromptWindow.PromptAsync(this, title, Loc.T("manager.boardName"), initial);

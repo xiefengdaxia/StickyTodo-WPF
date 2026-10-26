@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- 多目标与 Core 一致：net8.0 给 WPF 版，net6.0 给 Avalonia 版 -->
+    <TargetFrameworks>net8.0;net6.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\StickyTodo.Core\StickyTodo.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,4 +1,4 @@
-﻿# StickyTodo
+# StickyTodo
 
 **简体中文** | [English](README.en.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
 
@@ -127,7 +127,7 @@ publish-avalonia/
   StickyTodo-Avalonia-1.0.0-win-x86-portable.zip   # ~35 MB
 ```
 
-功能与 WPF 版对齐：待办看板、便签、日历（农历/节气/黄历）、Token 用量、番茄钟、提醒、托盘、全局快捷键、皮肤与透明度、四语言热切换、会话恢复、便携模式。
+功能与 WPF 版对齐：待办看板、便签、日历（农历/节气/黄历）、Token 用量、番茄钟、提醒、托盘、全局快捷键、皮肤与透明度、四语言热切换、会话恢复、便携模式，以及 **天气看板**（Open-Meteo 免费接口，唯一联网功能）、**世界时钟**（全球十大城市）、**桌面时钟挂件**（阳历/农历/时间/天气轮播）。
 
 > **Win7 上的已知限制**：Win7 只能用 `RedirectionSurface` 合成，**不支持窗口透明**，所以便签会以直角、不透明外观显示（Win8+ 保持圆角与半透明）。
 

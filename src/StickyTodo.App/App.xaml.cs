@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Threading;
 using System.Windows;
 using System.Windows.Media;
@@ -16,6 +16,7 @@ using StickyTodo.Core.Entitlements;
 using StickyTodo.Core.Recurrence;
 using StickyTodo.Core.Services;
 using StickyTodo.Infrastructure;
+using StickyTodo.Weather;
 using StickyTodo.Infrastructure.Persistence;
 
 namespace StickyTodo.App;
@@ -296,6 +297,20 @@ public partial class App : System.Windows.Application
             tray.Start();
 
             StartReminderPump(tray);
+
+            // 工具窗口演示参数：--weather-demo / --worldclock-demo / --desktopclock-demo
+            if (e.Args.Contains("--weather-demo", StringComparer.OrdinalIgnoreCase))
+            {
+                OpenTool(ToolWindowKind.Weather);
+            }
+            if (e.Args.Contains("--worldclock-demo", StringComparer.OrdinalIgnoreCase))
+            {
+                OpenTool(ToolWindowKind.WorldClock);
+            }
+            if (e.Args.Contains("--desktopclock-demo", StringComparer.OrdinalIgnoreCase))
+            {
+                OpenTool(ToolWindowKind.DesktopClock);
+            }
             AttachHotKeys(manager);
 
             // 开机自启：注册表与用户设置对齐（换了安装路径时自动更新）
@@ -437,6 +452,9 @@ public partial class App : System.Windows.Application
                 services.AddSingleton<ReminderPump>();
                 services.AddSingleton<HotKeyService>();
                 services.AddSingleton<AutoStartService>();
+                services.AddSingleton<Weather.WeatherService>();
+                services.AddSingleton<ViewModels.WorldClockViewModel>();
+                services.AddSingleton<ViewModels.DesktopClockViewModel>();
                 services.AddSingleton<Core.Abstractions.ITokenStatsProvider>(sp =>
                 {
                     if (TokenProviderOverride is not null)
@@ -456,8 +474,84 @@ public partial class App : System.Windows.Application
                 services.AddSingleton<ManagerWindow>();
                 services.AddSingleton<SettingsViewModel>();
                 services.AddSingleton<SettingsWindow>();
+                services.AddTransient<ViewModels.WeatherViewModel>();
+                services.AddTransient<WeatherWindow>();
+                services.AddTransient<WorldClockWindow>();
+                services.AddTransient<DesktopClockWindow>();
             })
             .Build();
+    }
+
+    /// <summary>天气窗口的外观菜单（皮肤 + 透明度），天气/世界时钟窗口共用。</summary>
+    public void ShowWeatherAppearanceMenu(Window window, FrameworkElement? target)
+    {
+        var skin = _host!.Services.GetRequiredService<SkinService>();
+        var settings = _host.Services.GetRequiredService<AppSettingsService>();
+        var menu = Views.WeatherMenuBuilder.Build(skin, settings);
+
+        if (target is not null)
+        {
+            menu.PlacementTarget = target;
+        }
+
+        menu.IsOpen = true;
+    }
+
+    /// <summary>打开工具型窗口（天气 / 世界时钟 / 桌面时钟）。单例：重复点只是激活已有窗口。</summary>
+    public async Task OpenToolWindowAsync(ToolWindowKind kind)
+    {
+        var services = _host!.Services;
+
+        Window window = kind switch
+        {
+            ToolWindowKind.Weather => GetOrCreateToolWindow("weather", () =>
+            {
+                var vm = services.GetRequiredService<ViewModels.WeatherViewModel>();
+                var w = new WeatherWindow(vm);
+                w.Closed += (_, _) => _toolWindows.Remove("weather");
+                return w;
+            }),
+            ToolWindowKind.WorldClock => GetOrCreateToolWindow("worldclock", () =>
+            {
+                var w = services.GetRequiredService<WorldClockWindow>();
+                w.Closed += (_, _) => _toolWindows.Remove("worldclock");
+                return w;
+            }),
+            ToolWindowKind.DesktopClock => GetOrCreateToolWindow("desktopclock", () =>
+            {
+                var w = services.GetRequiredService<DesktopClockWindow>();
+                w.Closed += (_, _) => _toolWindows.Remove("desktopclock");
+                return w;
+            }),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+        };
+
+        if (!window.IsVisible)
+        {
+            window.Show();
+        }
+
+        if (window.WindowState == WindowState.Minimized)
+        {
+            window.WindowState = WindowState.Normal;
+        }
+
+        window.Activate();
+        await Task.CompletedTask;
+    }
+
+    private readonly Dictionary<string, Window> _toolWindows = new();
+
+    private Window GetOrCreateToolWindow(string key, Func<Window> factory)
+    {
+        if (_toolWindows.TryGetValue(key, out var existing) && existing.IsLoaded)
+        {
+            return existing;
+        }
+
+        var window = factory();
+        _toolWindows[key] = window;
+        return window;
     }
 
     /// <summary>
@@ -2865,6 +2959,48 @@ public partial class App : System.Windows.Application
     }
 
     /// <summary>打开（或激活）设置窗口。托盘菜单和主窗体左侧入口都走这里。</summary>
+
+
+    /// <summary>打开工具型窗口（天气 / 世界时钟 / 桌面时钟）。单例。</summary>
+    public void OpenTool(ToolWindowKind kind)
+    {
+        var services = _host!.Services;
+        var key = kind.ToString();
+
+        if (_toolWindows.TryGetValue(key, out var existing) && existing.IsLoaded)
+        {
+            ShowAndActivateCompat(existing);
+            return;
+        }
+
+        Window window = kind switch
+        {
+            ToolWindowKind.Weather => new Views.WeatherWindow(services.GetRequiredService<ViewModels.WeatherViewModel>()),
+            ToolWindowKind.WorldClock => new Views.WorldClockWindow(services.GetRequiredService<ViewModels.WorldClockViewModel>()),
+            ToolWindowKind.DesktopClock => new Views.DesktopClockWindow(services.GetRequiredService<ViewModels.DesktopClockViewModel>()),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+        };
+
+        _toolWindows[key] = window;
+        window.Show();
+    }
+
+    /// <summary>ShowAndActivate 兼容方法。</summary>
+    private static void ShowAndActivateCompat(Window window)
+    {
+        if (!window.IsVisible)
+        {
+            window.Show();
+        }
+
+        if (window.WindowState == WindowState.Minimized)
+        {
+            window.WindowState = WindowState.Normal;
+        }
+
+        window.Activate();
+    }
+
     public void ShowSettings()
     {
         if (_host is null)

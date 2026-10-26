@@ -23,7 +23,8 @@ Avalonia 官方**不支持** Windows 7，Win7 属于 best-effort：
 ## 2. 工程结构
 
 ```
-src/StickyTodo.Core/            # 业务/实体/日历，多目标 net8.0;net6.0
+src/StickyTodo.Core/            # 业务/实体/日历，多目标 net8.0;net6.0（零网络依赖）
+src/StickyTodo.Weather/         # 天气数据（Open-Meteo），多目标 net8.0;net6.0，独立程序集
 src/StickyTodo.Infrastructure/  # SQLite/Dapper/Token，多目标 net8.0;net6.0
 src/StickyTodo.Avalonia/        # Avalonia UI（net6.0，命名空间 StickyTodo.Notes）
 tools/publish-avalonia-win7.ps1 # Win7 便携包发布脚本
@@ -56,7 +57,15 @@ WPF 版（`src/StickyTodo.App`）保持 `net8.0-windows` 不变，两者共用 C
 | 会话恢复、开机自启、单实例 | ✅ | ✅ |
 | 窗口尺寸记忆 + 边缘缩放 | ✅ | ✅ |
 | 便携模式（`portable.marker`） | ✅ | ✅ |
+| 天气看板（城市切换、实时+7天预报、空气质量） | ✅ | ✅ |
+| 世界时钟（全球十大城市、秒级刷新） | ✅ | ✅ |
+| 桌面时钟挂件（阳历/农历/时间/天气轮播，置顶小窗） | ✅ | ✅ |
 | 动效（淡入、悬停过渡） | ✅ | 部分（淡入/悬停；Avalonia 无 WPF 触发器动画） |
+
+> **联网说明**：天气看板是全应用唯一的联网功能，数据来自
+> [Open-Meteo](https://open-meteo.com/)（免费、无需注册）。天气代码放独立程序集
+> `StickyTodo.Weather`，Core 保持零网络依赖（有 NoNetworkTests 红线测试守护）。
+> 其余所有功能依旧全程本地。
 
 ## 4. 关键兼容设置
 
@@ -243,6 +252,9 @@ dotnet run --project src\StickyTodo.Avalonia\StickyTodo.Avalonia.csproj -- --dem
 | `--selftest` | 无界面自检，退出码 0/1 |
 | `--drag-trial <file>` | 拖拽排序回归：自动验证把手事件、落点解析与数据库写入，结果写进文件 |
 | `--exit-trial` | 退出回归：验证托盘图标与快捷键被正确清理 |
+| `--weather-demo` | 启动时打开天气看板 |
+| `--worldclock-demo` | 启动时打开世界时钟 |
+| `--desktopclock-demo` | 启动时打开桌面时钟挂件 |
 
 ## 8. 发布 Win7 便携包
 

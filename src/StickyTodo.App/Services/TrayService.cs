@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Extensions.DependencyInjection;
@@ -66,6 +66,18 @@ public sealed class TrayService : IDisposable
         var pomodoro = new WinForms.ToolStripMenuItem(Loc.T("tray.pomodoro"));
         pomodoro.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(ShowPomodoro);
         menu.Items.Add(pomodoro);
+
+        var weather = new WinForms.ToolStripMenuItem("天气");
+        weather.Click += (_, _) => (System.Windows.Application.Current as App)?.OpenTool(ToolWindowKind.Weather);
+        menu.Items.Add(weather);
+
+        var worldClock = new WinForms.ToolStripMenuItem("世界时钟");
+        worldClock.Click += (_, _) => (System.Windows.Application.Current as App)?.OpenTool(ToolWindowKind.WorldClock);
+        menu.Items.Add(worldClock);
+
+        var desktopClock = new WinForms.ToolStripMenuItem("桌面时钟");
+        desktopClock.Click += (_, _) => (System.Windows.Application.Current as App)?.OpenTool(ToolWindowKind.DesktopClock);
+        menu.Items.Add(desktopClock);
 
         _boardsMenu = new WinForms.ToolStripMenuItem(Loc.T("tray.boards"));
         menu.Items.Add(_boardsMenu);

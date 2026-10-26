@@ -56,7 +56,13 @@
             <Button Content="{loc:Loc manager.newCalendar}" Classes="ghost" HorizontalContentAlignment="Left"
                     Padding="12,8" Margin="0,0,0,6" Click="CreateCalendar_Click" />
             <Button Content="{loc:Loc manager.newToken}" Classes="ghost" HorizontalContentAlignment="Left"
-                    Padding="12,8" Margin="0,0,0,14" Click="CreateToken_Click" />
+                    Padding="12,8" Margin="0,0,0,6" Click="CreateToken_Click" />
+            <Button Content="+  天气看板" Classes="ghost" HorizontalContentAlignment="Left"
+                    Padding="12,8" Margin="0,0,0,6" Click="CreateWeather_Click" />
+            <Button Content="+  世界时钟" Classes="ghost" HorizontalContentAlignment="Left"
+                    Padding="12,8" Margin="0,0,0,6" Click="CreateWorldClock_Click" />
+            <Button Content="+  桌面时钟" Classes="ghost" HorizontalContentAlignment="Left"
+                    Padding="12,8" Margin="0,0,0,14" Click="CreateDesktopClock_Click" />
 
             <TextBlock Text="{loc:Loc manager.selected}" Classes="section" Margin="2,0,0,7" />
             <Button Content="{loc:Loc common.rename}" Classes="ghost" HorizontalContentAlignment="Left"

@@ -1,3 +1,4 @@
+using Avalonia.Controls;
 using Avalonia.Threading;
 using StickyTodo.Core.Abstractions;
 using StickyTodo.Core.Entitlements;
@@ -126,6 +127,57 @@ public sealed class AppServices : IDisposable
     {
         Windows.CloseBoard(boardId);
         _ = Manager.RefreshAsync();
+    }
+
+    // ---------------- 工具型窗口（天气 / 世界时钟 / 桌面时钟） ----------------
+
+    private readonly Dictionary<string, Window> _toolWindows = new();
+
+    private Weather.WeatherService? _weatherService;
+
+    /// <summary>天气服务（惰性创建；只有打开天气/桌面时钟才会用到网络）。</summary>
+    public Weather.WeatherService Weather => _weatherService ??= new Weather.WeatherService();
+
+    /// <summary>打开工具型窗口。单例：重复点只是激活已有窗口。</summary>
+    public void OpenToolWindow(ToolWindowKind kind)
+    {
+        var key = kind switch
+        {
+            ToolWindowKind.Weather => "weather",
+            ToolWindowKind.WorldClock => "worldclock",
+            ToolWindowKind.DesktopClock => "desktopclock",
+            _ => string.Empty,
+        };
+
+        if (key.Length == 0)
+        {
+            return;
+        }
+
+        if (_toolWindows.TryGetValue(key, out var existing) && existing.IsVisible)
+        {
+            if (existing.WindowState == WindowState.Minimized)
+            {
+                existing.WindowState = WindowState.Normal;
+            }
+
+            existing.Activate();
+            return;
+        }
+
+        Window window = kind switch
+        {
+            ToolWindowKind.Weather => new Views.WeatherBoardWindow(
+                new ViewModels.WeatherViewModel(Weather, Settings)),
+            ToolWindowKind.WorldClock => new Views.WorldClockBoardWindow(
+                new ViewModels.WorldClockViewModel()),
+            ToolWindowKind.DesktopClock => new Views.DesktopClockBoardWindow(
+                new ViewModels.DesktopClockViewModel(Weather, Settings)),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+        };
+
+        _toolWindows[key] = window;
+        window.Show();
     }
 
     /// <summary>退出：先固化会话，再关窗，最后清理托盘与快捷键。</summary>

@@ -60,6 +60,9 @@ public sealed class AppSettingsService
     /// <summary>番茄钟今日完成个数。</summary>
     public const string PomodoroCountTodayKey = "pomodoro.count";
 
+    /// <summary>天气看板的城市列表（逗号分隔，第一个为默认城市）。</summary>
+    public const string WeatherCitiesKey = "weather.cities";
+
     /// <summary>番茄钟计数对应的日期（用来跨天清零）。</summary>
     public const string PomodoroCountDateKey = "pomodoro.countDate";
 
@@ -222,6 +225,29 @@ public sealed class AppSettingsService
         }
         set => _repository.SetSetting(OpenBoardsKey, string.Join(",", value));
     }
+
+    /// <summary>天气看板的城市列表（中文城市名）。默认【双峰、岳麓、芙蓉、苏州、炎陵、杭州】。</summary>
+    public IReadOnlyList<string> WeatherCities
+    {
+        get
+        {
+            var raw = GetString(WeatherCitiesKey, null);
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return DefaultWeatherCities;
+            }
+
+            var cities = raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            return cities.Length > 0 ? cities : DefaultWeatherCities;
+        }
+        set => _repository.SetSetting(WeatherCitiesKey, string.Join(",", value));
+    }
+
+    /// <summary>默认城市列表（与参考 UI 一致）。</summary>
+    public static readonly IReadOnlyList<string> DefaultWeatherCities =
+    [
+        "双峰", "岳麓", "芙蓉", "苏州", "炎陵", "杭州",
+    ];
 
     public static double ClampOpacity(double value)
     {

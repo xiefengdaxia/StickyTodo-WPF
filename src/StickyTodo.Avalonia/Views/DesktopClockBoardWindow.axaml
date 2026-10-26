@@ -1,0 +1,47 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:StickyTodo.Notes.ViewModels"
+        x:Class="StickyTodo.Notes.Views.DesktopClockBoardWindow"
+        Title="桌面时钟"
+        Width="300"
+        SizeToContent="Height"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Topmost="True"
+        TransparencyBackgroundFallback="#F02F2A26"
+        FontFamily="Microsoft YaHei UI, Segoe UI"
+        UseLayoutRounding="True">
+
+  <Border Name="NoteRoot" Background="#F02F2A26" CornerRadius="12"
+          BorderBrush="#59FFFFFF" BorderThickness="1"
+          BoxShadow="0 3 16 0 #59000000">
+    <StackPanel Margin="16,12,16,14" PointerPressed="Root_PointerPressed">
+
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0" Text="{Binding SolarDateText}" FontSize="15" FontWeight="SemiBold"
+                   Foreground="#FFF0E6D8" />
+        <TextBlock Grid.Column="1" Text="{Binding WeekdayText}" FontSize="13"
+                   Foreground="#FFCFC3B4" />
+      </Grid>
+
+      <TextBlock Text="{Binding LunarText}" FontSize="11.5" Foreground="#FF9E9284" Margin="0,4,0,0" />
+
+      <TextBlock Text="{Binding TimeText}" FontSize="38" FontWeight="Light"
+                 Foreground="#FFF6EFE4" Margin="0,4,0,0" />
+
+      <Border Height="1" Background="#26FFFFFF" Margin="0,10,0,8" />
+      <StackPanel Orientation="Horizontal">
+        <TextBlock Text="{Binding WeatherLine}" FontSize="12.5" Foreground="#FFE8A85C"
+                   VerticalAlignment="Center" />
+        <TextBlock Text="{Binding WeatherDetail}" FontSize="11" Foreground="#FF9E9284"
+                   Margin="8,0,0,0" VerticalAlignment="Center" />
+      </StackPanel>
+
+      <Button Classes="chrome" Content="✕" FontSize="10" HorizontalAlignment="Right"
+              Margin="0,6,0,0" Click="Close_Click" />
+    </StackPanel>
+  </Border>
+</Window>

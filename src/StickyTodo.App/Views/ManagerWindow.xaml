@@ -81,6 +81,16 @@
                                 HorizontalContentAlignment="Left" Padding="12,8" Margin="0,0,0,14"
                                 Click="CreateToken_Click" />
 
+                        <Button Content="+  天气看板" Style="{StaticResource Button.Ghost}"
+                                HorizontalContentAlignment="Left" Padding="12,8" Margin="0,0,0,6"
+                                Click="CreateWeather_Click" />
+                        <Button Content="+  世界时钟" Style="{StaticResource Button.Ghost}"
+                                HorizontalContentAlignment="Left" Padding="12,8" Margin="0,0,0,6"
+                                Click="CreateWorldClock_Click" />
+                        <Button Content="+  桌面时钟" Style="{StaticResource Button.Ghost}"
+                                HorizontalContentAlignment="Left" Padding="12,8" Margin="0,0,0,14"
+                                Click="CreateDesktopClock_Click" />
+
                         <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=manager.selected}" Style="{StaticResource Text.Section}" Margin="2,0,0,7" />
                         <Button Content="{Binding Converter={StaticResource Loc}, ConverterParameter=common.rename}" Style="{StaticResource Button.Ghost}"
                                 HorizontalContentAlignment="Left" Padding="12,8" Margin="0,0,0,6"
