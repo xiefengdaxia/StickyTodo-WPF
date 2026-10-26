@@ -39,8 +39,11 @@ public sealed class Translator : INotifyPropertyChanged
 
             _language = value;
 
-            // 通知所有 indexer 绑定刷新（WPF 用 "Item[]" 表示索引器）
+            // WPF 的索引器绑定只认 "Item[]"；
+            // Avalonia 的索引器绑定只认"所有属性都变了"的空名通知（实测）。
+            // 两个都发，两边都能刷新，互不影响。
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("Item[]"));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(string.Empty));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Language)));
             LanguageChanged?.Invoke(this, EventArgs.Empty);
         }

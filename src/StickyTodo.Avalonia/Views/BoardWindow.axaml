@@ -1,0 +1,342 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:StickyTodo.Notes.Localization"
+        xmlns:conv="using:StickyTodo.Notes.Converters"
+        xmlns:vm="using:StickyTodo.Notes.ViewModels"
+        x:Class="StickyTodo.Notes.Views.BoardWindow"
+        Title="{Binding BoardName}"
+        Width="360" Height="480"
+        MinWidth="260" MinHeight="200"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent"
+        CanResize="True"
+        ShowInTaskbar="False"
+        Opacity="{Binding WindowOpacity}"
+        Topmost="{Binding IsTopmost}"
+        FontFamily="Microsoft YaHei UI, Segoe UI"
+        UseLayoutRounding="True">
+
+  <Window.Resources>
+    <conv:BoolToVisibilityConverter x:Key="BoolToVis" />
+    <conv:InverseBoolConverter x:Key="InverseBool" />
+    <conv:NullToCollapsedConverter x:Key="NullToCollapsed" />
+    <conv:HexToBrushConverter x:Key="HexToBrush" />
+  </Window.Resources>
+
+  <Window.Styles>
+    <!-- 行悬停时才显出操作按钮 -->
+    <Style Selector="StackPanel.rowActions">
+      <Setter Property="Opacity" Value="0" />
+    </Style>
+    <Style Selector="ListBoxItem:pointerover StackPanel.rowActions">
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="TextBox.rowTitle.done">
+      <Setter Property="Opacity" Value="0.55" />
+    </Style>
+    <Style Selector="Grid.dragging">
+      <Setter Property="Opacity" Value="0.4" />
+    </Style>
+    <!-- 置顶图钉：没置顶时淡显 -->
+    <Style Selector="TextBlock.pin">
+      <Setter Property="Opacity" Value="0.35" />
+    </Style>
+    <Style Selector="TextBlock.pin.active">
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+  </Window.Styles>
+
+  <!-- 外层留出阴影空间，真正的便签是里面这张圆角纸 -->
+  <Border Name="NoteRoot" Classes="note">
+    <Grid RowDefinitions="Auto,*,Auto">
+
+      <!-- 标题栏：拖动区 + 悬浮按钮 -->
+      <Border Name="TitleBar" Classes="header" CornerRadius="11,11,0,0" Padding="12,6">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel Grid.Column="0" VerticalAlignment="Center" Orientation="Horizontal">
+            <TextBlock Text="{Binding BoardName}"
+                       Classes="title"
+                       TextTrimming="CharacterEllipsis"
+                       VerticalAlignment="Center" />
+            <TextBlock Text=" 🔒" FontSize="11" VerticalAlignment="Center"
+                       ToolTip.Tip="{loc:Loc chrome.unlockTip}"
+                       IsVisible="{Binding IsLocked}" />
+          </StackPanel>
+
+          <!-- 平时淡显，指针移入窗口才完全显示 -->
+          <StackPanel Name="Chrome" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top"
+                      Opacity="0.35" PointerEntered="Chrome_PointerEntered" PointerExited="Chrome_PointerExited">
+
+            <Button Classes="chrome" ToolTip.Tip="{loc:Loc chrome.topmost}" Click="ToggleTopmost_Click">
+              <TextBlock Text="📌" FontSize="11" Classes="pin" Classes.active="{Binding IsTopmost}" />
+            </Button>
+
+            <Button Classes="chrome" ToolTip.Tip="{loc:Loc chrome.lockTip}" Click="ToggleLock_Click">
+              <Panel>
+                <TextBlock FontSize="11" Text="🔓" IsVisible="{Binding !IsLocked}" />
+                <TextBlock FontSize="11" Text="🔒" IsVisible="{Binding IsLocked}" />
+              </Panel>
+            </Button>
+
+            <Button Classes="chrome" Content="🎨" FontSize="11"
+                    ToolTip.Tip="{loc:Loc chrome.appearance}" Click="Appearance_Click" />
+            <Button Classes="chrome" Content="⋯" FontSize="13"
+                    ToolTip.Tip="{loc:Loc chrome.manageAndTags}" Click="OpenManager_Click" />
+            <Button Classes="chrome" Content="✕" FontSize="11"
+                    ToolTip.Tip="{loc:Loc chrome.closeBoard}" Click="Close_Click" />
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <!-- 内容区：锁定时整块禁用 -->
+      <Grid Grid.Row="1" IsEnabled="{Binding !IsLocked}" RowDefinitions="Auto,*,Auto">
+
+        <!-- 标签筛选 -->
+        <Grid Grid.Row="0" Margin="12,10,12,0" ColumnDefinitions="*,Auto">
+          <ItemsControl Name="ChipList" Grid.Column="0" ItemsSource="{Binding Chips}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Button Classes="chip"
+                        Classes.selected="{Binding IsSelected}"
+                        Classes.dropTarget="{Binding IsDropTarget}"
+                        ToolTip.Tip="{Binding ChipToolTip}"
+                        Tag="{Binding}"
+                        Click="Chip_Click"
+                        PointerPressed="Chip_PointerPressed">
+                  <StackPanel Orientation="Horizontal">
+                    <Ellipse Width="7" Height="7" Margin="0,0,5,0" VerticalAlignment="Center"
+                             Fill="{Binding Color, Converter={StaticResource HexToBrush}}" />
+                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding Count, StringFormat=' {0}'}" Opacity="0.6" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <Button Grid.Column="1"
+                  Content="{loc:Loc board.addTag}"
+                  VerticalAlignment="Top"
+                  Classes="ghost"
+                  FontSize="11"
+                  Padding="8,3"
+                  ToolTip.Tip="{loc:Loc board.addTagTip}"
+                  Click="AddTag_Click" />
+        </Grid>
+
+        <!-- 待办列表 -->
+        <Grid Grid.Row="1" Margin="0,8,0,0" RowDefinitions="*,Auto">
+          <ListBox Name="TodoList"
+                   Grid.Row="0"
+                   Classes="flat todoRows"
+                   ItemsSource="{Binding Rows}"
+                   Background="Transparent"
+                   PointerPressed="TodoList_PointerPressed">
+
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:TodoRowViewModel">
+                <Grid ColumnDefinitions="Auto,*,Auto,64" RowDefinitions="Auto,Auto,Auto"
+                      Classes.dragging="{Binding IsDragging}">
+
+                  <!-- 拖拽插入线 -->
+                  <Border Grid.Row="0" Grid.ColumnSpan="4" Height="2" Background="{DynamicResource Brush.Accent}"
+                          IsVisible="{Binding IsDragTarget}" />
+
+                  <!-- 拖动把手 -->
+                  <Border Grid.Row="1" Grid.RowSpan="2" Grid.Column="0"
+                          Width="16"
+                          VerticalAlignment="Center"
+                          Background="Transparent"
+                          Cursor="SizeAll"
+                          ToolTip.Tip="{loc:Loc board.dragHandleTip}"
+                          PointerPressed="DragHandle_PointerPressed"
+                          PointerMoved="DragHandle_PointerMoved"
+                          PointerReleased="DragHandle_PointerReleased"
+                          PointerCaptureLost="DragHandle_PointerCaptureLost">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                      <Ellipse Width="2" Height="2" Fill="{DynamicResource Brush.InkSoft}" Opacity="0.45" />
+                      <Ellipse Width="2" Height="2" Fill="{DynamicResource Brush.InkSoft}" Opacity="0.45" Margin="0,1.5" />
+                      <Ellipse Width="2" Height="2" Fill="{DynamicResource Brush.InkSoft}" Opacity="0.45" />
+                    </StackPanel>
+                  </Border>
+
+                  <!-- 标题：点行内任意位置都能编辑 -->
+                  <TextBox Grid.Row="1" Grid.Column="1"
+                           Classes="inline rowTitle"
+                           Classes.done="{Binding IsDone}"
+                           Text="{Binding Title, Mode=TwoWay}"
+                           HorizontalAlignment="Stretch"
+                           VerticalAlignment="Center"
+                           GotFocus="RowTitle_GotFocus"
+                           LostFocus="RowTitle_LostFocus"
+                           KeyDown="RowTitle_KeyDown"
+                           Tag="{Binding}" />
+
+                  <!-- 标签：固定在右侧 -->
+                  <TextBlock Grid.Row="1" Grid.Column="2"
+                             Text="{Binding TagText}"
+                             FontSize="10"
+                             Margin="6,0,6,0"
+                             MaxWidth="96"
+                             VerticalAlignment="Center"
+                             TextTrimming="CharacterEllipsis"
+                             ToolTip.Tip="{Binding TagText}"
+                             Foreground="{DynamicResource Brush.Accent}"
+                             Opacity="0.85"
+                             IsVisible="{Binding HasTags}" />
+
+                  <!-- 编辑错误提示 -->
+                  <TextBlock Grid.Row="1" Grid.Column="3"
+                             Text="{Binding EditError}"
+                             FontSize="10"
+                             Margin="0,0,4,0"
+                             VerticalAlignment="Center"
+                             TextTrimming="CharacterEllipsis"
+                             Foreground="{DynamicResource Brush.Danger}"
+                             IsVisible="{Binding EditError, Converter={StaticResource NullToCollapsed}}" />
+
+                  <!-- 第二行：完成时间 / 倒数日 / 提醒 / 重复 -->
+                  <WrapPanel Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2"
+                             Margin="-5,1,0,0"
+                             Orientation="Horizontal"
+                             VerticalAlignment="Center"
+                             IsVisible="{Binding HasMeta}">
+                    <Border Margin="0,0,5,0" Padding="5,1" CornerRadius="6" Background="#332E7D32"
+                            IsVisible="{Binding HasDoneAt}">
+                      <TextBlock Text="{Binding DoneAtText}" FontSize="10" Foreground="{DynamicResource Brush.Success}" />
+                    </Border>
+
+                    <Border Margin="0,0,5,0" Padding="5,1" CornerRadius="6" Background="#33C0392B"
+                            IsVisible="{Binding HasCountdown}">
+                      <TextBlock Text="{Binding CountdownText}" FontSize="10" VerticalAlignment="Center"
+                                 Foreground="{DynamicResource Brush.Accent}">
+                        <TextBlock.Styles>
+                          <Style Selector="TextBlock">
+                            <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}" />
+                          </Style>
+                        </TextBlock.Styles>
+                      </TextBlock>
+                    </Border>
+
+                    <TextBlock Text="{Binding RemindText}" FontSize="10" Margin="0,0,5,0"
+                               VerticalAlignment="Center" Opacity="0.8"
+                               Foreground="{DynamicResource Brush.InkSoft}"
+                               IsVisible="{Binding HasReminder}" />
+
+                    <Border Margin="0,0,5,0" Padding="5,1" CornerRadius="6" Background="#332E7D32"
+                            VerticalAlignment="Center" IsVisible="{Binding IsRecurring}">
+                      <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="🔁 " FontSize="9" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding RecurrenceText}" FontSize="10"
+                                   VerticalAlignment="Center" Foreground="{DynamicResource Brush.Success}" />
+                      </StackPanel>
+                    </Border>
+                  </WrapPanel>
+
+                  <!-- 悬停操作区 -->
+                  <StackPanel Grid.Row="1" Grid.RowSpan="2" Grid.Column="3"
+                              Classes="rowActions"
+                              Orientation="Horizontal"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Center">
+
+                    <Button Classes="rowAction" ToolTip.Tip="{loc:Loc row.markDone}"
+                            IsVisible="{Binding !IsDone}" Tag="{Binding}" Click="RowDone_Click">
+                      <Path Data="M 0.5,5.5 L 4.2,9.2 L 10.5,2"
+                            Stroke="{DynamicResource Brush.Accent}"
+                            StrokeThickness="1.9"
+                            StrokeLineCap="Round"
+                            StrokeJoin="Round" />
+                    </Button>
+
+                    <Button Classes="rowAction" ToolTip.Tip="{loc:Loc row.undo}"
+                            IsVisible="{Binding IsDone}" Tag="{Binding}" Click="RowUndone_Click">
+                      <Path Data="M 2.5,2 L 2.5,6 L 6.5,6 M 2.9,5.9 A 4.2,4.2 0 1 0 5.4,1"
+                            Stroke="{DynamicResource Brush.Accent}"
+                            StrokeThickness="1.7"
+                            StrokeLineCap="Round"
+                            StrokeJoin="Round" />
+                    </Button>
+
+                    <Button Classes="rowDelete" ToolTip.Tip="{loc:Loc row.delete}"
+                            Tag="{Binding}" Click="RowDelete_Click" />
+                  </StackPanel>
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+
+          <!-- 空列表提示 -->
+          <TextBlock Grid.Row="0"
+                     Text="{Binding EmptyHint}"
+                     HorizontalAlignment="Center"
+                     VerticalAlignment="Center"
+                     Margin="0,-20,0,0"
+                     Foreground="{DynamicResource Brush.InkSoft}"
+                     IsHitTestVisible="False"
+                     IsVisible="{Binding HasNoRows}" />
+
+          <!-- 末尾的「草稿行」 -->
+          <Border Grid.Row="1"
+                  Margin="6,0,6,2"
+                  Padding="12,4"
+                  CornerRadius="7"
+                  Background="#1AFFFFFF"
+                  BorderBrush="{DynamicResource Brush.Line}"
+                  BorderThickness="1">
+            <Grid ColumnDefinitions="Auto,*">
+              <TextBlock Grid.Column="0" Text="＋" FontSize="12" Margin="0,0,10,0"
+                         VerticalAlignment="Center" Foreground="{DynamicResource Brush.InkSoft}" />
+
+              <TextBox Name="DraftBox" Grid.Column="1"
+                       Classes="inline"
+                       IsEnabled="{Binding CanAdd}"
+                       Text="{Binding DraftTitle, Mode=TwoWay}"
+                       Watermark="{Binding DraftPlaceholder}"
+                       GotFocus="DraftBox_GotFocus"
+                       LostFocus="DraftBox_LostFocus"
+                       KeyDown="DraftBox_KeyDown" />
+            </Grid>
+          </Border>
+        </Grid>
+
+        <!-- 底部：状态 + TODO/Done 视图切换 -->
+        <Border Grid.Row="2"
+                BorderBrush="{DynamicResource Brush.Line}"
+                BorderThickness="0,1,0,0"
+                Padding="10,6"
+                Margin="0,4,0,0">
+          <Grid ColumnDefinitions="*,Auto">
+            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+              <TextBlock Text="{Binding StatusText}" Classes="caption" TextTrimming="CharacterEllipsis" />
+              <TextBlock Text="{Binding ErrorText}" FontSize="10"
+                         Foreground="{DynamicResource Brush.Danger}"
+                         TextTrimming="CharacterEllipsis"
+                         IsVisible="{Binding ErrorText, Converter={StaticResource NullToCollapsed}}" />
+            </StackPanel>
+
+            <Border Grid.Column="1" CornerRadius="9" Background="{DynamicResource Brush.ChipIdle}"
+                    BorderBrush="{DynamicResource Brush.Line}" BorderThickness="1" Padding="2">
+              <StackPanel Orientation="Horizontal">
+                <Button Name="TodoTab" Classes="segment" Classes.active="{Binding IsTodoView}"
+                        ToolTip.Tip="{loc:Loc view.todoTip}" Click="TodoTab_Click">
+                  <TextBlock Text="{Binding TodoViewText}" />
+                </Button>
+                <Button Name="DoneTab" Classes="segment" Classes.active="{Binding IsDoneView}"
+                        ToolTip.Tip="{loc:Loc view.doneTip}" Click="DoneTab_Click">
+                  <TextBlock Text="{Binding DoneViewText}" />
+                </Button>
+              </StackPanel>
+            </Border>
+          </Grid>
+        </Border>
+      </Grid>
+    </Grid>
+  </Border>
+</Window>

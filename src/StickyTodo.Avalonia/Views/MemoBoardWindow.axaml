@@ -1,0 +1,78 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:StickyTodo.Notes.Localization"
+        x:Class="StickyTodo.Notes.Views.MemoBoardWindow"
+        Title="{Binding BoardName}"
+        Width="380" Height="420"
+        MinWidth="240" MinHeight="180"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent"
+        CanResize="True"
+        ShowInTaskbar="False"
+        Opacity="{Binding WindowOpacity}"
+        Topmost="{Binding IsTopmost}"
+        FontFamily="Microsoft YaHei UI, Segoe UI"
+        UseLayoutRounding="True">
+
+  <Window.Styles>
+    <Style Selector="TextBlock.pin">
+      <Setter Property="Opacity" Value="0.35" />
+    </Style>
+    <Style Selector="TextBlock.pin.active">
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+  </Window.Styles>
+
+  <Border Name="NoteRoot" Classes="note">
+    <Grid RowDefinitions="Auto,*,Auto">
+
+      <Border Name="TitleBar" Classes="header" CornerRadius="11,11,0,0" Padding="12,8">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel Grid.Column="0" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="{Binding BoardName}" Classes="title" TextTrimming="CharacterEllipsis" />
+              <TextBlock Text=" 🔒" FontSize="11" VerticalAlignment="Center" IsVisible="{Binding IsLocked}" />
+            </StackPanel>
+            <TextBlock Text="{Binding StatusText}" Classes="caption" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+
+          <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+            <Button Classes="chrome" ToolTip.Tip="{loc:Loc chrome.topmost}" Click="ToggleTopmost_Click">
+              <TextBlock Text="📌" FontSize="11" Classes="pin" Classes.active="{Binding IsTopmost}" />
+            </Button>
+            <Button Classes="chrome" ToolTip.Tip="{loc:Loc chrome.lockTip}" Click="ToggleLock_Click">
+              <Panel>
+                <TextBlock FontSize="11" Text="🔓" IsVisible="{Binding !IsLocked}" />
+                <TextBlock FontSize="11" Text="🔒" IsVisible="{Binding IsLocked}" />
+              </Panel>
+            </Button>
+            <Button Classes="chrome" Content="🎨" FontSize="11"
+                    ToolTip.Tip="{loc:Loc chrome.appearance}" Click="Appearance_Click" />
+            <Button Classes="chrome" Content="⋯" FontSize="13"
+                    ToolTip.Tip="{loc:Loc chrome.manage}" Click="OpenManager_Click" />
+            <Button Classes="chrome" Content="✕" FontSize="11"
+                    ToolTip.Tip="{loc:Loc chrome.close}" Click="Close_Click" />
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <!-- 整块就是一张纸：无边框输入，边写边存 -->
+      <TextBox Name="Editor"
+               Grid.Row="1"
+               Classes="note"
+               Text="{Binding Content, Mode=TwoWay}"
+               IsEnabled="{Binding !IsLocked}"
+               TextChanged="Editor_TextChanged" />
+
+      <Border Grid.Row="2" BorderBrush="{DynamicResource Brush.Line}" BorderThickness="0,1,0,0" Padding="12,6">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Grid.Column="0" Text="{loc:Loc memo.placeholder}" Classes="caption" Opacity="0.75"
+                     VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+          <TextBlock Grid.Column="1" Text="{Binding ErrorText}" FontSize="11"
+                     Foreground="{DynamicResource Brush.Danger}" TextTrimming="CharacterEllipsis" />
+        </Grid>
+      </Border>
+    </Grid>
+  </Border>
+</Window>

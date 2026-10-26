@@ -1,0 +1,95 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:StickyTodo.Notes.Localization"
+        xmlns:conv="using:StickyTodo.Notes.Converters"
+        x:Class="StickyTodo.Notes.Views.PomodoroWindow"
+        Title="StickyTodo Pomodoro"
+        Width="260" Height="330"
+        MinWidth="240" MinHeight="300"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent"
+        CanResize="True"
+        ShowInTaskbar="False"
+        Topmost="True"
+        FontFamily="Microsoft YaHei UI, Segoe UI"
+        UseLayoutRounding="True">
+
+  <Border Name="NoteRoot" Classes="note" CornerRadius="14">
+    <Grid RowDefinitions="Auto,*,Auto">
+
+      <Border Name="TitleBar" Classes="header" CornerRadius="13,13,0,0" Padding="12,7"
+              PointerPressed="TitleBar_PointerPressed">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="🍅" FontSize="12" VerticalAlignment="Center" />
+            <TextBlock Text="{loc:Loc pomodoro.title}" Classes="title" Margin="6,0,0,0" VerticalAlignment="Center" />
+          </StackPanel>
+          <Button Grid.Column="1" Classes="chrome" Content="✕" FontSize="11"
+                  ToolTip.Tip="{loc:Loc chrome.close}" Click="Close_Click" />
+        </Grid>
+      </Border>
+
+      <Grid Grid.Row="1" Margin="14,10,14,6" RowDefinitions="*,Auto,Auto">
+
+        <Grid Grid.Row="0" MinHeight="140">
+          <Viewbox Stretch="Uniform" MaxWidth="180" MaxHeight="180">
+            <Canvas Width="180" Height="180">
+              <Ellipse Width="160" Height="160" Canvas.Left="10" Canvas.Top="10"
+                       Stroke="{DynamicResource Brush.Track}" StrokeThickness="9" />
+
+              <!-- 进度环：DashArray = 已走长度 + 剩余长度 -->
+              <Ellipse Width="160" Height="160" Canvas.Left="10" Canvas.Top="10"
+                       Stroke="{DynamicResource Brush.Accent}"
+                       StrokeThickness="9"
+                       StrokeLineCap="Round"
+                       RenderTransformOrigin="50%,50%"
+                       StrokeDashArray="{Binding Progress,
+                           Converter={x:Static conv:ProgressToDashArrayConverter.Instance},
+                           ConverterParameter=474.4}">
+                <Ellipse.RenderTransform>
+                  <RotateTransform Angle="-90" />
+                </Ellipse.RenderTransform>
+              </Ellipse>
+
+              <StackPanel Canvas.Left="0" Canvas.Top="62" Width="180">
+                <TextBlock Text="{Binding TimeText}"
+                           FontSize="38"
+                           FontWeight="Light"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource Brush.Ink}" />
+                <TextBlock Text="{Binding PhaseText}"
+                           FontSize="12"
+                           Margin="0,2,0,0"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource Brush.InkSoft}" />
+              </StackPanel>
+            </Canvas>
+          </Viewbox>
+        </Grid>
+
+        <TextBlock Grid.Row="1" Text="{Binding RoundText}" Classes="caption"
+                   HorizontalAlignment="Center" Margin="0,0,0,2" />
+        <TextBlock Grid.Row="2" Text="{Binding TodayText}" Classes="caption"
+                   HorizontalAlignment="Center" Opacity="0.7" />
+      </Grid>
+
+      <Border Grid.Row="2" BorderBrush="{DynamicResource Brush.Line}" BorderThickness="0,1,0,0" Padding="12,9">
+        <StackPanel>
+          <Button Content="{Binding PrimaryActionText}" Classes="primary"
+                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                  Padding="0,8" FontSize="13" Click="Toggle_Click" />
+
+          <Grid Margin="0,6,0,0" ColumnDefinitions="*,*">
+            <Button Grid.Column="0" Content="{loc:Loc pomodoro.reset}" Classes="ghost"
+                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                    Padding="0,5" FontSize="11" Margin="0,0,3,0" Click="Reset_Click" />
+            <Button Grid.Column="1" Content="{loc:Loc pomodoro.skip}" Classes="ghost"
+                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                    Padding="0,5" FontSize="11" Margin="3,0,0,0" Click="Skip_Click" />
+          </Grid>
+        </StackPanel>
+      </Border>
+    </Grid>
+  </Border>
+</Window>

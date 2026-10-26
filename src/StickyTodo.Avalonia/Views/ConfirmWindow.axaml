@@ -1,0 +1,30 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:StickyTodo.Notes.Localization"
+        x:Class="StickyTodo.Notes.Views.ConfirmWindow"
+        Width="380"
+        SizeToContent="Height"
+        CanResize="False"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        FontFamily="Microsoft YaHei UI, Segoe UI"
+        Topmost="True">
+
+  <Border Name="Shell" Classes="note" Margin="12" CornerRadius="12">
+    <StackPanel Margin="18,16,18,16">
+      <TextBlock Name="HeadingText" FontSize="14" FontWeight="SemiBold"
+                 Foreground="{DynamicResource Brush.Ink}" TextWrapping="Wrap" />
+
+      <TextBlock Name="BodyText" Margin="0,10,0,0" FontSize="12.5"
+                 Foreground="{DynamicResource Brush.InkSoft}" TextWrapping="Wrap" />
+
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
+        <Button Content="{loc:Loc common.cancel}" Classes="ghost" Click="Cancel_Click" />
+        <Button Content="{loc:Loc common.ok}" Classes="primary" Margin="8,0,0,0" Click="Ok_Click" />
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</Window>

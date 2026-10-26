@@ -103,11 +103,35 @@ TODO / Done 视图切换：
 | 磁盘 | 约 71 MB（exe 本身）；数据几 MB 起 |
 | 权限 | 普通用户即可，**不需要管理员权限**（开机自启只写 HKCU） |
 
-不支持的：Windows 7/8/8.1（.NET 8 与 WPF 的新 DPI API 都不支持）、32 位系统、Linux/macOS。
+不支持的：Windows 7/8/8.1（.NET 8 与 WPF 的新 DPI API 都不支持）、Linux/macOS。32 位系统请使用下方 Avalonia 版。
 
 **关于临时目录**：单文件发布会把原生库（wpfgfx_cor3.dll、e_sqlite3.dll 等约 10 MB）在首次运行时解压到
 %TEMP%\.net\StickyTodo\。这意味着 %TEMP% 必须可写；如果企业的临时目录策略很严，程序会启动失败。
 需要完全免解压的话，改用「单目录自包含发布」（去掉 PublishSingleFile）即可，代价是变成一个几十个文件的文件夹。
+
+---
+
+## 0.1 Windows 7 SP1 / 32 位：Avalonia 版
+
+WPF 版受 .NET 8 限制无法支持 Win7 和 32 位系统。为此仓库里另有一个 **Avalonia 11.3.22 + .NET 6** 的完整移植版，可发布到 **Windows 7 SP1（x64 / x86）**：
+
+```powershell
+.\tools\publish-avalonia-win7.ps1 -Version 1.0.0
+```
+
+产物（self-contained 单文件，目标机无需装 .NET）：
+
+```
+publish-avalonia/
+  StickyTodo-Avalonia-1.0.0-win-x64-portable.zip   # ~38 MB
+  StickyTodo-Avalonia-1.0.0-win-x86-portable.zip   # ~35 MB
+```
+
+功能与 WPF 版对齐：待办看板、便签、日历（农历/节气/黄历）、Token 用量、番茄钟、提醒、托盘、全局快捷键、皮肤与透明度、四语言热切换、会话恢复、便携模式。
+
+> **Win7 上的已知限制**：Win7 只能用 `RedirectionSurface` 合成，**不支持窗口透明**，所以便签会以直角、不透明外观显示（Win8+ 保持圆角与半透明）。
+
+细节、兼容设置、Avalonia 移植踩坑记录与 Win7 前置补丁见 **[docs/avalonia-win7.md](docs/avalonia-win7.md)**。
 
 
 ---

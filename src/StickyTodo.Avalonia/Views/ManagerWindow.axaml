@@ -1,0 +1,166 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:StickyTodo.Notes.Localization"
+        xmlns:conv="using:StickyTodo.Notes.Converters"
+        xmlns:vm="using:StickyTodo.Notes.ViewModels"
+        x:Class="StickyTodo.Notes.Views.ManagerWindow"
+        Title="StickyTodo"
+        Height="580" Width="820"
+        MinHeight="460" MinWidth="680"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent"
+        CanResize="True"
+        WindowStartupLocation="CenterScreen"
+        FontFamily="Microsoft YaHei UI, Segoe UI"
+        UseLayoutRounding="True">
+
+  <Window.Resources>
+    <conv:NullToCollapsedConverter x:Key="NullToCollapsed" />
+  </Window.Resources>
+
+  <Border Name="Shell" Classes="shell">
+    <Grid ColumnDefinitions="210,*">
+
+      <!-- 左侧：品牌 + 操作 -->
+      <Border Grid.Column="0" Background="{DynamicResource Brush.PaperDeep}" CornerRadius="13,0,0,13"
+              Padding="16,18,14,14">
+        <Grid RowDefinitions="Auto,Auto,*,Auto">
+
+          <!-- 注意 Background 必须有值：透明 StackPanel 收不到 PointerPressed，窗口会拖不动 -->
+          <StackPanel Grid.Row="0" Name="TitleBar" Background="Transparent">
+            <StackPanel Orientation="Horizontal">
+              <Border Width="30" Height="30" CornerRadius="9" Background="{DynamicResource Brush.Accent}"
+                      VerticalAlignment="Center">
+                <TextBlock Text="S" FontSize="16" FontWeight="Bold" Foreground="White"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+              <StackPanel Margin="9,0,0,0" VerticalAlignment="Center">
+                <TextBlock Text="StickyTodo" Classes="title" />
+                <TextBlock Text="{loc:Loc manager.title}" Classes="caption" />
+              </StackPanel>
+            </StackPanel>
+
+            <Border Margin="0,12,0,0" Padding="9,6" CornerRadius="8" Background="{DynamicResource Brush.AccentSoft}">
+              <TextBlock Text="{Binding EntitlementBadge}" FontSize="10.5"
+                         Foreground="{DynamicResource Brush.Accent}" TextTrimming="CharacterEllipsis" />
+            </Border>
+          </StackPanel>
+
+          <StackPanel Grid.Row="1" Margin="0,18,0,0">
+            <TextBlock Text="{loc:Loc manager.new}" Classes="section" Margin="2,0,0,7" />
+            <Button Content="{loc:Loc manager.newTodo}" Classes="primary" HorizontalContentAlignment="Left"
+                    Padding="12,8" Margin="0,0,0,6" Click="CreateTodo_Click" />
+            <Button Content="{loc:Loc manager.newMemo}" Classes="ghost" HorizontalContentAlignment="Left"
+                    Padding="12,8" Margin="0,0,0,6" Click="CreateMemo_Click" />
+            <Button Content="{loc:Loc manager.newCalendar}" Classes="ghost" HorizontalContentAlignment="Left"
+                    Padding="12,8" Margin="0,0,0,6" Click="CreateCalendar_Click" />
+            <Button Content="{loc:Loc manager.newToken}" Classes="ghost" HorizontalContentAlignment="Left"
+                    Padding="12,8" Margin="0,0,0,14" Click="CreateToken_Click" />
+
+            <TextBlock Text="{loc:Loc manager.selected}" Classes="section" Margin="2,0,0,7" />
+            <Button Content="{loc:Loc common.rename}" Classes="ghost" HorizontalContentAlignment="Left"
+                    Padding="12,8" Margin="0,0,0,6" Click="Rename_Click" />
+            <Button Content="{loc:Loc common.delete}" Classes="ghost" HorizontalContentAlignment="Left"
+                    Padding="12,8" Click="Delete_Click" />
+          </StackPanel>
+
+          <StackPanel Grid.Row="3">
+            <Border Classes="divider" Margin="0,0,0,10" />
+            <Button Content="{loc:Loc common.settings}" Classes="ghost" HorizontalContentAlignment="Left"
+                    Padding="12,8" Margin="0,0,0,6" Click="OpenSettings_Click" />
+            <Button Content="{loc:Loc common.exit}" Classes="ghost" HorizontalContentAlignment="Left"
+                    Padding="12,8" Foreground="{DynamicResource Brush.Danger}" Click="Exit_Click" />
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <!-- 右侧：看板列表 -->
+      <Grid Grid.Column="1" RowDefinitions="Auto,*,Auto">
+
+        <!-- 标题栏：必须有背景色才能接住 PointerPressed（透明 Grid 会让事件穿透） -->
+        <Border Grid.Row="0" Name="TitleBar2" Background="Transparent" Padding="18,16,16,6">
+          <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Text="{loc:Loc manager.boards}" Classes="display" FontSize="17" />
+              <TextBlock Text="{loc:Loc manager.listHint}" Classes="caption" Margin="0,2,0,0" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+              <Button Classes="chrome" Content="－" FontSize="13"
+                      ToolTip.Tip="{loc:Loc manager.minimize}" Click="Minimize_Click" />
+              <Button Classes="chrome" Content="□" FontSize="11"
+                      ToolTip.Tip="{loc:Loc manager.maximize}" Click="Maximize_Click" />
+              <Button Classes="chromeClose" Content="✕" FontSize="11"
+                      ToolTip.Tip="{loc:Loc manager.toTray}" Click="Hide_Click" />
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <ListBox Name="BoardList" Grid.Row="1" Classes="flat boardCards" Margin="18,8,18,0"
+                 ItemsSource="{Binding Boards}"
+                 SelectedItem="{Binding SelectedBoard, Mode=TwoWay}"
+                 Background="Transparent"
+                 PointerPressed="BoardList_PointerPressed"
+                 DoubleTapped="BoardList_DoubleTapped">
+          <ListBox.ContextMenu>
+            <ContextMenu>
+              <MenuItem Header="{loc:Loc menu.open}" Click="RowMenuOpen_Click" />
+              <Separator />
+              <MenuItem Header="{loc:Loc menu.renameEllipsis}" Click="RowMenuRename_Click" />
+              <MenuItem Header="{loc:Loc common.delete}" Click="RowMenuDelete_Click" />
+            </ContextMenu>
+          </ListBox.ContextMenu>
+
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:BoardRowViewModel">
+              <Grid ColumnDefinitions="Auto,*,Auto">
+                <Border Grid.Column="0" Width="34" Height="34" CornerRadius="9"
+                        Background="{DynamicResource Brush.AccentSoft}" VerticalAlignment="Center" Margin="0,0,11,0">
+                  <TextBlock Text="{Binding KindGlyph}" FontSize="15" HorizontalAlignment="Center"
+                             VerticalAlignment="Center" Foreground="{DynamicResource Brush.Accent}" />
+                </Border>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
+                               Foreground="{DynamicResource Brush.Ink}" TextTrimming="CharacterEllipsis" />
+                    <Border Margin="7,0,0,0" Padding="6,1" CornerRadius="5" VerticalAlignment="Center"
+                            Background="{DynamicResource Brush.ChipIdle}">
+                      <TextBlock Text="{Binding KindText}" FontSize="9.5"
+                                 Foreground="{DynamicResource Brush.InkSoft}" />
+                    </Border>
+                  </StackPanel>
+                  <TextBlock Text="{Binding Summary}" Classes="caption" Margin="0,3,0,0" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding WindowHint}" FontSize="10"
+                             Foreground="{DynamicResource Brush.Accent}" VerticalAlignment="Center" Margin="0,0,7,0" />
+                  <Button Content="✕" FontSize="11" Classes="link"
+                          ToolTip.Tip="{loc:Loc manager.deleteBoard}"
+                          Tag="{Binding}" Click="DeleteRow_Click" />
+                </StackPanel>
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+
+        <TextBlock Grid.Row="1" Text="{loc:Loc manager.empty}" HorizontalAlignment="Center"
+                   VerticalAlignment="Center" Foreground="{DynamicResource Brush.InkSoft}"
+                   IsHitTestVisible="False" IsVisible="{Binding HasNoBoards}" />
+
+        <Border Grid.Row="2" BorderBrush="{DynamicResource Brush.Line}" BorderThickness="0,1,0,0"
+                Padding="18,9" Margin="0,10,0,0">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Grid.Column="0" Text="{Binding FooterHint}" Classes="caption"
+                       TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding FooterHint}" />
+            <TextBlock Grid.Column="1" Text="{Binding ErrorText}" FontSize="11"
+                       Foreground="{DynamicResource Brush.Danger}" TextTrimming="CharacterEllipsis"
+                       IsVisible="{Binding ErrorText, Converter={StaticResource NullToCollapsed}}" />
+          </Grid>
+        </Border>
+      </Grid>
+    </Grid>
+  </Border>
+</Window>

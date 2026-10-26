@@ -20,3 +20,4 @@ Thumbs.db
 .DS_Store
 # 打包产物（单文件便携版）
 publish/
+publish-avalonia/

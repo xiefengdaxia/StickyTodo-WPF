@@ -18,7 +18,12 @@ public sealed class SqliteTodoRepository : ITodoRepository
 
     public SqliteTodoRepository(string databasePath)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(databasePath);
+        // 不用 ArgumentException.ThrowIfNullOrWhiteSpace：它只在 .NET 8+ 提供，
+        // 本程序集同时要跑在 net6.0（Windows 7）上。
+        if (string.IsNullOrWhiteSpace(databasePath))
+        {
+            throw new ArgumentException("数据库路径不能为空。", nameof(databasePath));
+        }
         var builder = new SqliteConnectionStringBuilder
         {
             DataSource = databasePath,

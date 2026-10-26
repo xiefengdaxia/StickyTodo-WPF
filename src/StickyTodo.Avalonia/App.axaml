@@ -1,0 +1,813 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="StickyTodo.Notes.App"
+             RequestedThemeVariant="Light">
+
+  <Application.Resources>
+    <!--
+      皮肤相关的画刷由 SkinService 在运行时覆盖（必须用 DynamicResource 才会跟着变），
+      这里给的是默认值：经典黄 + 92% 背景不透明度。
+    -->
+    <LinearGradientBrush x:Key="Brush.Paper"
+                         StartPoint="0%,0%" EndPoint="15%,100%">
+      <GradientStop Color="#EBFFF4B8" Offset="0" />
+      <GradientStop Color="#EBFBE18A" Offset="1" />
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="Brush.PaperDeep" Color="#1A3B382A" />
+    <!-- 不透明纸色：主窗体/设置页用（有圆角但不能透出桌面） -->
+    <LinearGradientBrush x:Key="Brush.PaperOpaque"
+                         StartPoint="0%,0%" EndPoint="15%,100%">
+      <GradientStop Color="#FFF4B8" Offset="0" />
+      <GradientStop Color="#FBE18A" Offset="1" />
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="Brush.Ink" Color="#FF3B382A" />
+    <SolidColorBrush x:Key="Brush.InkSoft" Color="#FF7C745E" />
+    <SolidColorBrush x:Key="Brush.Accent" Color="#FFB27F0A" />
+    <SolidColorBrush x:Key="Brush.Line" Color="#243B382A" />
+    <SolidColorBrush x:Key="Brush.ChipIdle" Color="#66FFFFFF" />
+    <SolidColorBrush x:Key="Brush.ChipActive" Color="#FFB27F0A" />
+    <SolidColorBrush x:Key="Brush.Surface" Color="#B8FFFFFF" />
+    <SolidColorBrush x:Key="Brush.SurfaceHover" Color="#E0FFFFFF" />
+    <SolidColorBrush x:Key="Brush.AccentSoft" Color="#26B27F0A" />
+    <SolidColorBrush x:Key="Brush.Track" Color="#1F3B382A" />
+
+    <!-- 语义色：这几组不随皮肤变，避免深色皮肤下红绿失真 -->
+    <SolidColorBrush x:Key="Brush.Danger" Color="#FFC0392B" />
+    <SolidColorBrush x:Key="Brush.Success" Color="#FF2E7D32" />
+
+    <!-- 统一的动效时长（毫秒），和 WPF 版保持一致的手感 -->
+    <x:Double x:Key="Motion.Fast">0.12</x:Double>
+    <x:Double x:Key="Motion.Base">0.18</x:Double>
+    <x:Double x:Key="Motion.Slow">0.26</x:Double>
+  </Application.Resources>
+
+  <Application.Styles>
+    <FluentTheme />
+
+    <!-- ==================== 排版 ==================== -->
+    <Style Selector="TextBlock.display">
+      <Setter Property="FontSize" Value="20" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
+    </Style>
+
+    <Style Selector="TextBlock.title">
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
+    </Style>
+
+    <Style Selector="TextBlock.section">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.InkSoft}" />
+    </Style>
+
+    <Style Selector="TextBlock.caption">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.InkSoft}" />
+    </Style>
+
+    <Style Selector="TextBlock.metricLabel">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Opacity" Value="0.7" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.InkSoft}" />
+    </Style>
+
+    <Style Selector="TextBlock.metricValue">
+      <Setter Property="FontSize" Value="17" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
+    </Style>
+
+    <Style Selector="TextBlock.danger">
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Danger}" />
+      <Setter Property="FontSize" Value="11" />
+    </Style>
+
+    <Style Selector="TextBlock.dim">
+      <Setter Property="Opacity" Value="0.7" />
+    </Style>
+
+    <!-- ==================== 按钮 ==================== -->
+    <!--
+      Avalonia 没有 WPF 的 Trigger，改用伪类选择器（:pointerover / :pressed / :disabled）。
+      悬停/按下用一层白色叠加的 Border 做高亮，避免直接改画刷颜色
+      （皮肤画刷是运行时换的，改色容易和状态动画打架）。
+    -->
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="{DynamicResource Brush.Accent}" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="14,7" />
+      <Setter Property="FontSize" Value="12.5" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="RenderTransformOrigin" Value="50%,50%" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Grid>
+            <Border Name="Root"
+                    Background="{TemplateBinding Background}"
+                    CornerRadius="8" />
+            <Border Name="Hover"
+                    CornerRadius="8"
+                    Background="White"
+                    Opacity="0"
+                    IsHitTestVisible="False" />
+            <ContentPresenter Name="PART_ContentPresenter"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalAlignment="Center"
+                              Margin="{TemplateBinding Padding}" />
+          </Grid>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+
+    <Style Selector="Button.primary:pointerover /template/ Border#Hover">
+      <Setter Property="Opacity" Value="0.14" />
+    </Style>
+    <Style Selector="Button.primary:pressed /template/ Border#Hover">
+      <Setter Property="Opacity" Value="0.26" />
+    </Style>
+    <Style Selector="Button.primary:pressed">
+      <Setter Property="RenderTransform" Value="scale(0.96,0.96)" />
+    </Style>
+    <Style Selector="Button.primary:disabled /template/ Border#Root">
+      <Setter Property="Opacity" Value="0.4" />
+    </Style>
+
+    <Style Selector="Button.ghost">
+      <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="13,7" />
+      <Setter Property="FontSize" Value="12.5" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Grid>
+            <Border Name="Root"
+                    Background="{TemplateBinding Background}"
+                    CornerRadius="8"
+                    BorderBrush="{DynamicResource Brush.Line}"
+                    BorderThickness="1" />
+            <Border Name="Hover"
+                    CornerRadius="8"
+                    Background="{DynamicResource Brush.Accent}"
+                    Opacity="0"
+                    IsHitTestVisible="False" />
+            <ContentPresenter Name="PART_ContentPresenter"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalAlignment="Center"
+                              Margin="{TemplateBinding Padding}" />
+          </Grid>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+
+    <Style Selector="Button.ghost:pointerover /template/ Border#Hover">
+      <Setter Property="Opacity" Value="0.10" />
+    </Style>
+    <Style Selector="Button.ghost:pressed /template/ Border#Hover">
+      <Setter Property="Opacity" Value="0.18" />
+    </Style>
+    <Style Selector="Button.ghost:disabled /template/ Border#Root">
+      <Setter Property="Opacity" Value="0.45" />
+    </Style>
+
+    <!-- 便签标题栏上的小圆按钮：平时半透明，悬停变实 -->
+    <Style Selector="Button.chrome">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Width" Value="26" />
+      <Setter Property="Height" Value="26" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Opacity" Value="0.5" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="Root" CornerRadius="13" Background="{TemplateBinding Background}">
+            <ContentPresenter Name="PART_ContentPresenter"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+
+    <Style Selector="Button.chrome:pointerover">
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="Button.chrome:pointerover /template/ Border#Root">
+      <Setter Property="Background" Value="#4DFFFFFF" />
+    </Style>
+    <Style Selector="Button.chrome:pressed /template/ Border#Root">
+      <Setter Property="Background" Value="#66FFFFFF" />
+    </Style>
+
+    <!-- 关闭按钮：悬停变红 -->
+    <Style Selector="Button.chromeClose">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Width" Value="26" />
+      <Setter Property="Height" Value="26" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="Root" CornerRadius="13" Background="{TemplateBinding Background}">
+            <ContentPresenter Name="PART_ContentPresenter"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+
+    <Style Selector="Button.chromeClose:pointerover /template/ Border#Root">
+      <Setter Property="Background" Value="#EED9453F" />
+    </Style>
+    <Style Selector="Button.chromeClose:pointerover">
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+
+    <Style Selector="Button.link">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.InkSoft}" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Padding" Value="6,2" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="Root" Background="{TemplateBinding Background}" CornerRadius="6">
+            <ContentPresenter Name="PART_ContentPresenter"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+
+    <Style Selector="Button.link:pointerover /template/ Border#Root">
+      <Setter Property="Background" Value="#14C0392B" />
+    </Style>
+    <Style Selector="Button.link:pointerover">
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Danger}" />
+    </Style>
+
+    <!-- 分段切换（待办 / 已完成） -->
+    <Style Selector="Button.segment">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.InkSoft}" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="10,3" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="Root" CornerRadius="7" Background="{TemplateBinding Background}">
+            <ContentPresenter Name="PART_ContentPresenter"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center"
+                              Margin="{TemplateBinding Padding}" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+
+    <Style Selector="Button.segment:pointerover /template/ Border#Root">
+      <Setter Property="Background" Value="#33FFFFFF" />
+    </Style>
+
+    <!-- 选中态：用 class 绑定（Classes.active="{Binding IsTodoView}"） -->
+    <Style Selector="Button.segment.active">
+      <Setter Property="Background" Value="{DynamicResource Brush.Accent}" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.segment.active:pointerover /template/ Border#Root">
+      <Setter Property="Background" Value="{DynamicResource Brush.Accent}" />
+    </Style>
+
+    <!-- 行内悬停操作按钮：圆形，平时半透明 -->
+    <Style Selector="Button.rowAction">
+      <Setter Property="Width" Value="22" />
+      <Setter Property="Height" Value="22" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="Root" CornerRadius="11" Background="{TemplateBinding Background}">
+            <Viewbox Margin="4">
+              <ContentPresenter Name="PART_ContentPresenter"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}" />
+            </Viewbox>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+
+    <Style Selector="Button.rowAction:pointerover /template/ Border#Root">
+      <Setter Property="Background" Value="#33B27F0A" />
+    </Style>
+    <Style Selector="Button.rowAction:pressed /template/ Border#Root">
+      <Setter Property="Background" Value="#59B27F0A" />
+    </Style>
+
+    <!-- 关闭/删除用小圆钮：悬停变红 -->
+    <Style Selector="Button.rowDelete">
+      <Setter Property="Width" Value="22" />
+      <Setter Property="Height" Value="22" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.InkSoft}" />
+      <Setter Property="Content" Value="✕" />
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="Root" CornerRadius="11" Background="{TemplateBinding Background}">
+            <ContentPresenter Name="PART_ContentPresenter"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+
+    <Style Selector="Button.rowDelete:pointerover /template/ Border#Root">
+      <Setter Property="Background" Value="#26C0392B" />
+    </Style>
+    <Style Selector="Button.rowDelete:pointerover">
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Danger}" />
+    </Style>
+
+    <!-- 标签筛选胶囊 -->
+    <Style Selector="Button.chip">
+      <Setter Property="Background" Value="{DynamicResource Brush.ChipIdle}" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="9,2" />
+      <Setter Property="Margin" Value="0,0,5,5" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="Root" CornerRadius="10" Background="{TemplateBinding Background}">
+            <ContentPresenter Name="PART_ContentPresenter"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              VerticalAlignment="Center"
+                              Margin="{TemplateBinding Padding}" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+
+    <Style Selector="Button.chip:pointerover /template/ Border#Root">
+      <Setter Property="Opacity" Value="0.82" />
+    </Style>
+
+    <Style Selector="Button.chip.dropTarget">
+      <Setter Property="Background" Value="{DynamicResource Brush.Accent}" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style Selector="Button.chip.selected">
+      <Setter Property="Background" Value="{DynamicResource Brush.ChipActive}" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.chip.selected:pointerover /template/ Border#Root">
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+
+    <!-- 皮肤色卡 -->
+    <Style Selector="Button.swatch">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="Root" Width="72" CornerRadius="9" BorderThickness="2"
+                  BorderBrush="Transparent" Padding="5">
+            <ContentPresenter Name="PART_ContentPresenter"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+
+    <Style Selector="Button.swatch:pointerover /template/ Border#Root">
+      <Setter Property="Background" Value="#26FFFFFF" />
+    </Style>
+    <Style Selector="Button.swatch.selected /template/ Border#Root">
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
+      <Setter Property="Background" Value="#33B27F0A" />
+    </Style>
+
+    <!-- ==================== 输入 ==================== -->
+    <!--
+      说明：Avalonia 的 TextBox 模板带必需部件（PART_TextPresenter / PART_ScrollViewer），
+      自己重写模板很容易漏部件而编译失败。所以这里只改属性（背景/边框/圆角/内边距），
+      把模板留给 FluentTheme，既安全又保留系统光标、输入法、右键菜单等行为。
+    -->
+    <Style Selector="TextBox.flat">
+      <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
+      <Setter Property="CaretBrush" Value="{DynamicResource Brush.Ink}" />
+      <Setter Property="SelectionBrush" Value="{DynamicResource Brush.Accent}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Line}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="10,7" />
+      <Setter Property="FontSize" Value="13.5" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+
+    <Style Selector="TextBox.flat:focus">
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
+    </Style>
+
+    <!-- 行内编辑框：无边框无背景，聚焦时才显出输入区 -->
+    <Style Selector="TextBox.inline">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
+      <Setter Property="CaretBrush" Value="{DynamicResource Brush.Accent}" />
+      <Setter Property="SelectionBrush" Value="{DynamicResource Brush.Accent}" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="5" />
+      <Setter Property="Padding" Value="4,2" />
+      <Setter Property="Margin" Value="-5,0,0,0" />
+      <Setter Property="FontSize" Value="13.5" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="TextBox.inline:focus">
+      <Setter Property="Background" Value="#59FFFFFF" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
+    </Style>
+    <Style Selector="TextBox.inline:pointerover">
+      <Setter Property="Background" Value="#33FFFFFF" />
+    </Style>
+
+    <!-- 便签正文：整块纸面就是输入区 -->
+    <Style Selector="TextBox.note">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="0" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
+      <Setter Property="CaretBrush" Value="{DynamicResource Brush.Ink}" />
+      <Setter Property="SelectionBrush" Value="{DynamicResource Brush.Accent}" />
+      <Setter Property="Padding" Value="14,12" />
+      <Setter Property="FontSize" Value="13.5" />
+      <Setter Property="AcceptsReturn" Value="True" />
+      <Setter Property="AcceptsTab" Value="True" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style Selector="TextBox.note:focus">
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+
+    <!-- ==================== 复选框 ==================== -->
+    <Style Selector="CheckBox.round">
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <StackPanel Orientation="Horizontal" Background="Transparent">
+            <Border Name="Box"
+                    Width="17" Height="17"
+                    CornerRadius="3.5"
+                    BorderThickness="1.6"
+                    BorderBrush="{DynamicResource Brush.InkSoft}"
+                    Background="#26FFFFFF"
+                    VerticalAlignment="Center"
+                    RenderTransformOrigin="50%,50%">
+              <Path Name="Tick"
+                    Data="M 3,8 L 6.6,11.6 L 13,4.2"
+                    Stroke="White"
+                    StrokeThickness="2.2"
+                    StrokeLineCap="Round"
+                    StrokeJoin="Round"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    IsVisible="False" />
+            </Border>
+            <ContentPresenter Name="PART_ContentPresenter"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              Margin="8,0,0,0"
+                              VerticalAlignment="Center" />
+          </StackPanel>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+
+    <Style Selector="CheckBox.round:pointerover /template/ Border#Box">
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
+      <Setter Property="Background" Value="#4DFFFFFF" />
+    </Style>
+
+    <Style Selector="CheckBox.round:checked /template/ Border#Box">
+      <Setter Property="Background" Value="{DynamicResource Brush.Accent}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
+    </Style>
+    <Style Selector="CheckBox.round:checked /template/ Path#Tick">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="CheckBox.round:disabled /template/ Border#Box">
+      <Setter Property="Opacity" Value="0.45" />
+    </Style>
+
+    <!-- 带文字标签的复选框（设置页用） -->
+    <Style Selector="CheckBox.labeled">
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <StackPanel Orientation="Horizontal" Background="Transparent">
+            <Border Name="Box"
+                    Width="16" Height="16"
+                    CornerRadius="5"
+                    BorderThickness="1.5"
+                    BorderBrush="{DynamicResource Brush.InkSoft}"
+                    Background="Transparent"
+                    VerticalAlignment="Center">
+              <Path Name="Tick"
+                    Data="M 2,6.2 L 5.4,9.6 L 11,3.4"
+                    Stroke="White"
+                    StrokeThickness="2"
+                    StrokeLineCap="Round"
+                    StrokeJoin="Round"
+                    IsVisible="False" />
+            </Border>
+            <ContentPresenter Name="PART_ContentPresenter"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              Margin="8,0,0,0"
+                              VerticalAlignment="Center" />
+          </StackPanel>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+
+    <Style Selector="CheckBox.labeled:checked /template/ Border#Box">
+      <Setter Property="Background" Value="{DynamicResource Brush.Accent}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
+    </Style>
+    <Style Selector="CheckBox.labeled:checked /template/ Path#Tick">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="CheckBox.labeled:pointerover /template/ Border#Box">
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
+    </Style>
+
+    <!-- ==================== 滑块 ==================== -->
+    <!--
+      滑块同样交给 FluentTheme 的模板，只调尺寸/颜色。
+      自绘 WPF 那套 Track+RepeatButton 在 Avalonia 里没有等价的静态 Command 常量，
+      硬搬会踩坑；这里保留系统滑块的完整交互（拖动、点击翻页、键盘）。
+    -->
+    <Style Selector="Slider.slim">
+      <Setter Property="Height" Value="22" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+
+    <Style Selector="Slider.slim /template/ Thumb">
+      <Setter Property="Width" Value="14" />
+      <Setter Property="Height" Value="14" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
+    <Style Selector="Slider.slim /template/ Thumb:pointerover">
+      <Setter Property="RenderTransform" Value="scale(1.2,1.2)" />
+      <Setter Property="RenderTransformOrigin" Value="50%,50%" />
+    </Style>
+
+    <Style Selector="Slider.slim /template/ Thumb:pressed">
+      <Setter Property="RenderTransform" Value="scale(1.35,1.35)" />
+      <Setter Property="RenderTransformOrigin" Value="50%,50%" />
+    </Style>
+
+    <!-- ==================== 列表 ==================== -->
+    <!-- 透明底的 ListBox：默认模板在有底色时会盖住便签纸 -->
+    <Style Selector="ListBox.flat">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+    </Style>
+
+    <Style Selector="ListBox.flat ListBoxItem">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
+
+    <Style Selector="ListBox.flat ListBoxItem:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+
+    <Style Selector="ListBox.flat ListBoxItem:selected /template/ ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+
+    <!-- 便签行：底部一条细线把行分开 -->
+    <Style Selector="ListBox.todoRows ListBoxItem">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="Row"
+                  Padding="6,1,8,1"
+                  Margin="6,0"
+                  CornerRadius="7"
+                  BorderBrush="{DynamicResource Brush.Line}"
+                  BorderThickness="0,0,0,1"
+                  Background="Transparent">
+            <ContentPresenter Name="PART_ContentPresenter"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              HorizontalContentAlignment="Stretch" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+
+    <Style Selector="ListBox.todoRows ListBoxItem:selected /template/ Border#Row">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+
+    <Style Selector="ListBox.todoRows ListBoxItem:pointerover /template/ Border#Row">
+      <Setter Property="Background" Value="#26FFFFFF" />
+    </Style>
+    <Style Selector="ListBox.todoRows ListBoxItem.dragTarget /template/ Border#Row">
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
+      <Setter Property="BorderThickness" Value="0,2,0,0" />
+    </Style>
+
+    <!-- 管理面板的看板卡片 -->
+    <Style Selector="ListBox.boardCards ListBoxItem">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="0,0,0,8" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="Row"
+                  CornerRadius="10"
+                  Background="{DynamicResource Brush.Surface}"
+                  BorderBrush="{DynamicResource Brush.Line}"
+                  BorderThickness="1"
+                  Padding="14,11"
+                  RenderTransformOrigin="50%,50%">
+            <ContentPresenter Name="PART_ContentPresenter"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+
+    <Style Selector="ListBox.boardCards ListBoxItem:pointerover /template/ Border#Row">
+      <Setter Property="Background" Value="{DynamicResource Brush.SurfaceHover}" />
+      <Setter Property="RenderTransform" Value="scale(1.012,1.012)" />
+    </Style>
+    <Style Selector="ListBox.boardCards ListBoxItem:selected /template/ Border#Row">
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
+      <Setter Property="Background" Value="#33B27F0A" />
+    </Style>
+
+    <!-- ==================== 滚动条 ==================== -->
+    <Style Selector="ScrollBar">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Width" Value="8" />
+    </Style>
+
+    <Style Selector="ScrollBar /template/ Thumb">
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="Root" CornerRadius="3" Background="#403B382A" Margin="1" />
+        </ControlTemplate>
+      </Setter>
+    </Style>
+
+    <Style Selector="ScrollBar /template/ Thumb:pointerover /template/ Border#Root">
+      <Setter Property="Background" Value="#703B382A" />
+    </Style>
+
+    <!-- ==================== 下拉框 ==================== -->
+    <Style Selector="ComboBox.flat">
+      <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Line}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="Padding" Value="8,4" />
+      <Setter Property="FontSize" Value="11.5" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+
+    <!-- ==================== 卡片 ==================== -->
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Line}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Padding" Value="14" />
+    </Style>
+
+    <!-- 便签纸外壳：圆角 + 阴影 -->
+    <Style Selector="Border.note">
+      <Setter Property="Margin" Value="10" />
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="Background" Value="{DynamicResource Brush.Paper}" />
+      <Setter Property="BorderBrush" Value="#59FFFFFF" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BoxShadow" Value="0 3 18 0 #4D000000" />
+    </Style>
+
+    <Style Selector="Border.noteFlat">
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="CornerRadius" Value="0" />
+      <Setter Property="Background" Value="{DynamicResource Brush.Paper}" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="BoxShadow" Value="none" />
+    </Style>
+
+    <!-- 主窗体/设置页外壳：不透明纸色 -->
+    <Style Selector="Border.shell">
+      <Setter Property="Margin" Value="12" />
+      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="Background" Value="{DynamicResource Brush.PaperOpaque}" />
+      <Setter Property="BorderBrush" Value="#59FFFFFF" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BoxShadow" Value="0 4 24 0 #4D000000" />
+    </Style>
+
+    <!-- 标题栏背景 -->
+    <Style Selector="Border.header">
+      <Setter Property="Background" Value="{DynamicResource Brush.PaperDeep}" />
+      <Setter Property="Padding" Value="12,8" />
+    </Style>
+
+    <!-- ==================== 分隔线 ==================== -->
+    <Style Selector="Border.divider">
+      <Setter Property="Height" Value="1" />
+      <Setter Property="Background" Value="{DynamicResource Brush.Line}" />
+    </Style>
+
+  </Application.Styles>
+</Application>

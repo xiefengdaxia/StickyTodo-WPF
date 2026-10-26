@@ -1,0 +1,204 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:StickyTodo.Notes.Localization"
+        xmlns:conv="using:StickyTodo.Notes.Converters"
+        xmlns:vm="using:StickyTodo.Notes.ViewModels"
+        xmlns:controls="using:StickyTodo.Notes.Controls"
+        x:Class="StickyTodo.Notes.Views.TokenBoardWindow"
+        Title="{Binding BoardName}"
+        Width="430" Height="600"
+        MinWidth="320" MinHeight="360"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent"
+        CanResize="True"
+        ShowInTaskbar="False"
+        Opacity="{Binding WindowOpacity}"
+        Topmost="{Binding IsTopmost}"
+        FontFamily="Microsoft YaHei UI, Segoe UI"
+        UseLayoutRounding="True">
+
+  <Window.Resources>
+    <conv:BoolToVisibilityConverter x:Key="BoolToVis" />
+    <conv:NullToCollapsedConverter x:Key="NullToCollapsed" />
+  </Window.Resources>
+
+  <Window.Styles>
+    <Style Selector="TextBlock.pin">
+      <Setter Property="Opacity" Value="0.35" />
+    </Style>
+    <Style Selector="TextBlock.pin.active">
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="Button.rangeTab">
+      <Setter Property="FontSize" Value="10.5" />
+      <Setter Property="Padding" Value="8,3" />
+      <Setter Property="Margin" Value="0,0,2,0" />
+    </Style>
+  </Window.Styles>
+
+  <Border Name="NoteRoot" Classes="note">
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto">
+
+      <Border Name="TitleBar" Classes="header" CornerRadius="11,11,0,0" Padding="12,8">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel Grid.Column="0" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="{Binding BoardName}" Classes="title" TextTrimming="CharacterEllipsis" />
+              <TextBlock Text=" 🔒" FontSize="11" VerticalAlignment="Center" IsVisible="{Binding IsLocked}" />
+            </StackPanel>
+            <TextBlock Text="{Binding RangeText}" Classes="caption" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+
+          <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+            <Button Classes="chrome" ToolTip.Tip="{loc:Loc chrome.topmost}" Click="ToggleTopmost_Click">
+              <TextBlock Text="📌" FontSize="11" Classes="pin" Classes.active="{Binding IsTopmost}" />
+            </Button>
+            <Button Classes="chrome" ToolTip.Tip="{loc:Loc chrome.lockTip}" Click="ToggleLock_Click">
+              <Panel>
+                <TextBlock FontSize="11" Text="🔓" IsVisible="{Binding !IsLocked}" />
+                <TextBlock FontSize="11" Text="🔒" IsVisible="{Binding IsLocked}" />
+              </Panel>
+            </Button>
+            <Button Classes="chrome" Content="🎨" FontSize="11"
+                    ToolTip.Tip="{loc:Loc chrome.appearance}" Click="Appearance_Click" />
+            <Button Classes="chrome" Content="⋯" FontSize="13"
+                    ToolTip.Tip="{loc:Loc chrome.manage}" Click="OpenManager_Click" />
+            <Button Classes="chrome" Content="✕" FontSize="11"
+                    ToolTip.Tip="{loc:Loc chrome.close}" Click="Close_Click" />
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <!-- 范围 / 刷新间隔 / 手动刷新 -->
+      <Grid Grid.Row="1" Margin="12,8,12,0" ColumnDefinitions="Auto,*,Auto">
+        <ItemsControl Grid.Column="0" ItemsSource="{Binding Ranges}" VerticalAlignment="Center">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Orientation="Horizontal" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:TokenRangeOption">
+              <Button Classes="segment rangeTab" Classes.active="{Binding IsSelected}"
+                      Content="{Binding Name}"
+                      Click="Range_Click" Tag="{Binding}" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <ItemsControl Grid.Column="2" ItemsSource="{Binding Intervals}" VerticalAlignment="Center">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Orientation="Horizontal" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:TokenIntervalOption">
+              <Button Classes="segment rangeTab" Classes.active="{Binding IsSelected}"
+                      Content="{Binding Name}" Padding="7,3" Margin="2,0,0,0"
+                      Click="Interval_Click" Tag="{Binding}" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </Grid>
+
+      <!-- 汇总 -->
+      <Border Grid.Row="2" Margin="12,10,12,0" Padding="12,10" CornerRadius="10"
+              Background="{DynamicResource Brush.Surface}">
+        <Grid ColumnDefinitions="1.5*,*,*,Auto">
+          <StackPanel Grid.Column="0">
+            <TextBlock Text="{loc:Loc token.total}" Classes="metricLabel" />
+            <TextBlock Text="{Binding TotalText}" Classes="metricValue" FontSize="22" />
+          </StackPanel>
+          <StackPanel Grid.Column="1" VerticalAlignment="Center">
+            <TextBlock Text="{loc:Loc token.calls}" Classes="metricLabel" />
+            <TextBlock Text="{Binding StepsText}" Classes="metricValue" />
+          </StackPanel>
+          <StackPanel Grid.Column="2" VerticalAlignment="Center">
+            <TextBlock Text="{loc:Loc token.cacheRatio}" Classes="metricLabel" />
+            <TextBlock Text="{Binding CacheRatioText}" Classes="metricValue" />
+          </StackPanel>
+          <Button Grid.Column="3" Classes="chrome" ToolTip.Tip="{Binding RefreshHint}"
+                  Click="Refresh_Click" VerticalAlignment="Center" Margin="6,0,0,0">
+            <TextBlock Text="⟳" FontSize="15" />
+          </Button>
+        </Grid>
+      </Border>
+
+      <TextBlock Grid.Row="3" Margin="14,6,14,0" Text="{Binding BreakdownText}"
+                 Classes="caption" TextWrapping="Wrap" Opacity="0.85" />
+
+      <!-- 趋势 -->
+      <StackPanel Grid.Row="4" Margin="12,6,12,0">
+        <Grid Margin="2,0,2,4" ColumnDefinitions="*,Auto">
+          <TextBlock Text="{loc:Loc token.trendTitle}" Classes="caption" Opacity="0.75" />
+          <Button Grid.Column="1" Classes="link" Content="{loc:Loc token.hideDetail}"
+                  FontSize="10" Padding="0" Click="HideDetail_Click"
+                  IsVisible="{Binding HasDetail}" />
+        </Grid>
+
+        <controls:TrendChart Name="Chart" Height="132"
+                             Series="{Binding Stats.Series}"
+                             SelectedIndex="{Binding SelectedIndex}"
+                             Accent="{DynamicResource Brush.Accent}" />
+
+        <Border Margin="0,6,0,0" Padding="10,7" CornerRadius="8"
+                Background="{DynamicResource Brush.AccentSoft}"
+                IsVisible="{Binding HasDetail}">
+          <StackPanel>
+            <TextBlock Text="{Binding DetailTitle}" FontSize="11.5" FontWeight="SemiBold"
+                       Foreground="{DynamicResource Brush.Ink}" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding DetailBody}" Classes="caption" TextWrapping="Wrap" Margin="0,3,0,0" />
+          </StackPanel>
+        </Border>
+      </StackPanel>
+
+      <!-- 按模型 -->
+      <Grid Grid.Row="5" Margin="12,10,12,0" RowDefinitions="Auto,*">
+        <TextBlock Grid.Row="0" Text="{loc:Loc token.byModel}" Classes="caption" Opacity="0.75" Margin="2,0,0,4" />
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <ItemsControl ItemsSource="{Binding Models}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:TokenModelUsageRow">
+                <Grid Margin="0,2" ColumnDefinitions="*,Auto">
+                  <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                    <TextBlock Text="{Binding Name}" FontSize="11.5" TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource Brush.Ink}" />
+                    <TextBlock Text="{Binding DetailText}" Classes="caption" TextTrimming="CharacterEllipsis" Opacity="0.7" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
+                    <TextBlock Text="{Binding TotalText}" FontSize="11.5" FontWeight="SemiBold"
+                               HorizontalAlignment="Right" Foreground="{DynamicResource Brush.Ink}" />
+                    <TextBlock Text="{Binding ShareText}" Classes="caption" HorizontalAlignment="Right" Opacity="0.7" />
+                  </StackPanel>
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </Grid>
+
+      <!-- 页脚 -->
+      <Border Grid.Row="6" BorderBrush="{DynamicResource Brush.Line}" BorderThickness="0,1,0,0"
+              Padding="12,6" Margin="0,8,0,0">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel Grid.Column="0">
+            <TextBlock Text="{Binding UpdatedText}" Classes="caption" Opacity="0.75" />
+            <TextBlock Text="{Binding SourceText}" Classes="caption" Opacity="0.5" FontSize="9.5"
+                       TextTrimming="CharacterEllipsis" MaxWidth="280" Margin="0,1,0,0" />
+          </StackPanel>
+          <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
+            <TextBlock Text="{Binding ErrorText}" HorizontalAlignment="Right" FontSize="11"
+                       Foreground="{DynamicResource Brush.Danger}" TextTrimming="CharacterEllipsis" MaxWidth="200"
+                       IsVisible="{Binding ErrorText, Converter={StaticResource NullToCollapsed}}" />
+            <TextBlock Text="{Binding SourceError}" HorizontalAlignment="Right" FontSize="10"
+                       Foreground="{DynamicResource Brush.Danger}" TextWrapping="Wrap" MaxWidth="200"
+                       IsVisible="{Binding SourceError, Converter={StaticResource NullToCollapsed}}" />
+          </StackPanel>
+        </Grid>
+      </Border>
+    </Grid>
+  </Border>
+</Window>

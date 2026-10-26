@@ -1,0 +1,217 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:StickyTodo.Notes.Localization"
+        xmlns:conv="using:StickyTodo.Notes.Converters"
+        xmlns:vm="using:StickyTodo.Notes.ViewModels"
+        x:Class="StickyTodo.Notes.Views.SettingsWindow"
+        Title="{loc:Loc settings.title}"
+        Width="520" Height="700"
+        MinWidth="460" MinHeight="560"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent"
+        CanResize="True"
+        WindowStartupLocation="CenterScreen"
+        FontFamily="Microsoft YaHei UI, Segoe UI"
+        UseLayoutRounding="True">
+
+  <Window.Resources>
+    <conv:LanguageNameConverter x:Key="LocLanguage" />
+  </Window.Resources>
+
+  <Border Name="Shell" Classes="shell">
+    <Grid RowDefinitions="Auto,*,Auto">
+
+      <Border Grid.Row="0" Name="TitleBar" Classes="header" CornerRadius="13,13,0,0" Padding="18,14">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel>
+            <TextBlock Text="{loc:Loc settings.title}" Classes="display" />
+            <TextBlock Text="{loc:Loc settings.subtitle}" Classes="caption" Margin="0,3,0,0" />
+          </StackPanel>
+          <Button Grid.Column="1" Classes="chromeClose" Content="✕" FontSize="11"
+                  ToolTip.Tip="{loc:Loc chrome.close}" Click="Close_Click" />
+        </Grid>
+      </Border>
+
+      <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="18,14,10,14">
+        <StackPanel>
+
+          <!-- 外观：皮肤 -->
+          <TextBlock Text="{loc:Loc settings.appearance}" Classes="section" Margin="2,0,0,8" />
+
+          <Border Classes="card" Margin="0,0,0,14">
+            <StackPanel>
+              <TextBlock Text="{loc:Loc settings.palette}" Classes="title" FontSize="13" Margin="0,0,0,3" />
+              <TextBlock Text="{loc:Loc settings.paletteHint}" Classes="caption" Margin="0,0,0,12" />
+
+              <ItemsControl Name="SkinList" ItemsSource="{Binding Skins}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:SkinOptionViewModel">
+                    <Button Classes="swatch" Margin="0,0,8,8" ToolTip.Tip="{Binding Name}"
+                            Tag="{Binding}" Click="Skin_Click">
+                      <StackPanel>
+                        <Border Height="34" CornerRadius="6" Background="{Binding Preview}"
+                                BorderBrush="#33000000" BorderThickness="1">
+                          <TextBlock Text="Aa" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                     FontSize="13" FontWeight="SemiBold" Foreground="{Binding TextPreview}" />
+                        </Border>
+                        <TextBlock Text="{Binding Name}" FontSize="10.5" HorizontalAlignment="Center"
+                                   Margin="0,5,0,0" Foreground="{DynamicResource Brush.InkSoft}" />
+                      </StackPanel>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Border>
+
+          <!-- 外观：语言 -->
+          <Border Classes="card" Margin="0,0,0,14">
+            <StackPanel>
+              <Grid Margin="0,0,0,6" ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" Text="{loc:Loc settings.language}" FontSize="13" FontWeight="SemiBold"
+                           Foreground="{DynamicResource Brush.Ink}" VerticalAlignment="Center" />
+                <ComboBox Grid.Column="1" Name="LanguageBox" Classes="flat" Width="132"
+                          ItemsSource="{Binding Languages}"
+                          SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding Converter={StaticResource LocLanguage}}" FontSize="12" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+              </Grid>
+              <TextBlock Text="{loc:Loc settings.languageHint}" Classes="caption" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+
+          <!-- 外观：透明度 -->
+          <Border Classes="card" Margin="0,0,0,14">
+            <StackPanel>
+              <Grid Margin="0,0,0,4" ColumnDefinitions="*,Auto">
+                <TextBlock Text="{loc:Loc settings.bgOpacity}" Classes="title" FontSize="13" />
+                <TextBlock Grid.Column="1" Text="{Binding BackgroundOpacityText}" FontSize="12"
+                           FontWeight="SemiBold" Foreground="{DynamicResource Brush.Accent}" />
+              </Grid>
+              <TextBlock Text="{loc:Loc settings.bgOpacityHint}" Classes="caption" Margin="0,0,0,6" />
+              <Slider Classes="slim" Minimum="10" Maximum="100" TickFrequency="1"
+                      IsSnapToTickEnabled="True" Value="{Binding BackgroundOpacity, Mode=TwoWay}" />
+
+              <Border Classes="divider" Margin="0,10" />
+
+              <Grid Margin="0,0,0,4" ColumnDefinitions="*,Auto">
+                <TextBlock Text="{loc:Loc settings.winOpacity}" Classes="title" FontSize="13" />
+                <TextBlock Grid.Column="1" Text="{Binding WindowOpacityText}" FontSize="12"
+                           FontWeight="SemiBold" Foreground="{DynamicResource Brush.Accent}" />
+              </Grid>
+              <TextBlock Text="{loc:Loc settings.winOpacityHint}" Classes="caption" Margin="0,0,0,6" />
+              <Slider Classes="slim" Minimum="10" Maximum="100" TickFrequency="1"
+                      IsSnapToTickEnabled="True" Value="{Binding WindowOpacity, Mode=TwoWay}" />
+            </StackPanel>
+          </Border>
+
+          <!-- 启动 -->
+          <TextBlock Text="{loc:Loc settings.startup}" Classes="section" Margin="2,4,0,8" />
+
+          <Border Classes="card" Margin="0,0,0,14">
+            <StackPanel>
+              <CheckBox Classes="labeled" FontSize="12.5"
+                        Content="{loc:Loc settings.autoStart}"
+                        IsChecked="{Binding LaunchAtStartup, Mode=TwoWay}" />
+              <TextBlock Text="{loc:Loc settings.autoStartHint}" Classes="caption" Margin="24,5,0,0" />
+
+              <Border Classes="divider" Margin="0,11" />
+
+              <CheckBox Classes="labeled" FontSize="12.5"
+                        Content="{loc:Loc settings.restoreSession}"
+                        IsChecked="{Binding RestoreSession, Mode=TwoWay}" />
+              <TextBlock Text="{loc:Loc settings.restoreSessionHint}" Classes="caption" Margin="24,5,0,0" />
+            </StackPanel>
+          </Border>
+
+          <!-- Token 用量 -->
+          <TextBlock Text="{loc:Loc settings.token}" Classes="section" Margin="2,4,0,8" />
+
+          <Border Classes="card" Margin="0,0,0,14">
+            <StackPanel>
+              <TextBlock Text="{loc:Loc settings.tokenDb}" FontSize="12.5"
+                         Foreground="{DynamicResource Brush.Ink}" />
+              <TextBox Name="TokenDatabaseBox" Classes="flat" Margin="0,6,0,0"
+                       Text="{Binding TokenDatabasePath, Mode=TwoWay}"
+                       ToolTip.Tip="{loc:Loc settings.tokenDbTip}"
+                       LostFocus="TokenDatabaseBox_LostFocus"
+                       KeyDown="TokenDatabaseBox_KeyDown" />
+              <TextBlock Text="{loc:Loc settings.tokenDbHint}" Classes="caption" TextWrapping="Wrap" Margin="2,5,0,0" />
+            </StackPanel>
+          </Border>
+
+          <!-- 快捷键 -->
+          <TextBlock Text="{loc:Loc settings.shortcuts}" Classes="section" Margin="2,4,0,8" />
+
+          <Border Classes="card" Margin="0,0,0,14">
+            <StackPanel>
+              <Grid Margin="0,0,0,9" ColumnDefinitions="*,Auto">
+                <TextBlock Text="{loc:Loc settings.scNewTodo}" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
+                <Border Grid.Column="1" Background="{DynamicResource Brush.AccentSoft}" CornerRadius="6" Padding="8,2">
+                  <TextBlock Text="{Binding ShortcutNewTodo}" FontSize="11" Foreground="{DynamicResource Brush.Accent}" />
+                </Border>
+              </Grid>
+              <Grid Margin="0,0,0,9" ColumnDefinitions="*,Auto">
+                <TextBlock Text="{loc:Loc settings.scToggle}" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
+                <Border Grid.Column="1" Background="{DynamicResource Brush.AccentSoft}" CornerRadius="6" Padding="8,2">
+                  <TextBlock Text="{Binding ShortcutToggleBoards}" FontSize="11" Foreground="{DynamicResource Brush.Accent}" />
+                </Border>
+              </Grid>
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="{loc:Loc settings.scLock}" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
+                <Border Grid.Column="1" Background="{DynamicResource Brush.AccentSoft}" CornerRadius="6" Padding="8,2">
+                  <TextBlock Text="{Binding ShortcutLockActive}" FontSize="11" Foreground="{DynamicResource Brush.Accent}" />
+                </Border>
+              </Grid>
+            </StackPanel>
+          </Border>
+
+          <!-- 数据 -->
+          <TextBlock Text="{loc:Loc settings.data}" Classes="section" Margin="2,4,0,8" />
+
+          <Border Classes="card">
+            <StackPanel>
+              <Grid Margin="0,0,0,9" ColumnDefinitions="*,Auto">
+                <TextBlock Text="{loc:Loc settings.entitlement}" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
+                <TextBlock Grid.Column="1" Text="{Binding EntitlementText}" FontSize="11.5"
+                           Foreground="{DynamicResource Brush.Accent}" />
+              </Grid>
+              <Grid Margin="0,0,0,9" ColumnDefinitions="*,Auto">
+                <TextBlock Text="{loc:Loc settings.stats}" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
+                <TextBlock Grid.Column="1" Text="{Binding StatsText}" FontSize="11.5"
+                           Foreground="{DynamicResource Brush.InkSoft}" />
+              </Grid>
+              <TextBlock Text="{loc:Loc settings.storage}" FontSize="12.5"
+                         Foreground="{DynamicResource Brush.Ink}" Margin="0,0,0,4" />
+              <Border Background="{DynamicResource Brush.AccentSoft}" CornerRadius="7" Padding="9,7">
+                <TextBlock Text="{Binding DataPathText}" FontSize="10.5" TextWrapping="Wrap"
+                           Foreground="{DynamicResource Brush.InkSoft}" />
+              </Border>
+
+              <TextBlock Text="{Binding StatusText}" FontSize="11" Margin="0,10,0,0"
+                         Foreground="{DynamicResource Brush.Success}" TextWrapping="Wrap" />
+              <TextBlock Text="{Binding ErrorText}" FontSize="11" Margin="0,4,0,0"
+                         Foreground="{DynamicResource Brush.Danger}" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+
+        </StackPanel>
+      </ScrollViewer>
+
+      <Border Grid.Row="2" BorderBrush="{DynamicResource Brush.Line}" BorderThickness="0,1,0,0"
+              Padding="18,10" Background="{DynamicResource Brush.PaperDeep}" CornerRadius="0,0,13,13">
+        <TextBlock Text="{loc:Loc settings.autoSaved}" Classes="caption" />
+      </Border>
+    </Grid>
+  </Border>
+</Window>
