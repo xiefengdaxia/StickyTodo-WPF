@@ -82,6 +82,7 @@
                                         Padding="18,5"
                                         Click="City_Click"
                                         Tag="{Binding}">
+                                        Tag="{Binding}">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
                                             <Setter Property="Background" Value="#66FFFFFF" />

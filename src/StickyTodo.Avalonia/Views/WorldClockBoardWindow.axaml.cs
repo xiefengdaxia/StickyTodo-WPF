@@ -11,10 +11,20 @@ public partial class WorldClockBoardWindow : Window
     {
         InitializeComponent();
         DataContext = viewModel;
+
+        WindowStartupLocation = WindowStartupLocation.CenterScreen;
     }
 
     private void TitleBar_PointerPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
     {
+        try
+        {
+            BeginMoveDrag(e);
+        }
+        catch (Exception)
+        {
+            // 忽略
+        }
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
         {
             return;

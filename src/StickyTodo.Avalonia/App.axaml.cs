@@ -133,6 +133,32 @@ public partial class App : Application
             {
                 services.ShowManager();
             }
+
+            // --create-tool-demo <weather|worldclock|desktopclock>：创建一个工具型看板（进看板列表）
+            var toolBoard = ReadOption(args, "--create-tool-demo");
+            if (!string.IsNullOrWhiteSpace(toolBoard))
+            {
+                var kind = toolBoard.Trim().ToLowerInvariant() switch
+                {
+                    "weather" => Core.Entities.BoardKind.Weather,
+                    "worldclock" => Core.Entities.BoardKind.WorldClock,
+                    "desktopclock" => Core.Entities.BoardKind.DesktopClock,
+                    _ => Core.Entities.BoardKind.Todo,
+                };
+
+                Log.Info($"[toolboard] creating kind={kind}");
+                var created = services.Todos.CreateBoard(
+                    kind switch
+                    {
+                        Core.Entities.BoardKind.Weather => "天气",
+                        Core.Entities.BoardKind.WorldClock => "世界时钟",
+                        _ => "桌面时钟",
+                    }, kind);
+                Log.Info($"[toolboard] created id={created.Id}");
+                services.Windows.OpenBoard(created);
+                services.Manager.RefreshAsync();
+                Log.Info("[toolboard] opened");
+            }
         }
         else
         {
@@ -147,6 +173,8 @@ public partial class App : Application
 
             services.ShowSettings();
             services.ShowPomodoro();
+
+
 
             // 工具窗口演示：--weather-demo / --worldclock-demo / --desktopclock-demo
             if (HasFlag(args, "--weather-demo"))

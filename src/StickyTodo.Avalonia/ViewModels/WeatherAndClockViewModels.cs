@@ -310,6 +310,8 @@ public sealed partial class DesktopClockViewModel : ObservableObject
     private IReadOnlyList<string> _cities;
     private int _currentCityIndex;
     private int _rotation;
+    private WeatherReport? _report;
+    private bool _fetching;
 
     public DesktopClockViewModel(WeatherService weather, AppSettingsService settings)
     {
@@ -355,6 +357,9 @@ public sealed partial class DesktopClockViewModel : ObservableObject
     [ObservableProperty]
     private string _weatherDetail = string.Empty;
 
+    /// <summary>天气是否处于失败态（失败时降低重试频率）。</summary>
+    private bool _weatherFailed;
+
     private async Task TickAsync()
     {
         OnPropertyChanged(nameof(SolarDateText));
@@ -363,13 +368,15 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         OnPropertyChanged(nameof(LunarText));
 
         _rotation++;
-        UpdateWeatherLine();
 
-        // 每 30 分钟刷新一次天气
-        if (_rotation % 1800 == 0)
+        // 天气数据每 30 分钟刷新一次；失败时 60 秒后重试
+        if ((!_weatherFailed && _rotation % 1800 == 0) || (_weatherFailed && _rotation % 60 == 0))
         {
             await LoadWeatherAsync();
+            return;
         }
+
+        UpdateWeatherLine();
     }
 
     private void UpdateWeatherLine()
@@ -379,6 +386,7 @@ public sealed partial class DesktopClockViewModel : ObservableObject
             return;
         }
 
+        // 前 9 秒显示当前城市天气，之后 3 秒显示下一个城市名（提示可切换）
         var cycle = _rotation % 12;
         if (cycle < 9)
         {
@@ -389,32 +397,49 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         else
         {
             WeatherLine = _cities.Count > 0 ? _cities[_currentCityIndex % _cities.Count] : string.Empty;
-            WeatherDetail = "城市轮播";
+            WeatherDetail = "轮播";
         }
     }
 
-    private WeatherReport? _report;
-
     private async Task LoadWeatherAsync()
     {
-        if (_cities.Count == 0)
+        if (_fetching || _cities.Count == 0)
         {
             return;
         }
 
-        _currentCityIndex = (_currentCityIndex + 1) % _cities.Count;
-        var city = _cities[_currentCityIndex];
+        _fetching = true;
 
-        var report = await Task.Run(() => _weather.FetchAsync(city));
-        if (report is not null)
+        try
         {
-            _report = report;
-            UpdateWeatherLine();
+            _currentCityIndex = (_currentCityIndex + 1) % _cities.Count;
+            var city = _cities[_currentCityIndex];
+
+            var report = await Task.Run(() => _weather.FetchAsync(city));
+            if (report is not null)
+            {
+                _report = report;
+                _weatherFailed = false;
+                WeatherLine = $"{report.CityName} 天气已更新";
+                WeatherDetail = string.Empty;
+                UpdateWeatherLine();
+            }
+            else
+            {
+                _weatherFailed = true;
+                WeatherLine = "天气获取失败";
+                WeatherDetail = "稍后自动重试";
+            }
         }
-        else
+        catch (Exception)
         {
+            _weatherFailed = true;
             WeatherLine = "天气获取失败";
-            WeatherDetail = "请检查网络";
+            WeatherDetail = "稍后自动重试";
+        }
+        finally
+        {
+            _fetching = false;
         }
     }
 }

@@ -18,10 +18,27 @@ public partial class WorldClockWindow : Window
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ButtonState == MouseButtonState.Pressed)
+        if (e.ButtonState != MouseButtonState.Pressed)
         {
-            try { DragMove(); } catch (InvalidOperationException) { }
+            return;
         }
+
+        // 点在按钮上不拖动
+        if (e.OriginalSource is DependencyObject source)
+        {
+            var current = source;
+            while (current is not null)
+            {
+                if (current is System.Windows.Controls.Button)
+                {
+                    return;
+                }
+
+                current = System.Windows.Media.VisualTreeHelper.GetParent(current);
+            }
+        }
+
+        try { DragMove(); } catch (InvalidOperationException) { }
     }
 
     private void Appearance_Click(object sender, RoutedEventArgs e)

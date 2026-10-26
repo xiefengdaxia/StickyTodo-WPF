@@ -27,6 +27,9 @@ public sealed class BoardRowViewModel : ObservableObject
         BoardKind.Memo => "manager.kindMemo",
         BoardKind.Calendar => "manager.kindCalendar",
         BoardKind.Token => "manager.kindToken",
+        BoardKind.Weather => "manager.kindWeather",
+        BoardKind.WorldClock => "manager.kindWorldClock",
+        BoardKind.DesktopClock => "manager.kindDesktopClock",
         _ => "manager.kindTodo",
     });
 
@@ -36,6 +39,9 @@ public sealed class BoardRowViewModel : ObservableObject
         BoardKind.Memo => "✎",
         BoardKind.Calendar => "▦",
         BoardKind.Token => "◎",
+        BoardKind.Weather => "🌤",
+        BoardKind.WorldClock => "🌍",
+        BoardKind.DesktopClock => "🕔",
         _ => "✓",
     };
 
@@ -44,6 +50,9 @@ public sealed class BoardRowViewModel : ObservableObject
     public bool IsCalendar => Board.Kind == BoardKind.Calendar;
 
     public bool IsToken => Board.Kind == BoardKind.Token;
+
+    /// <summary>工具型看板（天气/世界时钟/桌面时钟）：没有待办数量。</summary>
+    public bool IsToolBoard => BoardKinds.IsToolBoard(Board.Kind);
 
     public int Pending { get; }
 
@@ -55,7 +64,9 @@ public sealed class BoardRowViewModel : ObservableObject
             ? Loc.T("manager.summaryCalendar")
             : IsToken
                 ? Loc.T("manager.summaryToken")
-                : Loc.F("manager.summaryTodo", Pending, Done);
+                : IsToolBoard
+                    ? Loc.T("manager.summaryTool")
+                    : Loc.F("manager.summaryTodo", Pending, Done);
 
     public string WindowHint => Board.Window is null ? string.Empty : Loc.T("manager.rememberedGeometry");
 

@@ -17,8 +17,12 @@ public partial class DesktopClockBoardWindow : Window
         InitializeComponent();
         DataContext = viewModel;
 
-        // 首次布局后挪到右下角
-        Opened += (_, _) => MoveToBottomRight();
+        // 首次布局后挪到右下角并嵌入桌面层
+        Opened += (_, _) =>
+        {
+            MoveToBottomRight();
+            DesktopEmbed.Embed(this);
+        };
 
         Closed += (_, _) => viewModel.Stop();
     }

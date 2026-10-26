@@ -18,7 +18,11 @@ public partial class DesktopClockWindow : Window
         InitializeComponent();
         DataContext = viewModel;
 
-        SourceInitialized += (_, _) => MoveToBottomRight();
+        SourceInitialized += (_, _) =>
+        {
+            MoveToBottomRight();
+            DesktopEmbed.Embed(this);
+        };
         Loaded += (_, _) => viewModel.Start();
         Closed += (_, _) => viewModel.Stop();
     }

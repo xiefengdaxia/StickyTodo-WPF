@@ -1,0 +1,9 @@
+StickyTodo Avalonia - selftest
+OS       : Microsoft Windows 10.0.22631 (10.0.22631.0)
+Runtime  : .NET 6.0.24
+Arch     : X64
+Win7     : False
+DataDir  : C:\Users\PC\AppData\Local\StickyTodo
+Portable : False
+SQLite   : PASS
+RESULT   : OK

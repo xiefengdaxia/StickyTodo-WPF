@@ -15,11 +15,14 @@ public partial class WeatherBoardWindow : Window
         InitializeComponent();
         DataContext = viewModel;
 
+        WindowStartupLocation = WindowStartupLocation.CenterScreen;
+
         Opened += async (_, _) => await viewModel.LoadCoreAsync();
     }
 
     private void TitleBar_PointerPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
     {
+        Services.Log.Info($"[wt] TitleBar_PointerPressed source={e.Source?.GetType().Name}");
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
         {
             return;

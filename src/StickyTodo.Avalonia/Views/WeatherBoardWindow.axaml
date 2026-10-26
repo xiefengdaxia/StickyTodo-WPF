@@ -55,7 +55,8 @@
   <Border Name="NoteRoot" Classes="note">
     <Grid RowDefinitions="Auto,*">
 
-      <Border Name="TitleBar" Classes="header" CornerRadius="11,11,0,0" Padding="12,8">
+      <Border Name="TitleBar" Classes="header" CornerRadius="11,11,0,0" Padding="12,8"
+              PointerPressed="TitleBar_PointerPressed">
         <Grid ColumnDefinitions="*,Auto">
           <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
             <TextBlock Text="🌤" FontSize="12" VerticalAlignment="Center" />
