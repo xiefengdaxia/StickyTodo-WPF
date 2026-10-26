@@ -1,4 +1,4 @@
-﻿namespace StickyTodo.Core.Localization;
+namespace StickyTodo.Core.Localization;
 
 /// <summary>
 /// 界面文案。键用「模块.用途」的点号命名，值按语言索引。
@@ -250,7 +250,16 @@ public static class UiStrings
 
         // ================= Token 看板 =================
         ["token.title"] = ["Token 用量", "Token usage", "Token 使用量", "Token 사용량"],
-        ["token.total"] = ["总 token", "Total tokens", "総 Token", "총 Token"],
+["token.copyTip"] = ["复制用量摘要到剪贴板", "Copy usage summary to clipboard", "使用量サマリーをクリップボードにコピー", "사용량 요약을 클립보드로 복사"],
+["token.copied"] = ["已复制到剪贴板 {0}", "Copied to clipboard at {0}", "{0} にクリップボードへコピーしました", "{0}에 클립보드로 복사됨"],
+["token.copyFailed"] = ["复制失败：窗口未就绪", "Copy failed: window not ready", "コピー失敗：ウィンドウ未就緒", "복사 실패: 창이 준비되지 않았습니다"],
+["token.copyEmpty"] = ["没有可复制的数据", "Nothing to copy", "コピーするデータがありません", "복사할 데이터가 없습니다"],
+["token.copySummary"] = ["Token 用量（{0}）", "Token usage ({0})", "Token 使用量（{0}）", "Token 사용량 ({0})"],
+["token.copyTotal"] = ["- 总计：{0} tokens，{1} 次调用", "- Total: {0} tokens, {1} calls", "- 合計：{0} トークン、{1} 回の呼び出し", "- 합계: {0} 토큰, {1}회 호출"],
+["token.copyBreakdown"] = ["- 输入 {0} · 输出 {1} · 推理 {2} · 缓存读 {3}", "- Input {0}, Output {1}, Reasoning {2}, Cache read {3}", "- 入力 {0}・出力 {1}・推論 {2}・キャッシュ読取 {3}", "- 입력 {0} · 출력 {1} · 추론 {2} · 캐시 읽기 {3}"],
+["token.copyCacheRatio"] = ["- 缓存命中率：{0}", "- Cache hit ratio: {0}", "- キャッシュ命中率：{0}", "- 캐시 적중률: {0}"],
+["token.copyModels"] = ["- 按模型：", "- By model:", "- モデル別：", "- 모델별:"],
+["token.copyModelRow"] = ["  - {0}：{1} tokens（{2}%）", "  - {0}: {1} tokens ({2}%)", "  - {0}：{1} トークン（{2}%）", "  - {0}: {1} 토큰 ({2}%)"],        ["token.total"] = ["总 token", "Total tokens", "総 Token", "총 Token"],
         ["token.calls"] = ["调用", "Calls", "呼び出し", "호출"],
         ["token.cacheRatio"] = ["缓存比", "Cache ratio", "キャッシュ率", "캐시 비율"],
         ["token.trendTitle"] = ["用量趋势 · 柱=token 折线=调用次数 · 数据来自本机", "Usage trend · bars = tokens, line = calls · local data", "使用量推移・棒=Token 線=呼び出し回数・ローカルデータ", "사용량 추세 · 막대=Token 선=호출 수 · 로컬 데이터"],

@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Text;
+using Avalonia.Controls;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -413,9 +415,97 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, IR
         }
     }
 
-    /// <summary>趋势图点击：显示该点的明细。</summary>
-    public void ShowPointDetail(int index)
+    /// <summary>复制到剪贴板的摘要文本（贴合当前统计范围）。</summary>
+    [ObservableProperty]
+    private string? _copyStatusText;
+
+    /// <summary>复制成功后的提示自动消失计时。</summary>
+    private DispatcherTimer? _copyStatusTimer;
+
+    private Window? _ownerWindow;
+
+    /// <summary>窗口构造后把自身交给 ViewModel，供剪贴板访问。</summary>
+    public void AttachOwner(Window owner) => _ownerWindow = owner;
+
+    /// <summary>
+    /// 把当前用量整理成文本并复制到剪贴板。
+    /// 格式是面向"粘贴给别人看"的：Markdown 汇总 + 按模型明细表。
+    /// </summary>
+    [RelayCommand]
+    private void CopyToClipboard()
     {
+        var clipboard = _ownerWindow is null ? null : TopLevel.GetTopLevel(_ownerWindow)?.Clipboard;
+        if (clipboard is null)
+        {
+            CopyStatusText = Loc.T("token.copyFailed");
+            return;
+        }
+
+        var text = BuildCopyText();
+        if (text.Length == 0)
+        {
+            CopyStatusText = Loc.T("token.copyEmpty");
+            return;
+        }
+
+        _ = clipboard.SetTextAsync(text);
+        CopyStatusText = Loc.F("token.copied", DateTime.Now.ToString("HH:mm"));
+
+        // 提示 3 秒后自动消失
+        if (_copyStatusTimer is null)
+        {
+            _copyStatusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+            _copyStatusTimer.Tick += (_, _) =>
+            {
+                _copyStatusTimer.Stop();
+                CopyStatusText = null;
+            };
+        }
+
+        _copyStatusTimer.Stop();
+        _copyStatusTimer.Start();
+    }
+
+    /// <summary>组装复制文本。没有数据时返回空串。</summary>
+    private string BuildCopyText()
+    {
+        var stats = Stats;
+        if (stats.Total.Total == 0)
+        {
+            return string.Empty;
+        }
+
+        var sb = new StringBuilder();
+        sb.AppendLine(Loc.F("token.copySummary", RangeDays == 0 ? Loc.T("token.rangeToday") : $"{stats.From:MM-dd} ~ {stats.To:MM-dd}"));
+        sb.AppendLine();
+        sb.AppendLine(Loc.F("token.copyTotal", stats.Total.Total.ToString("N0"), stats.Steps.ToString("N0")));
+        sb.AppendLine(Loc.F(
+            "token.copyBreakdown",
+            stats.Total.Input.ToString("N0"),
+            stats.Total.Output.ToString("N0"),
+            stats.Total.Reasoning.ToString("N0"),
+            stats.Total.CacheRead.ToString("N0")));
+        sb.AppendLine(Loc.F("token.copyCacheRatio", $"{stats.Total.CacheRatio * 100:0.0}%"));
+
+        if (Models.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine(Loc.T("token.copyModels"));
+            foreach (var row in Models)
+            {
+                sb.AppendLine(Loc.F(
+                    "token.copyModelRow",
+                    row.Name,
+                    row.Usage.Total.ToString("N0"),
+                    (row.Share * 100).ToString("0.#")));
+            }
+        }
+
+        return sb.ToString().TrimEnd();
+    }
+
+    /// <summary>趋势图点击：显示该点的明细。</summary>
+    public void ShowPointDetail(int index)    {
         if (index < 0 || index >= Stats.Series.Count)
         {
             HideDetail();

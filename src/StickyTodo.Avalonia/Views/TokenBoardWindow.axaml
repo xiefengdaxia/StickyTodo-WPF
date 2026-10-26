@@ -106,7 +106,7 @@
       <!-- 汇总 -->
       <Border Grid.Row="2" Margin="12,10,12,0" Padding="12,10" CornerRadius="10"
               Background="{DynamicResource Brush.Surface}">
-        <Grid ColumnDefinitions="1.5*,*,*,Auto">
+        <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="1.5*,*,*,Auto,Auto">
           <StackPanel Grid.Column="0">
             <TextBlock Text="{loc:Loc token.total}" Classes="metricLabel" />
             <TextBlock Text="{Binding TotalText}" Classes="metricValue" FontSize="22" />
@@ -123,6 +123,16 @@
                   Click="Refresh_Click" VerticalAlignment="Center" Margin="6,0,0,0">
             <TextBlock Text="⟳" FontSize="15" />
           </Button>
+          <Button Grid.Column="4" Classes="chrome" ToolTip.Tip="{loc:Loc token.copyTip}"
+                  Click="Copy_Click" VerticalAlignment="Center" Margin="2,0,0,0">
+            <TextBlock Text="⧉" FontSize="14" />
+          </Button>
+
+          <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="5"
+                     Text="{Binding CopyStatusText}"
+                     Classes="caption" HorizontalAlignment="Right" Margin="0,6,0,0"
+                     Foreground="{DynamicResource Brush.Success}"
+                     IsVisible="{Binding CopyStatusText, Converter={StaticResource NullToCollapsed}}" />
         </Grid>
       </Border>
 

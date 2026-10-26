@@ -20,6 +20,10 @@ public partial class TokenBoardWindow : StickyWindowBase
         InitializeComponent();
         DataContext = viewModel;
 
+        // 复制按钮需要访问剪贴板，剪贴板挂在 TopLevel 上，
+        // 所以等窗口建好后把自身交给 ViewModel。
+        _viewModel.AttachOwner(this);
+
         InitStickyWindow(TitleBar, NoteRoot);
 
         Chart.PointPicked += (_, index) =>
@@ -65,6 +69,8 @@ public partial class TokenBoardWindow : StickyWindowBase
     }
 
     private void Refresh_Click(object? sender, RoutedEventArgs e) => _viewModel.RefreshCommand.Execute(null);
+
+    private void Copy_Click(object? sender, RoutedEventArgs e) => _viewModel.CopyToClipboardCommand.Execute(null);
 
     private void HideDetail_Click(object? sender, RoutedEventArgs e) => _viewModel.HideDetail();
 
