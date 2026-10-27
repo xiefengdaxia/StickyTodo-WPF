@@ -24,6 +24,9 @@ public sealed partial class DesktopClockViewModel : ObservableObject
     private bool _weatherReady;
     private int _rotation;
 
+    /// <summary>天气全列表失败后的下次重试时间；null = 不需要急着重试。</summary>
+    private DateTime? _failedUntil;
+
     public DesktopClockViewModel(WeatherService weather, AppSettingsService settings)
     {
         _weather = weather;
@@ -88,7 +91,12 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         _rotation++;
         UpdateWeatherLine();
 
-        if (_rotation % 1800 == 0)
+        if (_failedUntil is { } until && DateTime.Now < until)
+        {
+            return;
+        }
+
+        if (_rotation % 1800 == 0 || _failedUntil is not null)
         {
             await LoadWeatherAsync();
         }
@@ -120,26 +128,45 @@ public sealed partial class DesktopClockViewModel : ObservableObject
 
     private async Task LoadWeatherAsync()
     {
+        // 每次都重新读设置：用户在天气看板里加/删城市后，轮播立刻跟上
+        _cities = _settings.WeatherCities;
+
         if (_cities.Count == 0)
         {
+            WeatherLine = "没有可显示的城市";
+            WeatherDetail = "在天气看板里添加城市";
             return;
         }
 
-        // 轮流刷新列表里的城市（每次只取一个，避免频繁请求）
-        _currentCityIndex = (_currentCityIndex + 1) % _cities.Count;
-        var city = _cities[_currentCityIndex];
+        // 逐个试：内置坐标的城市基本不会失败；在线解析查不到的跳过试下一个
+        WeatherFetchOutcome? outcome = null;
 
-        var report = await _weather.FetchAsync(city);
-        if (report is not null)
+        for (var attempt = 0; attempt < _cities.Count; attempt++)
         {
-            _report = report;
+            var city = _cities[_currentCityIndex % _cities.Count];
+            var result = await Task.Run(() => _weather.FetchWithOutcomeAsync(city));
+            if (result.Success)
+            {
+                outcome = result;
+                break;
+            }
+
+            _currentCityIndex = (_currentCityIndex + 1) % _cities.Count;
+            outcome = result;
+        }
+
+        if (outcome?.Success == true)
+        {
+            _report = outcome.Report;
             _weatherReady = true;
+            _failedUntil = null;
             UpdateWeatherLine();
+            return;
         }
-        else
-        {
-            WeatherLine = "天气获取失败";
-            WeatherDetail = "请检查网络";
-        }
+
+        // 全列表都失败：60 秒后再试，别一秒一秒地砸接口
+        _failedUntil = DateTime.Now.AddSeconds(60);
+        WeatherLine = "天气获取失败";
+        WeatherDetail = "60 秒后自动重试";
     }
 }

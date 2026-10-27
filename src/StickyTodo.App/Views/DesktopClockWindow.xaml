@@ -9,7 +9,6 @@
         Background="Transparent"
         ResizeMode="NoResize"
         ShowInTaskbar="False"
-        Topmost="True"
         FontFamily="Microsoft YaHei UI"
         UseLayoutRounding="True">
 

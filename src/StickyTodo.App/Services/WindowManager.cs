@@ -27,6 +27,7 @@ public sealed class WindowManager
     private readonly AppSettingsService _settings;
     private readonly SkinService _skinService;
     private readonly Core.Abstractions.ITokenStatsProvider _tokenProvider;
+    private readonly Weather.WeatherService _weatherService;
     private readonly Dictionary<string, Window> _windows = new();
 
     private string? _activeBoardId;
@@ -48,12 +49,14 @@ public sealed class WindowManager
         TodoService todoService,
         AppSettingsService settings,
         SkinService skinService,
-        Core.Abstractions.ITokenStatsProvider tokenProvider)
+        Core.Abstractions.ITokenStatsProvider tokenProvider,
+        Weather.WeatherService weatherService)
     {
         _todoService = todoService;
         _settings = settings;
         _skinService = skinService;
         _tokenProvider = tokenProvider;
+        _weatherService = weatherService;
     }
 
     /// <summary>打开的窗口数变化时触发（托盘菜单据此刷新）。</summary>
@@ -80,6 +83,12 @@ public sealed class WindowManager
                 new CalendarViewModel(_todoService, board, _settings, _skinService), this),
             BoardKind.Token => new TokenBoardWindow(
                 new TokenBoardViewModel(_tokenProvider, _todoService, board, _settings, _skinService), this),
+            // 工具型看板：面板本身不带待办数据，但它是正式看板（进列表、可会话恢复、可重命名/删除）
+            BoardKind.Weather => new WeatherWindow(
+                new WeatherViewModel(_weatherService, _settings)),
+            BoardKind.WorldClock => new WorldClockWindow(new WorldClockViewModel()),
+            BoardKind.DesktopClock => new DesktopClockWindow(
+                new DesktopClockViewModel(_weatherService, _settings)),
             _ => new BoardWindow(new BoardViewModel(_todoService, board, _settings, _skinService), this),
         };
 

@@ -416,6 +416,114 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, ID
         }
     }
 
+    /// <summary>复制到剪贴板后的提示文本（null = 不显示）。</summary>
+    [ObservableProperty]
+    private string? _copyStatusText;
+
+    /// <summary>复制成功后的提示自动消失计时。</summary>
+    private DispatcherTimer? _copyStatusTimer;
+
+    /// <summary>
+    /// 把当前用量整理成文本并复制到剪贴板。
+    /// 格式是面向"粘贴给别人看"的：汇总 + 按模型明细表。
+    /// </summary>
+    [RelayCommand]
+    private void CopyToClipboard()
+    {
+        var text = BuildCopyText();
+        if (text.Length == 0)
+        {
+            CopyStatusText = Loc.T("token.copyEmpty");
+            return;
+        }
+
+        // WPF 的 Clipboard 是同步 API，且剪贴板常被其它进程占着而抛异常，重试几次
+        if (!TrySetClipboardText(text))
+        {
+            CopyStatusText = Loc.T("token.copyFailed");
+            return;
+        }
+
+        CopyStatusText = Loc.F("token.copied", DateTime.Now.ToString("HH:mm"));
+
+        // 提示 3 秒后自动消失
+        if (_copyStatusTimer is null)
+        {
+            _copyStatusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+            _copyStatusTimer.Tick += (_, _) =>
+            {
+                _copyStatusTimer.Stop();
+                CopyStatusText = null;
+            };
+        }
+
+        _copyStatusTimer.Stop();
+        _copyStatusTimer.Start();
+    }
+
+    /// <summary>
+    /// 写剪贴板。被其它程序（远程桌面、输入法、剪贴板管理器）瞬时占用时
+    /// Clipboard.SetDataObject 会抛 ExternalException，这里重试到 3 次。
+    /// </summary>
+    private static bool TrySetClipboardText(string text)
+    {
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            try
+            {
+                System.Windows.Clipboard.SetText(text);
+                return true;
+            }
+            catch (Exception)
+            {
+                // 稍等一下再抢一次；System.Windows 没有 Sleep 的异步版本可用，UI 线程上短暂阻塞可接受
+                System.Threading.Thread.Sleep(60);
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>组装复制文本。没有数据时返回空串。</summary>
+    private string BuildCopyText()
+    {        var stats = Stats;
+        if (stats.Total.Total == 0)
+        {
+            return string.Empty;
+        }
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine(Loc.F("token.copySummary", RangeDays == 0 ? Loc.T("token.rangeToday") : $"{stats.From:MM-dd} ~ {stats.To:MM-dd}"));
+        sb.AppendLine();
+        sb.AppendLine(Loc.F("token.copyTotal", stats.Total.Total.ToString("N0"), stats.Steps.ToString("N0")));
+        sb.AppendLine(Loc.F(
+            "token.copyBreakdown",
+            stats.Total.Input.ToString("N0"),
+            stats.Total.Output.ToString("N0"),
+            stats.Total.Reasoning.ToString("N0"),
+            stats.Total.CacheRead.ToString("N0")));
+        sb.AppendLine(Loc.F("token.copyCacheRatio", $"{stats.Total.CacheRatio * 100:0.0}%"));
+
+        if (Models.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine(Loc.T("token.copyModels"));
+            foreach (var row in Models)
+            {
+                sb.AppendLine(Loc.F(
+                    "token.copyModelRow",
+                    row.Name,
+                    row.Usage.Total.ToString("N0"),
+                    (row.Share * 100).ToString("0.#")));
+            }
+        }
+
+        return sb.ToString().TrimEnd();
+    }
+
+    /// <summary>回归用：只看组装出来的复制文本，不碰剪贴板。</summary>
+    internal string CopyTextForTest() => BuildCopyText();
+
     /// <summary>趋势图点击：显示该点的明细。</summary>
     public void ShowPointDetail(int index)
     {
@@ -565,6 +673,7 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, ID
 
         _disposed = true;
         _timer.Stop();
+        _copyStatusTimer?.Stop();
 
         try
         {

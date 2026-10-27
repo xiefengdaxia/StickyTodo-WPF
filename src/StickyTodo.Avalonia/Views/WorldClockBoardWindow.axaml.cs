@@ -13,23 +13,18 @@ public partial class WorldClockBoardWindow : Window
         DataContext = viewModel;
 
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
+
+        Opened += (_, _) => Services.ScreenHelper.FitIntoWorkArea(this);
     }
 
     private void TitleBar_PointerPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
     {
-        try
-        {
-            BeginMoveDrag(e);
-        }
-        catch (Exception)
-        {
-            // 忽略
-        }
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
         {
             return;
         }
 
+        // 点在按钮上不触发拖动
         if (e.Source is Control source)
         {
             var current = source;

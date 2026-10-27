@@ -243,7 +243,11 @@ public sealed class AppSettingsService
         set => _repository.SetSetting(WeatherCitiesKey, string.Join(",", value));
     }
 
-    /// <summary>默认城市列表（与参考 UI 一致）。</summary>
+    /// <summary>
+    /// 默认城市列表（与参考 UI 一致）。
+    /// 这些名字都收录在天气模块的内置坐标表里，所以即便 Open-Meteo 的中文地理编码
+    /// 查不到（「岳麓」「炎陵」）或会命中同名异地（「双峰」在浙江），也能定位到正确城市。
+    /// </summary>
     public static readonly IReadOnlyList<string> DefaultWeatherCities =
     [
         "双峰", "岳麓", "芙蓉", "苏州", "炎陵", "杭州",

@@ -97,6 +97,8 @@ public partial class TokenBoardWindow : Window, IStickyWindow
 
     private void HideDetail_Click(object sender, RoutedEventArgs e) => _viewModel.HideDetail();
 
+    private void Copy_Click(object sender, RoutedEventArgs e) => _viewModel.CopyToClipboardCommand.Execute(null);
+
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ButtonState == MouseButtonState.Pressed)
@@ -301,4 +303,14 @@ public partial class TokenBoardWindow : Window, IStickyWindow
 
     /// <summary>给回归用：当前趋势图有多少个点。</summary>
     internal int PointCountForTest => _viewModel.Stats.Series.Count;
+
+    /// <summary>Regression hook: simulate clicking the copy button; returns the status text.</summary>
+    internal string CopyForTest()
+    {
+        _viewModel.CopyToClipboardCommand.Execute(null);
+        return _viewModel.CopyStatusText ?? "(null)";
+    }
+
+    /// <summary>Regression hook: the assembled copy text (no clipboard touch).</summary>
+    internal string CopyTextForTest() => _viewModel.CopyTextForTest();
 }

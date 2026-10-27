@@ -39,4 +39,37 @@ public static class ScreenHelper
         var y = Math.Min(Math.Max(top, area.Top), Math.Max(area.Top, area.Bottom - height));
         return (x, y);
     }
+
+    /// <summary>
+    /// 把窗口收进工作区并居中：小屏 / 高缩放下（1080p + 150% 的工作区只有 720 逻辑高）
+    /// 默认尺寸的大窗口会把标题栏顶到屏幕外，看起来就像"拖不动"。
+    /// </summary>
+    public static void FitIntoWorkArea(Window window, bool centerHorizontally = true)
+    {
+        var area = GetWorkArea(window);
+
+        var width = window.ActualWidth > 0 ? window.ActualWidth : window.Width;
+        var height = window.ActualHeight > 0 ? window.ActualHeight : window.Height;
+
+        var maxW = Math.Max(320, area.Width - 16);
+        var maxH = Math.Max(360, area.Height - 16);
+
+        if (width > maxW)
+        {
+            window.Width = maxW;
+            width = maxW;
+        }
+
+        if (height > maxH)
+        {
+            window.Height = maxH;
+            height = maxH;
+        }
+
+        var left = centerHorizontally ? area.Left + (area.Width - width) / 2 : window.Left;
+        var top = area.Top + Math.Max(0, (area.Height - height) / 2);
+        var (clampedLeft, clampedTop) = ClampIntoWorkArea(window, left, top, width, height);
+        window.Left = clampedLeft;
+        window.Top = clampedTop;
+    }
 }

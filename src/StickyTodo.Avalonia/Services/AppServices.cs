@@ -51,6 +51,7 @@ public sealed class AppServices : IDisposable
 
         Manager = new ManagerWindow(ManagerViewModel);
         SettingsWindow = new SettingsWindow(SettingsViewModel);
+        AttachManagerAutoRefresh();
     }
 
     public IEntitlementService Entitlement { get; }
@@ -99,6 +100,15 @@ public sealed class AppServices : IDisposable
         _ = Manager.RefreshAsync();
     }
 
+    /// <summary>
+    /// 看板增删（含托盘 / 启动参数 / 工具看板这些不走管理面板按钮的路径）之后，
+    /// 「我的看板」列表自动刷新。与 WPF 版 ManagerWindow 订阅 BoardsChanged 的行为对齐。
+    /// </summary>
+    private void AttachManagerAutoRefresh()
+    {
+        Windows.BoardsChanged += (_, _) => _ = Manager.RefreshAsync();
+    }
+
     public void ShowSettings()
     {
         SettingsWindow.ShowAndActivate();
@@ -131,53 +141,35 @@ public sealed class AppServices : IDisposable
 
     // ---------------- 工具型窗口（天气 / 世界时钟 / 桌面时钟） ----------------
 
-    private readonly Dictionary<string, Window> _toolWindows = new();
-
     private Weather.WeatherService? _weatherService;
 
     /// <summary>天气服务（惰性创建；只有打开天气/桌面时钟才会用到网络）。</summary>
     public Weather.WeatherService Weather => _weatherService ??= new Weather.WeatherService();
 
-    /// <summary>打开工具型窗口。单例：重复点只是激活已有窗口。</summary>
+    /// <summary>
+    /// 打开工具型面板。走「正式看板」路径：没有就建一条 Board 记录，
+    /// 这样它和待办看板一样出现在「我的看板」列表里，也参与会话恢复。
+    /// 单例语义：已开着就只激活。
+    /// </summary>
     public void OpenToolWindow(ToolWindowKind kind)
     {
-        var key = kind switch
+        var (boardKind, defaultName) = kind switch
         {
-            ToolWindowKind.Weather => "weather",
-            ToolWindowKind.WorldClock => "worldclock",
-            ToolWindowKind.DesktopClock => "desktopclock",
-            _ => string.Empty,
+            ToolWindowKind.Weather => (Core.Entities.BoardKind.Weather, "天气"),
+            ToolWindowKind.WorldClock => (Core.Entities.BoardKind.WorldClock, "世界时钟"),
+            ToolWindowKind.DesktopClock => (Core.Entities.BoardKind.DesktopClock, "桌面时钟"),
+            _ => (Core.Entities.BoardKind.Todo, string.Empty),
         };
 
-        if (key.Length == 0)
+        if (boardKind == Core.Entities.BoardKind.Todo)
         {
             return;
         }
 
-        if (_toolWindows.TryGetValue(key, out var existing) && existing.IsVisible)
-        {
-            if (existing.WindowState == WindowState.Minimized)
-            {
-                existing.WindowState = WindowState.Normal;
-            }
+        var board = Todos.GetBoards().FirstOrDefault(b => b.Kind == boardKind)
+            ?? Todos.CreateBoard(defaultName, boardKind);
 
-            existing.Activate();
-            return;
-        }
-
-        Window window = kind switch
-        {
-            ToolWindowKind.Weather => new Views.WeatherBoardWindow(
-                new ViewModels.WeatherViewModel(Weather, Settings)),
-            ToolWindowKind.WorldClock => new Views.WorldClockBoardWindow(
-                new ViewModels.WorldClockViewModel()),
-            ToolWindowKind.DesktopClock => new Views.DesktopClockBoardWindow(
-                new ViewModels.DesktopClockViewModel(Weather, Settings)),
-            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
-        };
-
-        _toolWindows[key] = window;
-        window.Show();
+        Windows.OpenBoard(board);
     }
 
     /// <summary>退出：先固化会话，再关窗，最后清理托盘与快捷键。</summary>

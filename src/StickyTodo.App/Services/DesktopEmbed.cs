@@ -9,34 +9,53 @@ namespace StickyTodo.App.Services;
 /// </summary>
 internal static class DesktopEmbed
 {
-    public static void Embed(System.Windows.Window window)
+    /// <summary>
+    /// 尝试嵌入桌面层。
+    /// </summary>
+    /// <returns>true = 已挂到桌面图标层后面；false = 嵌入失败，调用方应自己退回置顶。</returns>
+    public static bool Embed(System.Windows.Window window)
     {
         try
         {
             var handle = new System.Windows.Interop.WindowInteropHelper(window).Handle;
             if (handle == nint.Zero)
             {
-                return;
+                return false;
             }
 
             var exStyle = GetWindowLong(handle, GwlExStyle);
             _ = SetWindowLong(handle, GwlExStyle, exStyle | WsExToolwindow);
 
             var worker = FindWorkerW();
-            if (worker != nint.Zero)
+            if (worker == nint.Zero)
             {
-                _ = SetWindowPos(handle, worker, 0, 0, 0, 0,
-                    SwpNomove | SwpNosize | SwpNoactivate);
+                return false;
             }
+
+            // 先脱离置顶带：topmost 窗口没法插到桌面层后面
+            _ = SetWindowPos(handle, HwndNotopmost, 0, 0, 0, 0,
+                SwpNomove | SwpNosize | SwpNoactivate);
+
+            // 挂到桌面图标层之后：普通窗口都压在它上面，Win+D 也不会收起它
+            _ = SetWindowPos(handle, worker, 0, 0, 0, 0,
+                SwpNomove | SwpNosize | SwpNoactivate);
+            return true;
         }
         catch (Exception)
         {
             // 嵌入失败不影响使用，只是行为退回普通置顶窗
+            return false;
         }
     }
 
     private static nint FindWorkerW()
     {
+        // 桌面层进程活着就不会变：缓存起来，避免每次嵌入都给 Progman 发消息（可能卡 UI）
+        if (_cachedWorker != nint.Zero && IsWindow(_cachedWorker))
+        {
+            return _cachedWorker;
+        }
+
         var progman = FindWindow("Progman", null);
         if (progman == nint.Zero)
         {
@@ -62,8 +81,12 @@ internal static class DesktopEmbed
             return true;
         }, nint.Zero);
 
+        _cachedWorker = result;
         return result;
     }
+
+    /// <summary>缓存的桌面层句柄（Explorer 重启后失效，用 IsWindow 校验）。</summary>
+    private static nint _cachedWorker;
 
     private static string GetClassNameOf(nint hwnd)
     {
@@ -79,6 +102,9 @@ internal static class DesktopEmbed
     private const uint SwpNoactivate = 0x0010;
     private const uint SmtoAbortifhung = 0x0002;
 
+    /// <summary>退出置顶带（否则 Z 序操作无效，窗口永远盖在所有程序上面）。</summary>
+    private static readonly nint HwndNotopmost = new(-2);
+
     private delegate bool EnumWindowsProc(nint hwnd, nint lParam);
 
     [DllImport("user32.dll")] private static extern int GetWindowLong(nint hwnd, int index);
@@ -90,6 +116,8 @@ internal static class DesktopEmbed
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern nint FindWindowEx(nint parent, nint child, string? className, string? windowName);
 
     [DllImport("user32.dll")] private static extern bool EnumWindows(EnumWindowsProc callback, nint lParam);
+
+    [DllImport("user32.dll")] private static extern bool IsWindow(nint hwnd);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(nint hwnd, char[] buffer, int maxCount);
 

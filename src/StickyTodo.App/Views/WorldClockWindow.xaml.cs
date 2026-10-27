@@ -14,6 +14,9 @@ public partial class WorldClockWindow : Window
         _viewModel = viewModel;
         InitializeComponent();
         DataContext = viewModel;
+
+        // 小屏 / 高缩放下收进工作区，避免标题栏跑到屏幕外
+        Loaded += (_, _) => Services.ScreenHelper.FitIntoWorkArea(this);
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

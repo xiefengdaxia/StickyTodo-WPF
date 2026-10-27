@@ -10,7 +10,6 @@
         Background="Transparent"
         CanResize="False"
         ShowInTaskbar="False"
-        Topmost="True"
         TransparencyBackgroundFallback="#F02F2A26"
         FontFamily="Microsoft YaHei UI, Segoe UI"
         UseLayoutRounding="True">

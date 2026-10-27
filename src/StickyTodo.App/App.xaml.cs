@@ -311,6 +311,7 @@ public partial class App : System.Windows.Application
             {
                 OpenTool(ToolWindowKind.DesktopClock);
             }
+
             AttachHotKeys(manager);
 
             // 开机自启：注册表与用户设置对齐（换了安装路径时自动更新）
@@ -333,6 +334,33 @@ public partial class App : System.Windows.Application
                 {
                     manager.Show();
                 }
+            }
+
+            // --create-tool-demo <weather|worldclock|desktopclock>：打开一个工具型看板（进「我的看板」列表）。
+            // 已有同类型的就复用，否则每次启动都会多建一个看板。
+            // 必须放在 RestoreSession 之后：先开会话记录会被覆盖，上次的看板就丢了。
+            var toolArg = ToolDemoArgument(e.Args);
+            var toolKind = toolArg?.Trim().ToLowerInvariant() switch
+            {
+                "weather" => BoardKind.Weather,
+                "worldclock" => BoardKind.WorldClock,
+                "desktopclock" => BoardKind.DesktopClock,
+                _ => (BoardKind?)null,
+            };
+
+            if (toolKind is { } kind)
+            {
+                var todos = _host.Services.GetRequiredService<TodoService>();
+                var board = todos.GetBoards().FirstOrDefault(b => b.Kind == kind)
+                    ?? todos.CreateBoard(
+                        kind switch
+                        {
+                            BoardKind.Weather => "天气",
+                            BoardKind.WorldClock => "世界时钟",
+                            _ => "桌面时钟",
+                        }, kind);
+
+                _host.Services.GetRequiredService<WindowManager>().OpenBoard(board);
             }
 
             if (isDemo)
@@ -497,61 +525,33 @@ public partial class App : System.Windows.Application
         menu.IsOpen = true;
     }
 
-    /// <summary>打开工具型窗口（天气 / 世界时钟 / 桌面时钟）。单例：重复点只是激活已有窗口。</summary>
-    public async Task OpenToolWindowAsync(ToolWindowKind kind)
+    /// <summary>
+    /// 打开工具型面板（天气 / 世界时钟 / 桌面时钟）。
+    /// 走「正式看板」路径：没有就建一条 Board 记录，于是它和待办看板一样
+    /// 出现在「我的看板」列表里，也参与会话恢复。已开着就只激活。
+    /// </summary>
+    public void OpenTool(ToolWindowKind kind)
     {
         var services = _host!.Services;
 
-        Window window = kind switch
+        var (boardKind, defaultName) = kind switch
         {
-            ToolWindowKind.Weather => GetOrCreateToolWindow("weather", () =>
-            {
-                var vm = services.GetRequiredService<ViewModels.WeatherViewModel>();
-                var w = new WeatherWindow(vm);
-                w.Closed += (_, _) => _toolWindows.Remove("weather");
-                return w;
-            }),
-            ToolWindowKind.WorldClock => GetOrCreateToolWindow("worldclock", () =>
-            {
-                var w = services.GetRequiredService<WorldClockWindow>();
-                w.Closed += (_, _) => _toolWindows.Remove("worldclock");
-                return w;
-            }),
-            ToolWindowKind.DesktopClock => GetOrCreateToolWindow("desktopclock", () =>
-            {
-                var w = services.GetRequiredService<DesktopClockWindow>();
-                w.Closed += (_, _) => _toolWindows.Remove("desktopclock");
-                return w;
-            }),
-            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+            ToolWindowKind.Weather => (BoardKind.Weather, "天气"),
+            ToolWindowKind.WorldClock => (BoardKind.WorldClock, "世界时钟"),
+            ToolWindowKind.DesktopClock => (BoardKind.DesktopClock, "桌面时钟"),
+            _ => (BoardKind.Todo, string.Empty),
         };
 
-        if (!window.IsVisible)
+        if (boardKind == BoardKind.Todo)
         {
-            window.Show();
+            return;
         }
 
-        if (window.WindowState == WindowState.Minimized)
-        {
-            window.WindowState = WindowState.Normal;
-        }
+        var todos = services.GetRequiredService<TodoService>();
+        var board = todos.GetBoards().FirstOrDefault(b => b.Kind == boardKind)
+            ?? todos.CreateBoard(defaultName, boardKind);
 
-        window.Activate();
-        await Task.CompletedTask;
-    }
-
-    private readonly Dictionary<string, Window> _toolWindows = new();
-
-    private Window GetOrCreateToolWindow(string key, Func<Window> factory)
-    {
-        if (_toolWindows.TryGetValue(key, out var existing) && existing.IsLoaded)
-        {
-            return existing;
-        }
-
-        var window = factory();
-        _toolWindows[key] = window;
-        return window;
+        services.GetRequiredService<WindowManager>().OpenBoard(board);
     }
 
     /// <summary>
@@ -1493,6 +1493,13 @@ public partial class App : System.Windows.Application
 
             // 恢复到默认间隔，免得把演示数据留成 5s
             window.SelectIntervalForTest(15);
+
+            // 复制摘要（WPF 版补齐，与 Avalonia 版对齐）：
+            // 文本内容可确定性断言；剪贴板是否可用取决于环境，只记日志不判失败。
+            var copyText = window.CopyTextForTest();
+            var copyStatus = window.CopyForTest();
+            Log.Information("[token] 复制摘要：{Len} 字，提示='{Status}'", copyText.Length, copyStatus);
+            ok &= copyText.Length > 0 && copyText.Contains('\n');
 
             if (shotDirectory is not null)
             {
@@ -2962,27 +2969,18 @@ public partial class App : System.Windows.Application
 
 
     /// <summary>打开工具型窗口（天气 / 世界时钟 / 桌面时钟）。单例。</summary>
-    public void OpenTool(ToolWindowKind kind)
+    /// <summary>取 --create-tool-demo 后面跟的值（没有该参数时返回 null）。</summary>
+    private static string? ToolDemoArgument(string[] args)
     {
-        var services = _host!.Services;
-        var key = kind.ToString();
-
-        if (_toolWindows.TryGetValue(key, out var existing) && existing.IsLoaded)
+        for (var i = 0; i < args.Length - 1; i++)
         {
-            ShowAndActivateCompat(existing);
-            return;
+            if (string.Equals(args[i], "--create-tool-demo", StringComparison.OrdinalIgnoreCase))
+            {
+                return args[i + 1];
+            }
         }
 
-        Window window = kind switch
-        {
-            ToolWindowKind.Weather => new Views.WeatherWindow(services.GetRequiredService<ViewModels.WeatherViewModel>()),
-            ToolWindowKind.WorldClock => new Views.WorldClockWindow(services.GetRequiredService<ViewModels.WorldClockViewModel>()),
-            ToolWindowKind.DesktopClock => new Views.DesktopClockWindow(services.GetRequiredService<ViewModels.DesktopClockViewModel>()),
-            _ => throw new ArgumentOutOfRangeException(nameof(kind)),
-        };
-
-        _toolWindows[key] = window;
-        window.Show();
+        return null;
     }
 
     /// <summary>ShowAndActivate 兼容方法。</summary>

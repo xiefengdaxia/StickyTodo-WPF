@@ -17,12 +17,14 @@ public partial class WeatherBoardWindow : Window
 
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
+        // 小屏 / 高缩放下把窗口收进工作区，否则标题栏会被顶到屏幕外（看着像"拖不动"）
+        Opened += (_, _) => Services.ScreenHelper.FitIntoWorkArea(this);
+
         Opened += async (_, _) => await viewModel.LoadCoreAsync();
     }
 
     private void TitleBar_PointerPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
     {
-        Services.Log.Info($"[wt] TitleBar_PointerPressed source={e.Source?.GetType().Name}");
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
         {
             return;
@@ -57,6 +59,16 @@ public partial class WeatherBoardWindow : Window
         if (sender is Control { Tag: WeatherCityRow city })
         {
             _viewModel.SelectCity(city.Name);
+        }
+    }
+
+    /// <summary>输入城市名后按回车 = 点「添加」。</summary>
+    private void NewCity_KeyDown(object? sender, Avalonia.Input.KeyEventArgs e)
+    {
+        if (e.Key == Avalonia.Input.Key.Enter)
+        {
+            _viewModel.AddCityFromInputCommand.Execute(null);
+            e.Handled = true;
         }
     }
 

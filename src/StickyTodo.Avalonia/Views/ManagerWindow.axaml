@@ -25,7 +25,7 @@
       <!-- 左侧：品牌 + 操作 -->
       <Border Grid.Column="0" Background="{DynamicResource Brush.PaperDeep}" CornerRadius="13,0,0,13"
               Padding="16,18,14,14">
-        <Grid RowDefinitions="Auto,Auto,*,Auto">
+        <Grid RowDefinitions="Auto,*,Auto">
 
           <!-- 注意 Background 必须有值：透明 StackPanel 收不到 PointerPressed，窗口会拖不动 -->
           <StackPanel Grid.Row="0" Name="TitleBar" Background="Transparent">
@@ -47,31 +47,35 @@
             </Border>
           </StackPanel>
 
-          <StackPanel Grid.Row="1" Margin="0,18,0,0">
-            <TextBlock Text="{loc:Loc manager.new}" Classes="section" Margin="2,0,0,7" />
-            <Button Content="{loc:Loc manager.newTodo}" Classes="primary" HorizontalContentAlignment="Left"
-                    Padding="12,8" Margin="0,0,0,6" Click="CreateTodo_Click" />
-            <Button Content="{loc:Loc manager.newMemo}" Classes="ghost" HorizontalContentAlignment="Left"
-                    Padding="12,8" Margin="0,0,0,6" Click="CreateMemo_Click" />
-            <Button Content="{loc:Loc manager.newCalendar}" Classes="ghost" HorizontalContentAlignment="Left"
-                    Padding="12,8" Margin="0,0,0,6" Click="CreateCalendar_Click" />
-            <Button Content="{loc:Loc manager.newToken}" Classes="ghost" HorizontalContentAlignment="Left"
-                    Padding="12,8" Margin="0,0,0,6" Click="CreateToken_Click" />
-            <Button Content="+  天气看板" Classes="ghost" HorizontalContentAlignment="Left"
-                    Padding="12,8" Margin="0,0,0,6" Click="CreateWeather_Click" />
-            <Button Content="+  世界时钟" Classes="ghost" HorizontalContentAlignment="Left"
-                    Padding="12,8" Margin="0,0,0,6" Click="CreateWorldClock_Click" />
-            <Button Content="+  桌面时钟" Classes="ghost" HorizontalContentAlignment="Left"
-                    Padding="12,8" Margin="0,0,0,14" Click="CreateDesktopClock_Click" />
+          <!-- 中间区：按钮多了会超高，用 ScrollViewer 保证底部「设置 / 退出」永远可见 -->
+          <ScrollViewer Grid.Row="1" Margin="0,18,0,0" VerticalScrollBarVisibility="Auto"
+                        HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
+              <TextBlock Text="{loc:Loc manager.new}" Classes="section" Margin="2,0,0,7" />
+              <Button Content="{loc:Loc manager.newTodo}" Classes="primary" HorizontalContentAlignment="Left"
+                      Padding="12,8" Margin="0,0,0,6" Click="CreateTodo_Click" />
+              <Button Content="{loc:Loc manager.newMemo}" Classes="ghost" HorizontalContentAlignment="Left"
+                      Padding="12,8" Margin="0,0,0,6" Click="CreateMemo_Click" />
+              <Button Content="{loc:Loc manager.newCalendar}" Classes="ghost" HorizontalContentAlignment="Left"
+                      Padding="12,8" Margin="0,0,0,6" Click="CreateCalendar_Click" />
+              <Button Content="{loc:Loc manager.newToken}" Classes="ghost" HorizontalContentAlignment="Left"
+                      Padding="12,8" Margin="0,0,0,6" Click="CreateToken_Click" />
+              <Button Content="{loc:Loc manager.newWeather}" Classes="ghost" HorizontalContentAlignment="Left"
+                      Padding="12,8" Margin="0,0,0,6" Click="CreateWeather_Click" />
+              <Button Content="{loc:Loc manager.newWorldClock}" Classes="ghost" HorizontalContentAlignment="Left"
+                      Padding="12,8" Margin="0,0,0,6" Click="CreateWorldClock_Click" />
+              <Button Content="{loc:Loc manager.newDesktopClock}" Classes="ghost" HorizontalContentAlignment="Left"
+                      Padding="12,8" Margin="0,0,0,14" Click="CreateDesktopClock_Click" />
 
-            <TextBlock Text="{loc:Loc manager.selected}" Classes="section" Margin="2,0,0,7" />
-            <Button Content="{loc:Loc common.rename}" Classes="ghost" HorizontalContentAlignment="Left"
-                    Padding="12,8" Margin="0,0,0,6" Click="Rename_Click" />
-            <Button Content="{loc:Loc common.delete}" Classes="ghost" HorizontalContentAlignment="Left"
-                    Padding="12,8" Click="Delete_Click" />
-          </StackPanel>
+              <TextBlock Text="{loc:Loc manager.selected}" Classes="section" Margin="2,0,0,7" />
+              <Button Content="{loc:Loc common.rename}" Classes="ghost" HorizontalContentAlignment="Left"
+                      Padding="12,8" Margin="0,0,0,6" Click="Rename_Click" />
+              <Button Content="{loc:Loc common.delete}" Classes="ghost" HorizontalContentAlignment="Left"
+                      Padding="12,8" Click="Delete_Click" />
+            </StackPanel>
+          </ScrollViewer>
 
-          <StackPanel Grid.Row="3">
+          <StackPanel Grid.Row="2">
             <Border Classes="divider" Margin="0,0,0,10" />
             <Button Content="{loc:Loc common.settings}" Classes="ghost" HorizontalContentAlignment="Left"
                     Padding="12,8" Margin="0,0,0,6" Click="OpenSettings_Click" />

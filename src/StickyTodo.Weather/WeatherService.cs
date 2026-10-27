@@ -121,16 +121,177 @@ public sealed record WeatherReport
     public IReadOnlyList<WeatherDayInfo> Days { get; init; } = Array.Empty<WeatherDayInfo>();
 }
 
+/// <summary>一次天气抓取的结果：成功带报告，失败带可读原因。</summary>
+public sealed record WeatherFetchOutcome
+{
+    private WeatherFetchOutcome(WeatherReport? report, string? error)
+    {
+        Report = report;
+        Error = error;
+    }
+
+    public WeatherReport? Report { get; }
+
+    /// <summary>失败原因（用户可读）；成功时为 null。</summary>
+    public string? Error { get; }
+
+    public bool Success => Report is not null;
+
+    public static WeatherFetchOutcome Ok(WeatherReport report) => new(report, null);
+
+    public static WeatherFetchOutcome Fail(string error) => new(null, error);
+}
+
 /// <summary>
 /// 天气数据访问：Open-Meteo 免费接口（无需注册、无 API key）。
 ///   地理编码: https://geocoding-api.open-meteo.com/v1/search?name=双峰&language=zh&count=1
 ///   天气:     https://api.open-meteo.com/v1/forecast?...&daily=...&current=...
 ///   空气质量: https://air-quality-api.open-meteo.com/v1/air-quality?...&hourly=...（ european_aqi 为整数）
 ///
-/// 这是全应用唯一的联网功能，超时 8 秒、全部失败时返回 null，界面显示"获取失败"。
+/// 这是全应用唯一的联网功能，超时 8 秒；失败带原因文本，界面显示"获取失败：原因"。
+///
+/// 中文小地名在 Open-Meteo 的地理库里很不可靠：实测「岳麓」「炎陵」「娄底」根本查不到
+/// （返回的 JSON 没有 results 字段），「双峰」会解析到浙江金华、「长沙」解析到重庆、
+/// 「湘潭」解析到安徽黄山。所以先查内置坐标表，查不到才回落到在线地理编码。
 /// </summary>
 public sealed class WeatherService
 {
+    /// <summary>内置城市坐标表：城市名 → (纬度, 经度)。WGS84，与 Open-Meteo 接口一致。</summary>
+    public static readonly IReadOnlyDictionary<string, (double Lat, double Lon)> KnownCities =
+        new Dictionary<string, (double Lat, double Lon)>(StringComparer.OrdinalIgnoreCase)
+        {
+            // 湖南（默认城市）
+            ["长沙"] = (28.2278, 112.9388),
+            ["岳麓"] = (28.2300, 112.9330),
+            ["芙蓉"] = (28.1945, 112.9867),
+            ["天心"] = (28.1170, 112.9730),
+            ["开福"] = (28.2530, 112.9730),
+            ["望城"] = (28.3520, 112.8190),
+            ["双峰"] = (27.4608, 112.0020),
+            ["娄底"] = (27.7340, 111.9950),
+            ["炎陵"] = (26.4870, 113.7310),
+            ["株洲"] = (27.8270, 113.1340),
+            ["湘潭"] = (27.8300, 112.9400),
+            ["衡阳"] = (26.8930, 112.5720),
+            ["岳阳"] = (29.3570, 113.1290),
+            ["常德"] = (29.0400, 111.6830),
+            ["郴州"] = (25.7700, 113.0160),
+            ["邵阳"] = (27.2400, 111.4650),
+            ["张家界"] = (29.1170, 110.4790),
+            ["益阳"] = (28.5530, 112.3550),
+            ["永州"] = (26.4360, 111.6140),
+            ["怀化"] = (27.5500, 110.0000),
+
+            // 国内主要城市
+            ["北京"] = (39.9042, 116.4074),
+            ["上海"] = (31.2304, 121.4737),
+            ["广州"] = (23.1291, 113.2644),
+            ["深圳"] = (22.5431, 114.0579),
+            ["杭州"] = (30.2741, 120.1551),
+            ["苏州"] = (31.2989, 120.5853),
+            ["南京"] = (32.0603, 118.7969),
+            ["成都"] = (30.5728, 104.0668),
+            ["武汉"] = (30.5928, 114.3055),
+            ["西安"] = (34.3416, 108.9398),
+            ["重庆"] = (29.5630, 106.5516),
+            ["天津"] = (39.3434, 117.3616),
+            ["郑州"] = (34.7466, 113.6254),
+            ["济南"] = (36.6512, 117.1201),
+            ["青岛"] = (36.0671, 120.3826),
+            ["大连"] = (38.9140, 121.6147),
+            ["沈阳"] = (41.8057, 123.4315),
+            ["哈尔滨"] = (45.8038, 126.5340),
+            ["长春"] = (43.8171, 125.3235),
+            ["石家庄"] = (38.0428, 114.5149),
+            ["太原"] = (37.8706, 112.5489),
+            ["合肥"] = (31.8206, 117.2272),
+            ["宁波"] = (29.8683, 121.5440),
+            ["厦门"] = (24.4798, 118.0819),
+            ["福州"] = (26.0745, 119.2965),
+            ["南昌"] = (28.6820, 115.8579),
+            ["南宁"] = (22.8170, 108.3665),
+            ["昆明"] = (25.0389, 102.7183),
+            ["贵阳"] = (26.6470, 106.6302),
+            ["兰州"] = (36.0611, 103.8343),
+            ["银川"] = (38.4872, 106.2309),
+            ["乌鲁木齐"] = (43.8256, 87.6168),
+            ["呼和浩特"] = (40.8424, 111.7490),
+            ["拉萨"] = (29.6500, 91.1000),
+            ["海口"] = (20.0444, 110.1999),
+            ["三亚"] = (18.2528, 109.8539),
+            ["东莞"] = (23.0207, 113.7518),
+            ["佛山"] = (23.0218, 113.1219),
+            ["珠海"] = (22.2707, 113.5767),
+            ["无锡"] = (31.4912, 120.3119),
+            ["常州"] = (31.8106, 119.9740),
+            ["温州"] = (28.0000, 120.6720),
+            ["金华"] = (29.0780, 119.6470),
+            ["洛阳"] = (34.6180, 112.4540),
+            ["徐州"] = (34.2058, 117.2840),
+            ["烟台"] = (37.5330, 121.3800),
+            ["绵阳"] = (31.4680, 104.6790),
+            ["遵义"] = (27.7210, 106.9280),
+            ["桂林"] = (25.2736, 110.2990),
+
+            // 港澳台
+            ["香港"] = (22.3193, 114.1694),
+            ["澳门"] = (22.1987, 113.5439),
+            ["台北"] = (25.0330, 121.5654),
+
+            // 常用国外城市
+            ["东京"] = (35.6762, 139.6503),
+            ["首尔"] = (37.5665, 126.9780),
+            ["新加坡"] = (1.3521, 103.8198),
+            ["曼谷"] = (13.7563, 100.5018),
+            ["纽约"] = (40.7128, -74.0060),
+            ["洛杉矶"] = (34.0522, -118.2437),
+            ["旧金山"] = (37.7749, -122.4194),
+            ["芝加哥"] = (41.8781, -87.6298),
+            ["温哥华"] = (49.2827, -123.1207),
+            ["伦敦"] = (51.5074, -0.1278),
+            ["巴黎"] = (48.8566, 2.3522),
+            ["柏林"] = (52.5200, 13.4050),
+            ["莫斯科"] = (55.7558, 37.6173),
+            ["迪拜"] = (25.2048, 55.2708),
+            ["悉尼"] = (-33.8688, 151.2093),
+            ["墨尔本"] = (-37.8136, 144.9631),
+        };
+
+    /// <summary>城市名是否命中内置坐标表。</summary>
+    public static bool IsKnownCity(string city) => KnownCities.ContainsKey(city);
+
+    /// <summary>
+    /// 用内置坐标表解析城市：先原名，再去掉常见行政后缀（"岳麓区"→"岳麓"）试一次。
+    /// </summary>
+    public static bool TryResolveKnown(string city, out double lat, out double lon)
+    {
+        lat = 0;
+        lon = 0;
+
+        if (string.IsNullOrWhiteSpace(city))
+        {
+            return false;
+        }
+
+        if (KnownCities.TryGetValue(city.Trim(), out var hit))
+        {
+            (lat, lon) = hit;
+            return true;
+        }
+
+        foreach (var suffix in new[] { "特别行政区", "自治州", "地区", "市", "县", "区", "州" })
+        {
+            if (city.Length > suffix.Length && city.EndsWith(suffix, StringComparison.Ordinal)
+                && KnownCities.TryGetValue(city[..^suffix.Length], out hit))
+            {
+                (lat, lon) = hit;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private const string GeocodingUrl =
         "https://geocoding-api.open-meteo.com/v1/search?name={0}&language=zh&count=1";
 
@@ -146,41 +307,77 @@ public sealed class WeatherService
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public async Task<WeatherReport?> FetchAsync(string city, CancellationToken cancellation = default)
+    /// <summary>抓一个城市的天气；失败时带上用户可读的原因。</summary>
+    public async Task<WeatherFetchOutcome> FetchWithOutcomeAsync(string city, CancellationToken cancellation = default)
     {
+        if (string.IsNullOrWhiteSpace(city))
+        {
+            return WeatherFetchOutcome.Fail("城市名为空");
+        }
+
+        city = city.Trim();
+
         try
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
 
-            var (lat, lon, resolvedName) = await GeocodeAsync(http, city, cancellation);
-            if (!lat.HasValue)
+            double lat;
+            double lon;
+            var name = city;
+
+            if (TryResolveKnown(city, out lat, out lon))
             {
-                return null;
+                // 内置坐标：不联网就能定位，避免 Open-Meteo 把同名小地名解析到外省
+                var report = await FetchForecastAsync(http, lat, lon, name, cancellation);
+                return await FinishAsync(http, report, name, cancellation);
             }
 
-            var forecast = await FetchForecastAsync(http, lat.Value, lon.Value, resolvedName, cancellation);
-            if (forecast is null)
+            var geo = await GeocodeAsync(http, city, cancellation);
+            if (geo.Lat is null)
             {
-                return null;
+                return WeatherFetchOutcome.Fail(geo.Error ?? $"查不到「{city}」的位置");
             }
 
-            // 空气质量是加分项，失败不影响主数据
-            var aqi = await FetchAirQualityAsync(http, lat.Value, lon.Value, cancellation);
+            lat = geo.Lat.Value;
+            lon = geo.Lon!.Value;
+            name = geo.Name;
 
-            return forecast with
-            {
-                AirQualityIndex = aqi?.Index,
-                AirQualityText = aqi?.Text,
-            };
+            var forecast = await FetchForecastAsync(http, lat, lon, name, cancellation);
+            return await FinishAsync(http, forecast, name, cancellation);
         }
-        catch (Exception)
+        catch (TaskCanceledException)
         {
-            // 网络 / 解析失败都算"获取失败"，由界面提示
-            return null;
+            return WeatherFetchOutcome.Fail("请求超时");
+        }
+        catch (HttpRequestException ex)
+        {
+            return WeatherFetchOutcome.Fail("网络错误：" + ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return WeatherFetchOutcome.Fail(ex.GetType().Name + ": " + ex.Message);
         }
     }
 
-    private static async Task<(double? Lat, double? Lon, string Name)> GeocodeAsync(
+    private static async Task<WeatherFetchOutcome> FinishAsync(
+        HttpClient http, WeatherReport? report, string name, CancellationToken cancellation)
+    {
+        if (report is null)
+        {
+            return WeatherFetchOutcome.Fail($"「{name}」的天气数据为空");
+        }
+
+        // 空气质量是加分项，失败不影响主数据
+        var aqi = await FetchAirQualityAsync(http, report.Latitude, report.Longitude, cancellation);
+
+        return WeatherFetchOutcome.Ok(report with
+        {
+            AirQualityIndex = aqi?.Index,
+            AirQualityText = aqi?.Text,
+        });
+    }
+
+    private static async Task<(double? Lat, double? Lon, string Name, string? Error)> GeocodeAsync(
         HttpClient http, string city, CancellationToken cancellation)
     {
         var url = string.Format(GeocodingUrl, Uri.EscapeDataString(city));
@@ -189,18 +386,25 @@ public sealed class WeatherService
 
         var json = await response.Content.ReadAsStringAsync(cancellation);
         using var doc = JsonDocument.Parse(json);
-        var results = doc.RootElement.GetProperty("results");
+        var root = doc.RootElement;
 
-        if (results.GetArrayLength() == 0)
+        // Open-Meteo 查不到时直接不返回 results 字段（而不是空数组），这里要判存在性
+        if (!root.TryGetProperty("results", out var results))
         {
-            return (null, null, string.Empty);
+            return (null, null, string.Empty, $"查不到「{city}」的位置");
+        }
+
+        if (results.ValueKind != JsonValueKind.Array || results.GetArrayLength() == 0)
+        {
+            return (null, null, string.Empty, $"查不到「{city}」的位置");
         }
 
         var first = results[0];
         return (
             first.GetProperty("latitude").GetDouble(),
             first.GetProperty("longitude").GetDouble(),
-            first.TryGetProperty("name", out var name) ? name.GetString() ?? city : city);
+            first.TryGetProperty("name", out var name) ? name.GetString() ?? city : city,
+            null);
     }
 
     private static async Task<WeatherReport?> FetchForecastAsync(

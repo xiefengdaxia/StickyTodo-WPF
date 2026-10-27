@@ -660,6 +660,7 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, IR
 
         _disposed = true;
         _timer.Stop();
+        _copyStatusTimer?.Stop();
 
         try
         {

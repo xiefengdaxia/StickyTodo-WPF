@@ -20,7 +20,12 @@ public partial class WeatherWindow : Window
             viewModel.SelectedCity = viewModel.Cities[0];
         }
 
-        Loaded += async (_, _) => await viewModel.LoadAsync();
+        Loaded += async (_, _) =>
+        {
+            // 小屏 / 高缩放下把窗口收进工作区，否则标题栏被顶到屏幕外（看着像"拖不动"）
+            Services.ScreenHelper.FitIntoWorkArea(this);
+            await viewModel.LoadAsync();
+        };
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -57,6 +62,27 @@ public partial class WeatherWindow : Window
     }
 
     private async void Refresh_Click(object sender, RoutedEventArgs e) => await _viewModel.LoadAsync();
+
+    private void AddCity_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel.AddCity(NewCityBox.Text))
+        {
+            NewCityBox.Clear();
+        }
+
+        NewCityBox.Focus();
+    }
+
+    private void RemoveCity_Click(object sender, RoutedEventArgs e) => _viewModel.RemoveSelectedCity();
+
+    private void NewCity_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            AddCity_Click(sender, e);
+            e.Handled = true;
+        }
+    }
 
     private void Appearance_Click(object sender, RoutedEventArgs e)
     {

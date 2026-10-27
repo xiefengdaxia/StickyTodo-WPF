@@ -79,6 +79,9 @@ public sealed partial class WeatherCityRow : ObservableObject
 /// <summary>天气看板。</summary>
 public sealed partial class WeatherViewModel : ObservableObject
 {
+    /// <summary>城市数量上限（再多加界面就排不下了）。</summary>
+    private const int MaxCities = 12;
+
     private readonly WeatherService _weather;
     private readonly AppSettingsService _settings;
 
@@ -99,8 +102,37 @@ public sealed partial class WeatherViewModel : ObservableObject
 
     public ObservableCollection<WeatherDayRow> Days { get; } = new();
 
+    /// <summary>当前选中的城市名（界面上的 📍 标签）。</summary>
+    public string CurrentCity => SelectedCity?.Name ?? "未选择城市";
+
+    /// <summary>城市来源说明：内置坐标 / 在线解析。</summary>
+    public string CurrentCityNote
+    {
+        get
+        {
+            var city = SelectedCity?.Name;
+            if (string.IsNullOrEmpty(city))
+            {
+                return string.Empty;
+            }
+
+            return WeatherService.IsKnownCity(city) ? "（内置坐标）" : "（在线解析）";
+        }
+    }
+
+    /// <summary>可以移除当前城市（至少得留一个）。</summary>
+    public bool CanRemoveCity => Cities.Count > 1;
+
+    /// <summary>输入框里待添加的城市名。</summary>
+    [ObservableProperty]
+    private string _newCityName = string.Empty;
+
     [ObservableProperty]
     private WeatherCityRow? _selectedCity;
+
+    /// <summary>最后一次操作的提示（添加失败原因等）。</summary>
+    [ObservableProperty]
+    private string _noticeText = string.Empty;
 
     [ObservableProperty]
     private string _boardName = "天气";
@@ -150,6 +182,10 @@ public sealed partial class WeatherViewModel : ObservableObject
 
             _ = LoadAsync();
         }
+
+        OnPropertyChanged(nameof(CurrentCity));
+        OnPropertyChanged(nameof(CurrentCityNote));
+        OnPropertyChanged(nameof(CanRemoveCity));
     }
 
     public void SelectCity(string name)
@@ -161,8 +197,92 @@ public sealed partial class WeatherViewModel : ObservableObject
         }
     }
 
+    /// <summary>把当前城市列表写回设置（桌面时钟轮播用的也是这一份）。</summary>
+    private void PersistCities()
+    {
+        _settings.WeatherCities = Cities.Select(c => c.Name).ToList();
+    }
+
+    /// <summary>添加城市；重名 / 空名 / 超限都会给出提示。</summary>
+    public bool AddCity(string name)
+    {
+        var clean = (name ?? string.Empty).Trim();
+
+        if (clean.Length == 0)
+        {
+            NoticeText = "请输入城市名";
+            return false;
+        }
+
+        if (clean.Length > 12)
+        {
+            NoticeText = "城市名太长（最多 12 个字）";
+            return false;
+        }
+
+        if (Cities.Any(c => string.Equals(c.Name, clean, StringComparison.OrdinalIgnoreCase)))
+        {
+            NoticeText = $"「{clean}」已经在列表里了";
+            return false;
+        }
+
+        if (Cities.Count >= MaxCities)
+        {
+            NoticeText = $"最多 {MaxCities} 个城市，先移除一个";
+            return false;
+        }
+
+        var row = new WeatherCityRow(clean);
+        Cities.Add(row);
+        PersistCities();
+        NoticeText = $"已添加「{clean}」";
+        SelectedCity = row;
+        return true;
+    }
+
+    /// <summary>移除当前城市（最后一个不让删）。</summary>
+    public void RemoveSelectedCity()
+    {
+        var current = SelectedCity;
+        if (current is null || Cities.Count <= 1)
+        {
+            NoticeText = "至少要保留一个城市";
+            return;
+        }
+
+        var index = Cities.IndexOf(current);
+        Cities.Remove(current);
+        PersistCities();
+        NoticeText = $"已移除「{current.Name}」";
+
+        var next = Cities.Count == 0 ? null : Cities[Math.Min(index, Cities.Count - 1)];
+        SelectedCity = next;
+        if (next is null)
+        {
+            _ = LoadAsync();
+        }
+    }
+
+    [RelayCommand]
+    private void AddCityFromInput()
+    {
+        if (AddCity(NewCityName))
+        {
+            NewCityName = string.Empty;
+        }
+    }
+
+    [RelayCommand]
+    private void RemoveCity() => RemoveSelectedCity();
+
     [RelayCommand]
     private Task LoadAsync() => LoadCoreAsync();
+
+    /// <summary>正在请求中的城市（同一城市的并发请求合并成一个）。</summary>
+    private string? _loadingCity;
+
+    /// <summary>请求序号：只让"最后一次点击"的结果落到界面上。</summary>
+    private int _requestId;
 
     public async Task LoadCoreAsync()
     {
@@ -172,20 +292,45 @@ public sealed partial class WeatherViewModel : ObservableObject
             return;
         }
 
+        if (string.Equals(_loadingCity, city, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var request = ++_requestId;
+        _loadingCity = city;
+
         ErrorText = null;
         IsBusyOverlayVisible = true;
         BusyText = $"正在获取 {city} 的天气…";
 
-        var report = await Task.Run(() => _weather.FetchAsync(city));
-
-        if (report is null)
+        WeatherFetchOutcome outcome;
+        try
         {
-            IsBusyOverlayVisible = true;
-            BusyText = $"获取 {city} 的天气失败，请检查网络后重试";
+            outcome = await Task.Run(() => _weather.FetchWithOutcomeAsync(city));
+        }
+        finally
+        {
+            if (request == _requestId)
+            {
+                _loadingCity = null;
+            }
+        }
+
+        // 期间用户又点了别的城市：这次结果作废
+        if (request != _requestId)
+        {
             return;
         }
 
-        Apply(report);
+        if (outcome.Report is null)
+        {
+            IsBusyOverlayVisible = true;
+            BusyText = $"获取 {city} 的天气失败：{outcome.Error}";
+            return;
+        }
+
+        Apply(outcome.Report);
         IsBusyOverlayVisible = false;
     }
 
@@ -412,16 +557,31 @@ public sealed partial class DesktopClockViewModel : ObservableObject
 
         try
         {
-            _currentCityIndex = (_currentCityIndex + 1) % _cities.Count;
-            var city = _cities[_currentCityIndex];
+            // 重新读设置：用户在天气看板里加/删城市后轮播立刻跟上
+            _cities = _settings.WeatherCities;
 
-            var report = await Task.Run(() => _weather.FetchAsync(city));
-            if (report is not null)
+            // 逐个试：内置坐标的城市基本不会失败；查不到的（在线解析）跳过试下一个
+            WeatherFetchOutcome? outcome = null;
+            var city = string.Empty;
+
+            for (var attempt = 0; attempt < _cities.Count; attempt++)
             {
-                _report = report;
+                city = _cities[_currentCityIndex % _cities.Count];
+                var result = await Task.Run(() => _weather.FetchWithOutcomeAsync(city));
+                if (result.Success)
+                {
+                    outcome = result;
+                    break;
+                }
+
+                _currentCityIndex = (_currentCityIndex + 1) % _cities.Count;
+                outcome = result;
+            }
+
+            if (outcome?.Success == true)
+            {
+                _report = outcome.Report;
                 _weatherFailed = false;
-                WeatherLine = $"{report.CityName} 天气已更新";
-                WeatherDetail = string.Empty;
                 UpdateWeatherLine();
             }
             else

@@ -134,30 +134,30 @@ public partial class App : Application
                 services.ShowManager();
             }
 
-            // --create-tool-demo <weather|worldclock|desktopclock>：创建一个工具型看板（进看板列表）
+            // --create-tool-demo <weather|worldclock|desktopclock>：打开一个工具型看板（进看板列表）。
+            // 已有同类型的就复用，否则每次启动都会多建一个看板。
             var toolBoard = ReadOption(args, "--create-tool-demo");
-            if (!string.IsNullOrWhiteSpace(toolBoard))
+            var toolKind = toolBoard?.Trim().ToLowerInvariant() switch
             {
-                var kind = toolBoard.Trim().ToLowerInvariant() switch
-                {
-                    "weather" => Core.Entities.BoardKind.Weather,
-                    "worldclock" => Core.Entities.BoardKind.WorldClock,
-                    "desktopclock" => Core.Entities.BoardKind.DesktopClock,
-                    _ => Core.Entities.BoardKind.Todo,
-                };
+                "weather" => Core.Entities.BoardKind.Weather,
+                "worldclock" => Core.Entities.BoardKind.WorldClock,
+                "desktopclock" => Core.Entities.BoardKind.DesktopClock,
+                _ => (Core.Entities.BoardKind?)null,
+            };
 
-                Log.Info($"[toolboard] creating kind={kind}");
-                var created = services.Todos.CreateBoard(
-                    kind switch
-                    {
-                        Core.Entities.BoardKind.Weather => "天气",
-                        Core.Entities.BoardKind.WorldClock => "世界时钟",
-                        _ => "桌面时钟",
-                    }, kind);
-                Log.Info($"[toolboard] created id={created.Id}");
+            if (toolKind is { } kind)
+            {
+                var created = services.Todos.GetBoards().FirstOrDefault(b => b.Kind == kind)
+                    ?? services.Todos.CreateBoard(
+                        kind switch
+                        {
+                            Core.Entities.BoardKind.Weather => "天气",
+                            Core.Entities.BoardKind.WorldClock => "世界时钟",
+                            _ => "桌面时钟",
+                        }, kind);
+
+                // OpenBoard 会触发 BoardsChanged，管理面板自动刷新（见 AppServices）
                 services.Windows.OpenBoard(created);
-                services.Manager.RefreshAsync();
-                Log.Info("[toolboard] opened");
             }
         }
         else

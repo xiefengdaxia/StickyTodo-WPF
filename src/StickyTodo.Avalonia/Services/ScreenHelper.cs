@@ -60,4 +60,51 @@ public static class ScreenHelper
         var y = Math.Min(Math.Max(top, area.Top), Math.Max(area.Top, area.Bottom - height));
         return (x, y);
     }
+
+    /// <summary>
+    /// 把窗口收进工作区并水平居中：小屏 / 高缩放下（比如 1080p + 150% 只有 720 逻辑高）
+    /// 默认尺寸的大窗口会把标题栏顶到屏幕外，看起来就像"拖不动"。
+    /// </summary>
+    public static void FitIntoWorkArea(Avalonia.Controls.Window window, bool centerHorizontally = true)
+    {
+        var area = GetWorkArea(window);
+
+        var width = window.Bounds.Width > 0 ? window.Bounds.Width : window.Width;
+        var height = window.Bounds.Height > 0 ? window.Bounds.Height : window.Height;
+        if (double.IsNaN(width) || width <= 0)
+        {
+            width = area.Width;
+        }
+
+        if (double.IsNaN(height) || height <= 0)
+        {
+            height = area.Height;
+        }
+
+        // 允许缩到的下限：再小标题栏就叠到内容上了
+        var maxW = Math.Max(320, area.Width - 16);
+        var maxH = Math.Max(360, area.Height - 16);
+
+        if (width > maxW)
+        {
+            window.Width = maxW;
+            width = maxW;
+        }
+
+        if (height > maxH)
+        {
+            window.Height = maxH;
+            height = maxH;
+        }
+
+        var left = centerHorizontally ? area.Left + (area.Width - width) / 2 : window.Bounds.X;
+        var top = area.Top + Math.Max(0, (area.Height - height) / 2);
+        var (clampedLeft, clampedTop) = ClampIntoWorkArea(window, left, top, width, height);
+
+        // Avalonia 的 Window.Position 是物理像素，需要按缩放系数换算
+        var scale = window.Screens?.ScreenFromWindow(window)?.Scaling is { } s and > 0 ? s : 1.0;
+        window.Position = new Avalonia.PixelPoint(
+            (int)Math.Round(clampedLeft * scale),
+            (int)Math.Round(clampedTop * scale));
+    }
 }

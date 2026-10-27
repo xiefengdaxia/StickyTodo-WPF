@@ -292,23 +292,14 @@ public partial class ManagerWindow : Window
     private async void CreateToken_Click(object sender, RoutedEventArgs e) =>
         await CreateBoardAsync(BoardKind.Token);
 
-    private void CreateWeather_Click(object sender, RoutedEventArgs e) =>
-        _ = OpenToolWindowAsync(ToolWindowKind.Weather);
+    private async void CreateWeather_Click(object sender, RoutedEventArgs e) =>
+        await CreateBoardAsync(BoardKind.Weather);
 
-    private void CreateWorldClock_Click(object sender, RoutedEventArgs e) =>
-        _ = OpenToolWindowAsync(ToolWindowKind.WorldClock);
+    private async void CreateWorldClock_Click(object sender, RoutedEventArgs e) =>
+        await CreateBoardAsync(BoardKind.WorldClock);
 
-    private void CreateDesktopClock_Click(object sender, RoutedEventArgs e) =>
-        _ = OpenToolWindowAsync(ToolWindowKind.DesktopClock);
-
-    /// <summary>打开工具型窗口（天气/世界时钟/桌面时钟）。这些窗口不对应看板数据。</summary>
-    private async Task OpenToolWindowAsync(ToolWindowKind kind)
-    {
-        if (Application.Current is App app)
-        {
-            await app.OpenToolWindowAsync(kind);
-        }
-    }
+    private async void CreateDesktopClock_Click(object sender, RoutedEventArgs e) =>
+        await CreateBoardAsync(BoardKind.DesktopClock);
 
     private async Task CreateBoardAsync(BoardKind kind)
     {
@@ -317,6 +308,9 @@ public partial class ManagerWindow : Window
             BoardKind.Memo => (Loc.T("manager.newBoardTitle") + " · " + Loc.T("manager.kindMemo"), Loc.T("manager.newMemoDefault")),
             BoardKind.Calendar => (Loc.T("manager.newBoardTitle") + " · " + Loc.T("manager.kindCalendar"), Loc.T("manager.newCalendarDefault")),
             BoardKind.Token => (Loc.T("manager.newBoardTitle") + " · " + Loc.T("manager.kindToken"), Loc.T("token.title")),
+            BoardKind.Weather => (Loc.T("manager.newBoardTitle") + " · " + Loc.T("manager.kindWeather"), Loc.T("manager.newWeatherDefault")),
+            BoardKind.WorldClock => (Loc.T("manager.newBoardTitle") + " · " + Loc.T("manager.kindWorldClock"), Loc.T("manager.newWorldClockDefault")),
+            BoardKind.DesktopClock => (Loc.T("manager.newBoardTitle") + " · " + Loc.T("manager.kindDesktopClock"), Loc.T("manager.newDesktopClockDefault")),
             _ => (Loc.T("manager.newBoardTitle") + " · " + Loc.T("manager.kindTodo"), Loc.T("board.untitled")),
         };
 

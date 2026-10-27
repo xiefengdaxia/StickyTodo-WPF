@@ -175,10 +175,15 @@
                     CornerRadius="10"
                     Background="{DynamicResource Brush.Surface}">
                 <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="1.5*" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
@@ -227,6 +232,24 @@
                             </TextBlock.Style>
                         </TextBlock>
                     </Button>
+
+                    <Button Grid.Column="4"
+                            Style="{StaticResource Button.Chrome}"
+                            ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=token.copyTip}"
+                            Click="Copy_Click"
+                            VerticalAlignment="Center"
+                            Margin="2,0,0,0">
+                        <TextBlock Text="⧉" FontSize="14" />
+                    </Button>
+
+                    <!-- 复制结果提示：3 秒后自动消失 -->
+                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="5"
+                               Text="{Binding CopyStatusText}"
+                               Style="{StaticResource Text.Caption}"
+                               HorizontalAlignment="Right"
+                               Margin="0,6,0,0"
+                               Foreground="#FF2E7D32"
+                               Visibility="{Binding CopyStatusText, Converter={StaticResource NullToCollapsed}}" />
                 </Grid>
             </Border>
 
