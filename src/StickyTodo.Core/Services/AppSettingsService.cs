@@ -188,6 +188,15 @@ public sealed class AppSettingsService
         set => _repository.SetSetting(TokenRangeDaysKey, (value is 0 or 3 or 7 or 30 ? value : 0).ToString());
     }
 
+    /// <summary>Token 面板上次选的客户端（agent id），空 = 全部。</summary>
+    public const string TokenAgentKey = "token.agent";
+
+    public string TokenAgent
+    {
+        get => (GetString(TokenAgentKey, null) ?? string.Empty).Trim();
+        set => _repository.SetSetting(TokenAgentKey, value.Trim());
+    }
+
     /// <summary>番茄钟今天完成几个（跨天自动归零）。</summary>
     public int PomodoroCountToday
     {

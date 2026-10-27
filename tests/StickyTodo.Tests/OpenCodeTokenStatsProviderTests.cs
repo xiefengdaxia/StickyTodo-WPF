@@ -143,8 +143,11 @@ public sealed class OpenCodeTokenStatsProviderTests : IDisposable
     {
         var today = DateTimeOffset.Now.Date;
         var yesterday = today.AddDays(-1);
-        var todayMorning = new DateTimeOffset(today.AddHours(0).AddMinutes(30));
-        var yesterdayMorning = new DateTimeOffset(yesterday.AddHours(0).AddMinutes(30));
+        // 插入时间必须是"今天已过去的时刻"：写死钟点（00:30 / 12:30）在某些运行时刻
+        // 会落到 FetchAsync 的 now 上限之外或跨到昨天（历史缺陷，午夜后跑必挂）。
+        // 取"今天 00:00:01"永远安全（一天 86399 秒，测试跑得再快也在今天之内）。
+        var todayMorning = today.AddSeconds(1);
+        var yesterdayMorning = new DateTimeOffset(yesterday.AddSeconds(1));
 
         using (var connection = new SqliteConnection(_connectionString))
         {
@@ -157,7 +160,7 @@ public sealed class OpenCodeTokenStatsProviderTests : IDisposable
 
         Assert.Equal(24, stats.Series.Count);
 
-        // 0 点只应包含今天的量，不能被昨天的同小时污染
+        // 0 点桶只应包含今天的量，不能被昨天的同小时污染
         Assert.Equal(1, stats.Series[0].Steps);
         Assert.Equal(500 + 10 + 5 + 100 + 2, stats.Series[0].Total);
 
@@ -168,8 +171,9 @@ public sealed class OpenCodeTokenStatsProviderTests : IDisposable
     public async Task DailyBuckets_CoverWholeRangeAndIgnoreOutside()
     {
         var today = DateTimeOffset.Now.Date;
-        var todayEarly = new DateTimeOffset(today.AddMinutes(30));
         var yesterdayTen = new DateTimeOffset(today.AddDays(-1).AddHours(10));
+        // 插入时间用"今天 00:00:01"：永远在过去、且永远落在今天桶（见上条测试的注释）
+        var todayEarly = today.AddSeconds(1);
 
         using (var connection = new SqliteConnection(_connectionString))
         {

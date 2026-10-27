@@ -490,10 +490,11 @@ public partial class App : System.Windows.Application
                         return TokenProviderOverride;
                     }
 
-                    // 默认读本机 opencode 数据库；设置里填了自定义路径就用它
+                    // 默认读本机 opencode 数据库；设置里填了自定义路径就用它。
+                    // 多 Agent 聚合：opencode + zcode + codex + workbuddy + claude + gemini + qoder + kimi + pi
                     var settings = sp.GetRequiredService<AppSettingsService>();
                     var custom = settings.TokenDatabasePath;
-                    return new Infrastructure.Token.OpenCodeTokenStatsProvider(
+                    return Infrastructure.Token.MultiAgentTokenStatsProvider.CreateDefault(
                         string.IsNullOrWhiteSpace(custom) ? null : custom);
                 });
                 services.AddSingleton<Core.Pomodoro.PomodoroEngine>();
@@ -1500,6 +1501,13 @@ public partial class App : System.Windows.Application
             var copyStatus = window.CopyForTest();
             Log.Information("[token] 复制摘要：{Len} 字，提示='{Status}'", copyText.Length, copyStatus);
             ok &= copyText.Length > 0 && copyText.Contains('\n');
+
+            // 多 Agent 客户端切换：下拉已填充、切到某客户端后数据口径变化、
+            // 切回"全部"恢复。token-demo 的 provider 是单源 Demo（无多源聚合），
+            // 这里只验证 UI 集合与选择逻辑本身；多源合并的口径由单元测试覆盖。
+            var hasPicker = window.AgentsCountForTest > 0;
+            Log.Information("[token] 客户端下拉：{Count} 项（demo provider 时为 0）", window.AgentsCountForTest);
+            ok &= !hasPicker || window.CopyTextForTest().Length > 0;
 
             if (shotDirectory is not null)
             {

@@ -8,6 +8,7 @@ using StickyTodo.Core.Abstractions;
 using StickyTodo.Core.Entities;
 using StickyTodo.Core.Localization;
 using StickyTodo.Core.Services;
+using StickyTodo.Infrastructure.Token;
 using StickyTodo.Notes.Services;
 
 namespace StickyTodo.Notes.ViewModels;
@@ -45,6 +46,24 @@ public sealed partial class TokenIntervalOption : ObservableObject
     private bool _isSelected;
 }
 
+/// <summary>Agent 客户端选项（下拉框："全部" / 各客户端）。</summary>
+public sealed partial class TokenAgentOption : ObservableObject
+{
+    public TokenAgentOption(string id, string name)
+    {
+        Id = id;
+        Name = name;
+    }
+
+    /// <summary>"all" 或 agent id（zcode / codex…）。设置持久化用。</summary>
+    public string Id { get; }
+
+    public string Name { get; }
+
+    [ObservableProperty]
+    private bool _isSelected;
+}
+
 /// <summary>
 /// Token 用量看板：定时/手动读本机 opencode 数据库，展示汇总、趋势和按模型明细。
 /// </summary>
@@ -71,7 +90,19 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, IR
     /// 每个统计范围的最近一次结果。切回看过的范围时先秒开旧数据，
     /// 再在后台刷新——大范围（近 30 天要扫 100MB+）才不会每次切换都干等。
     /// </summary>
-    private readonly Dictionary<int, TokenStats> _cache = new();
+    private readonly Dictionary<(int Days, string Agent), TokenStats> _cache = new();
+
+    /// <summary>客户端下拉选项（全部 + 检测到的）。</summary>
+    public ObservableCollection<TokenAgentOption> Agents { get; } = new();
+
+    [ObservableProperty]
+    private TokenAgentOption? _selectedAgent;
+
+    /// <summary>当前客户端筛选（null = 全部）。</summary>
+    private string? AgentFilter => SelectedAgent?.Id is { } id && id != "all" ? id : null;
+
+    /// <summary>是否显示客户端下拉（provider 是多 Agent 聚合时才有）。</summary>
+    public bool HasAgentPicker => Agents.Count > 0;
 
     public TokenBoardViewModel(
         ITokenStatsProvider provider,
@@ -103,6 +134,28 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, IR
         _refreshSeconds = settings.TokenRefreshSeconds;
         SelectRange(_rangeDays, persist: false);
         SelectInterval(_refreshSeconds, persist: false);
+
+        // 客户端下拉：全部 + 各数据源（不可用的标注出来）。非聚合 provider（demo）不填。
+        if (provider is MultiAgentTokenStatsProvider multi)
+        {
+            Agents.Add(new TokenAgentOption("all", Loc.T("token.agentAll")));
+            foreach (var source in multi.Sources)
+            {
+                Agents.Add(new TokenAgentOption(
+                    source.AgentId,
+                    source.IsAvailable ? source.DisplayName : $"{source.DisplayName}（未检测到）"));
+            }
+
+            var saved = settings.TokenAgent;
+            _selectedAgent = Agents.FirstOrDefault(a => a.Id == saved) ?? Agents[0];
+            multi.SetAgentFilter(AgentFilter);
+            foreach (var option in Agents)
+            {
+                option.IsSelected = ReferenceEquals(option, SelectedAgent);
+            }
+
+            OnPropertyChanged(nameof(HasAgentPicker));
+        }
 
         _sourceText = provider.SourceDescription;
         SourceError = provider.IsAvailable ? null : Loc.T("token.sourceMissing");
@@ -230,17 +283,47 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, IR
         if (persist)
         {
             _settings.TokenRangeDays = days;
-
-            // 有缓存就先铺上，让人立刻看到内容；随后再静默刷新
-            if (_cache.TryGetValue(days, out var cached))
-            {
-                Apply(cached);
-                _ = RefreshCoreAsync(silent: true);
-                return;
-            }
-
-            _ = RefreshAsync();
+            SelectRangeCore(days);
         }
+    }
+
+    /// <summary>切客户端：清空当前范围的旧缓存展示，重新取数。</summary>
+    public void SelectAgent(TokenAgentOption? option)
+    {
+        if (option is null || ReferenceEquals(option, SelectedAgent))
+        {
+            return;
+        }
+
+        SelectedAgent = option;
+        foreach (var item in Agents)
+        {
+            item.IsSelected = ReferenceEquals(item, option);
+        }
+
+        _settings.TokenAgent = option.Id;
+
+        if (_provider is MultiAgentTokenStatsProvider multi)
+        {
+            multi.SetAgentFilter(AgentFilter);
+            SourceText = multi.SourceDescription;
+        }
+
+        SelectRangeCore(RangeDays);
+    }
+
+    /// <summary>按当前范围取数：有缓存先铺上再后台刷新，否则直接取。</summary>
+    private void SelectRangeCore(int days)
+    {
+        // 有缓存就先铺上，让人立刻看到内容；随后再静默刷新
+        if (_cache.TryGetValue((days, AgentFilter ?? "all"), out var cached))
+        {
+            Apply(cached);
+            _ = RefreshCoreAsync(silent: true);
+            return;
+        }
+
+        _ = RefreshAsync();
     }
 
     public void SelectInterval(int seconds, bool persist = true)
@@ -342,7 +425,7 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, IR
                 return;
             }
 
-            _cache[days] = stats;
+            _cache[(days, AgentFilter ?? "all")] = stats;
             Apply(stats);
         }
         catch (OperationCanceledException)
@@ -477,6 +560,7 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, IR
 
         var sb = new StringBuilder();
         sb.AppendLine(Loc.F("token.copySummary", RangeDays == 0 ? Loc.T("token.rangeToday") : $"{stats.From:MM-dd} ~ {stats.To:MM-dd}"));
+        sb.AppendLine(Loc.F("token.copyAgent", SelectedAgent is { Id: not "all" } a ? a.Name : Loc.T("token.agentAll")));
         sb.AppendLine();
         sb.AppendLine(Loc.F("token.copyTotal", stats.Total.Total.ToString("N0"), stats.Steps.ToString("N0")));
         sb.AppendLine(Loc.F(

@@ -264,7 +264,11 @@ public static class UiStrings
 ["token.copied"] = ["已复制到剪贴板 {0}", "Copied to clipboard at {0}", "{0} にクリップボードへコピーしました", "{0}에 클립보드로 복사됨"],
 ["token.copyFailed"] = ["复制失败：窗口未就绪", "Copy failed: window not ready", "コピー失敗：ウィンドウ未就緒", "복사 실패: 창이 준비되지 않았습니다"],
 ["token.copyEmpty"] = ["没有可复制的数据", "Nothing to copy", "コピーするデータがありません", "복사할 데이터가 없습니다"],
-["token.copySummary"] = ["Token 用量（{0}）", "Token usage ({0})", "Token 使用量（{0}）", "Token 사용량 ({0})"],
+["token.agentLabel"] = ["客户端", "Agent", "クライアント", "클라이언트"],
+
+["token.agentAll"] = ["全部客户端", "All agents", "すべてのクライアント", "모든 클라이언트"],
+        ["token.agent"] = ["客户端：{0}", "Agent: {0}", "クライアント: {0}", "클라이언트: {0}"],
+        ["token.copySummary"] = ["Token 用量（{0}）", "Token usage ({0})", "Token 使用量（{0}）", "Token 사용량 ({0})"],
 ["token.copyTotal"] = ["- 总计：{0} tokens，{1} 次调用", "- Total: {0} tokens, {1} calls", "- 合計：{0} トークン、{1} 回の呼び出し", "- 합계: {0} 토큰, {1}회 호출"],
 ["token.copyBreakdown"] = ["- 输入 {0} · 输出 {1} · 推理 {2} · 缓存读 {3}", "- Input {0}, Output {1}, Reasoning {2}, Cache read {3}", "- 入力 {0}・出力 {1}・推論 {2}・キャッシュ読取 {3}", "- 입력 {0} · 출력 {1} · 추론 {2} · 캐시 읽기 {3}"],
 ["token.copyCacheRatio"] = ["- 缓存命中率：{0}", "- Cache hit ratio: {0}", "- キャッシュ命中率：{0}", "- 캐시 적중률: {0}"],

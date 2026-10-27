@@ -99,6 +99,13 @@ public partial class TokenBoardWindow : Window, IStickyWindow
 
     private void Copy_Click(object sender, RoutedEventArgs e) => _viewModel.CopyToClipboardCommand.Execute(null);
 
+    private void Agent_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        // TwoWay 绑定已把 SelectedAgent 写回；这里只负责触发取数。
+        // 初始化期间的 SelectionChanged（ItemsSource 刚填时）会被 SelectedAgent 相同判断挡掉。
+        _viewModel.SelectAgent(_viewModel.SelectedAgent);
+    }
+
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ButtonState == MouseButtonState.Pressed)
@@ -313,4 +320,7 @@ public partial class TokenBoardWindow : Window, IStickyWindow
 
     /// <summary>Regression hook: the assembled copy text (no clipboard touch).</summary>
     internal string CopyTextForTest() => _viewModel.CopyTextForTest();
+
+    /// <summary>回归用：客户端下拉的选项数（非聚合 provider 为 0）。</summary>
+    internal int AgentsCountForTest => _viewModel.Agents.Count;
 }
