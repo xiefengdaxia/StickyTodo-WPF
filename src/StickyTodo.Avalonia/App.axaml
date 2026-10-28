@@ -760,6 +760,24 @@
       <Setter Property="MinHeight" Value="0" />
     </Style>
 
+    <!-- 下拉列表项：跟随皮肤（选中用主题色），半透明底 -->
+    <Style Selector="ComboBox.flat ComboBoxItem">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
+      <Setter Property="Padding" Value="8,4" />
+      <Setter Property="FontSize" Value="11.5" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="ComboBox.flat ComboBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Brush.AccentSoft}" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
+    </Style>
+    <Style Selector="ComboBox.flat ComboBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Brush.AccentSoft}" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
     <!-- ==================== 卡片 ==================== -->
     <Style Selector="Border.card">
       <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />

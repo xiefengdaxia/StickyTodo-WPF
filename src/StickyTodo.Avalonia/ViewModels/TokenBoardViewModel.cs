@@ -296,6 +296,15 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, IR
         }
 
         SelectedAgent = option;
+        ApplyAgentChange(option);
+    }
+
+    /// <summary>
+    /// 应用客户端切换的实际逻辑。UI 的 SelectionChanged 在 TwoWay 绑定写回
+    /// SelectedAgent 后触发，那时判等会短路，所以从绑定回调里要走这个方法。
+    /// </summary>
+    public void ApplyAgentChange(TokenAgentOption option)
+    {
         foreach (var item in Agents)
         {
             item.IsSelected = ReferenceEquals(item, option);

@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -102,8 +102,12 @@ public partial class TokenBoardWindow : Window, IStickyWindow
     private void Agent_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
         // TwoWay 绑定已把 SelectedAgent 写回；这里只负责触发取数。
-        // 初始化期间的 SelectionChanged（ItemsSource 刚填时）会被 SelectedAgent 相同判断挡掉。
-        _viewModel.SelectAgent(_viewModel.SelectedAgent);
+        // 初始化期间的 SelectionChanged（ItemsSource 刚填时）也会进来：
+        // ApplyAgentChange 里幂等（重复 SetAgentFilter / 重取一次无害）。
+        if (_viewModel.SelectedAgent is { } agent)
+        {
+            _viewModel.ApplyAgentChange(agent);
+        }
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

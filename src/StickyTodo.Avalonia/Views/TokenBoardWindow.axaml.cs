@@ -74,7 +74,10 @@ public partial class TokenBoardWindow : StickyWindowBase
     {
         // TwoWay 绑定已把 SelectedAgent 写回；这里只负责触发取数。
         // 初始化期间的 SelectionChanged 会被 SelectAgent 里的"同一选项"判断挡掉。
-        _viewModel.SelectAgent(_viewModel.SelectedAgent);
+        if (_viewModel.SelectedAgent is { } agent)
+        {
+            _viewModel.ApplyAgentChange(agent);
+        }
     }
 
     private void Copy_Click(object? sender, RoutedEventArgs e) => _viewModel.CopyToClipboardCommand.Execute(null);

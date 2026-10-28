@@ -416,9 +416,110 @@
             </Setter>
         </Style>
 
+        <!-- ==================== 下拉框（跟随皮肤） ==================== -->
+        <!-- 面板里的 ComboBox 默认是系统灰样式，与纸感皮肤不搭；这里给一套完整的
+             主题化模板：半透明 Surface 底、圆角、悬停高亮，下拉项同样跟随皮肤。
+             用法：<ComboBox Style="{StaticResource ComboBox.Flat}" … /> -->
+        <Style x:Key="ComboBoxItem.Flat" TargetType="ComboBoxItem">
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="Root" Background="Transparent" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="{DynamicResource Brush.AccentSoft}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="{DynamicResource Brush.AccentSoft}" />
+                                <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ComboBox.Flat" TargetType="ComboBox">
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="ItemContainerStyle" Value="{StaticResource ComboBoxItem.Flat}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="ToggleButton"
+                                          Focusable="False"
+                                          ClickMode="Press"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="Root"
+                                                CornerRadius="8"
+                                                Background="{DynamicResource Brush.Surface}"
+                                                BorderBrush="{DynamicResource Brush.Line}"
+                                                BorderThickness="1">
+                                            <Path HorizontalAlignment="Right" Margin="0,0,10,0"
+                                                  VerticalAlignment="Center"
+                                                  Data="M 0 0 L 4 4 L 8 0 Z"
+                                                  Fill="{DynamicResource Brush.InkSoft}" />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
+                                            </Trigger>
+                                            <Trigger Property="IsChecked" Value="True">
+                                                <Setter TargetName="Root" Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <ContentPresenter x:Name="ContentSite"
+                                              IsHitTestVisible="False"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              Margin="{TemplateBinding Padding}"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Left" />
+                            <Popup x:Name="Popup"
+                                   Placement="Bottom"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True"
+                                   PopupAnimation="Fade">
+                                <Border x:Name="DropDownBorder"
+                                        MinWidth="{TemplateBinding ActualWidth}"
+                                        MaxHeight="{TemplateBinding MaxDropDownHeight}"
+                                        CornerRadius="8"
+                                        Background="{DynamicResource Brush.PaperOpaque}"
+                                        BorderBrush="{DynamicResource Brush.Line}"
+                                        BorderThickness="1"
+                                        Margin="0,4,0,0"
+                                        Padding="4">
+                                    <ScrollViewer>
+                                        <ItemsPresenter />
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- 行内悬停操作按钮：圆形，平时半透明 -->
-        <Style x:Key="Button.RowAction" TargetType="Button">
-            <Setter Property="Width" Value="22" />
+        <Style x:Key="Button.RowAction" TargetType="Button">            <Setter Property="Width" Value="22" />
             <Setter Property="Height" Value="22" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />

@@ -108,7 +108,7 @@
             IsVisible="{Binding HasAgentPicker}">
         <TextBlock Grid.Column="0" Text="{loc:Loc token.agentLabel}" Classes="caption"
                    VerticalAlignment="Center" Margin="2,0,8,0" />
-        <ComboBox Grid.Column="1" ItemsSource="{Binding Agents}"
+        <ComboBox Grid.Column="1" Classes="flat" ItemsSource="{Binding Agents}"
                   SelectedItem="{Binding SelectedAgent, Mode=TwoWay}"
                   FontSize="12"
                   VerticalContentAlignment="Center"
