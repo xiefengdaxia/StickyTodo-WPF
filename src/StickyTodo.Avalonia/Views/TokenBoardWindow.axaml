@@ -183,8 +183,8 @@
           </StackPanel>
         </Border>
 
-        <!-- 热力图（周 × 天） -->
-        <StackPanel Margin="2,14,2,0">
+        <!-- 热力图（周 × 天，只在天粒度显示） -->
+        <StackPanel Margin="2,14,2,0" IsVisible="{Binding IsDaily}">
           <TextBlock Text="{loc:Loc token.heatmap}" Classes="caption" Opacity="0.75" Margin="2,0,0,6" />
           <Border HorizontalAlignment="Left">
             <controls:HeatMap Series="{Binding Stats.Series}"

@@ -38,6 +38,9 @@ public partial class TokenBoardWindow : StickyWindowBase
             }
         };
 
+        // 悬停 = 点击：指针扫过哪一根柱/点，就显示它的明细
+        Chart.PointHovered += (_, index) => _viewModel.ShowPointDetail(index);
+
         Closed += (_, _) => _viewModel.Dispose();
     }
 

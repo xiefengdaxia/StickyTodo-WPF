@@ -1419,6 +1419,10 @@ public partial class App : System.Windows.Application
                      && initial.Contains("粒度=hour")
                      && window.FetchCount >= 1;
 
+            // 0) 小时粒度（今天）不显示热力图——之前正是这里抛 FormatException 把界面炸了
+            Log.Information("[token] 首屏热力图可见={Visible}", window.HeatMapVisibleForTest);
+            ok &= !window.HeatMapVisibleForTest;
+
             // 1) 切到近 7 天：粒度应变 day，且要重新取数
             var before = window.FetchCount;
             var msWeek = await window.SelectRangeForTestAsync(7);
@@ -1426,15 +1430,25 @@ public partial class App : System.Windows.Application
             Log.Information("[token] 切到近7天：耗时 {Ms}ms，{State}", msWeek, week);
             ok &= week.Contains("范围=7") && week.Contains("粒度=day") && window.FetchCount > before;
 
+            // 天粒度应显示热力图
+            Log.Information("[token] 近7天热力图可见={Visible}", window.HeatMapVisibleForTest);
+            ok &= window.HeatMapVisibleForTest;
+
             // 2) 切回今天：粒度回 hour
             var msToday = await window.SelectRangeForTestAsync(0);
             var today = window.DescribeForTest();
             Log.Information("[token] 切回今天：耗时 {Ms}ms，{State}", msToday, today);
             ok &= today.Contains("范围=0") && today.Contains("粒度=hour");
 
+            // 切回小时粒度应重新隐藏热力图
+            Log.Information("[token] 今天热力图可见={Visible}", window.HeatMapVisibleForTest);
+            ok &= !window.HeatMapVisibleForTest;
+
             // 2b) 近 30 天（会跨到 v1 表，是最慢的一档）
             var ms30 = await window.SelectRangeForTestAsync(30);
             Log.Information("[token] 切到近30天：耗时 {Ms}ms，{State}", ms30, window.DescribeForTest());
+            Log.Information("[token] 近30天热力图可见={Visible}", window.HeatMapVisibleForTest);
+            ok &= window.HeatMapVisibleForTest;
 
             // 各档位耗时都要在可接受范围内（切换不该有明显卡顿）
             var slowest = Math.Max(msWeek, Math.Max(msToday, ms30));
@@ -1469,6 +1483,21 @@ public partial class App : System.Windows.Application
             var picked = window.DescribeForTest();
             Log.Information("[token] 点击趋势点 #{Index}：{State}", pickIndex, picked);
             ok &= picked.Contains("明细=") && !picked.Contains("明细=无");
+
+            // 4a) 悬停 = 点击：把指针"移到"图上的另一个点，选中列与明细都要跟着换
+            if (window.PointCountForTest > 1 && pickIndex != 0)
+            {
+                window.HoverChartForTest(0);
+                await Task.Delay(150);
+                var hovered = window.DescribeForTest();
+                Log.Information("[token] 悬停趋势点 #0：{State}", hovered);
+                ok &= window.SelectedIndexForTest == 0
+                      && hovered.Contains("明细=") && !hovered.Contains("明细=无");
+            }
+            else
+            {
+                Log.Information("[token] 趋势点不足 2 个，跳过悬停断言");
+            }
 
             // 4b) 再刷新一次，明细应该还在（自动刷新不该把用户点开的明细冲掉）
             await window.RefreshForTestAsync();

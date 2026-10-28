@@ -31,6 +31,9 @@ public partial class TokenBoardWindow : Window, IStickyWindow
 
         Chart.PointPicked += (_, index) => _viewModel.ShowPointDetail(index);
 
+        // 悬停 = 点击：指针扫过哪一根柱/点，就显示它的明细
+        Chart.PointHovered += (_, index) => _viewModel.ShowPointDetail(index);
+
         // 取数时让刷新图标转起来；停下时解除动画（回到静态的 ⟳）
         IDisposable? spinHandle = null;
         _viewModel.PropertyChanged += (_, e) =>
@@ -294,6 +297,12 @@ public partial class TokenBoardWindow : Window, IStickyWindow
         Chart.SelectedIndex = index;
     }
 
+    /// <summary>给回归用：模拟把指针悬停到趋势图第 index 个点（验证"悬停=点击"）。</summary>
+    internal void HoverChartForTest(int index) => Chart.HoverForTest(index);
+
+    /// <summary>给回归用：当前选中的点（-1 = 没选中）。</summary>
+    internal int SelectedIndexForTest => _viewModel.SelectedIndex;
+
     /// <summary>给回归用：把当前界面状态收成一行日志。</summary>
     internal string DescribeForTest()
     {
@@ -331,4 +340,7 @@ public partial class TokenBoardWindow : Window, IStickyWindow
 
     /// <summary>回归用：客户端下拉的选项数（非聚合 provider 为 0）。</summary>
     internal int AgentsCountForTest => _viewModel.Agents.Count;
+
+    /// <summary>回归用：热力图区域当前是否真的可见（验证 IsDaily → Visibility 绑定）。</summary>
+    internal bool HeatMapVisibleForTest => HeatSection.Visibility == Visibility.Visible;
 }

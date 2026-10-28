@@ -252,12 +252,16 @@ public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, ID
             if (SetProperty(ref _rangeDays, value))
             {
                 OnPropertyChanged(nameof(Granularity));
+                OnPropertyChanged(nameof(IsDaily));
             }
         }
     }
 
     /// <summary>0/3 天用小时粒度，7/30 天用天粒度。</summary>
     public string Granularity => RangeDays <= 3 ? "hour" : "day";
+
+    /// <summary>天粒度（近 7/30 天）才显示热力图；小时粒度没有热力图。</summary>
+    public bool IsDaily => Granularity == "day";
 
     public int RefreshSeconds
     {

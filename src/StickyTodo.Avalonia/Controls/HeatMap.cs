@@ -130,8 +130,18 @@ public sealed class HeatMap : Canvas
             levelBrushes[4] = Brushes.Black;
         }
 
+        // 只认天粒度（yyyy-MM-dd）。小时粒度的键是 "MM-dd HH:00"，画热力图没有意义，
+        // 也绝不能在这里抛错（会沿绑定链路炸到 UI 线程）——直接不画。
+        if (!DateOnly.TryParseExact(series[0].Key, "yyyy-MM-dd", out var first))
+        {
+            Width = Side;
+            Height = Top + 7 * (Cell + Gap);
+            DrawWeekdayLabels();
+            return;
+        }
+
         var col = 0;
-        var row = IsoDayOfWeek(DateOnly.ParseExact(series[0].Key, "yyyy-MM-dd"));
+        var row = IsoDayOfWeek(first);
 
         for (var index = 0; index < series.Count; index++)
         {

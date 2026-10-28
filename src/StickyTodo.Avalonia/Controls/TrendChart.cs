@@ -56,6 +56,12 @@ public sealed class TrendChart : Control
     /// <summary>用户点了某个数据点（-1 表示点了空白取消选择）。</summary>
     public event EventHandler<int>? PointPicked;
 
+    /// <summary>鼠标悬停到某个数据点上——语义与点击一致，直接显示该点明细。</summary>
+    public event EventHandler<int>? PointHovered;
+
+    /// <summary>当前悬停的列（-1 = 指针不在任何有效数据点上）。</summary>
+    private int _hoverIndex = -1;
+
     private const double LeftPad = 6;
     private const double RightPad = 6;
     private const double TopPad = 8;
@@ -87,6 +93,10 @@ public sealed class TrendChart : Control
             return;
         }
 
+        // 整块透明背景：柱子之间有空隙，没有它就只有「画到的地方」能命中指针，
+        // 悬停会一格一格地丢事件。
+        context.FillRectangle(Brushes.Transparent, new Rect(0, 0, width, height));
+
         var plotWidth = Math.Max(1, width - LeftPad - RightPad);
         var plotHeight = Math.Max(1, height - TopPad - BottomPad);
         var baseline = TopPad + plotHeight;
@@ -100,6 +110,15 @@ public sealed class TrendChart : Control
         {
             var y = TopPad + (plotHeight * i / 2.0);
             context.DrawLine(GridPen, new Point(LeftPad, y), new Point(width - RightPad, y));
+        }
+
+        // 悬停高亮：指针所在的那一列（主题色淡淡铺一层，深色皮肤也看得见）
+        if (_hoverIndex >= 0 && _hoverIndex < series.Count)
+        {
+            using (context.PushOpacity(0.14))
+            {
+                context.FillRectangle(Accent, new Rect(LeftPad + (slot * _hoverIndex), TopPad, slot, plotHeight));
+            }
         }
 
         // 堆叠柱
@@ -233,10 +252,82 @@ public sealed class TrendChart : Control
     {
         base.OnPointerMoved(e);
 
+        // 按住拖动 = 连续选择；不按键时 = 悬停，等价于点击
         if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
         {
             Pick(e.GetPosition(this));
+            return;
         }
+
+        Hover(e.GetPosition(this));
+    }
+
+    protected override void OnPointerExited(PointerEventArgs e)
+    {
+        base.OnPointerExited(e);
+        if (_hoverIndex < 0)
+        {
+            return;
+        }
+
+        // 只收起高亮，不动已经显示出来的明细（悬停=点击，点完的结果留着）
+        _hoverIndex = -1;
+        Cursor = Cursor.Default;
+        InvalidateVisual();
+    }
+
+    /// <summary>悬停：指针落在哪一列，就等同于点击那一列。</summary>
+    private void Hover(Point position)
+    {
+        var series = Series;
+        if (series is null || series.Count == 0)
+        {
+            return;
+        }
+
+        var index = IndexAt(position.X, series.Count);
+        if (index == _hoverIndex)
+        {
+            return;
+        }
+
+        if (index < 0)
+        {
+            // 落在左右留白上：取消高亮，但保留已有选择（免得指针划出图就把明细清掉）
+            _hoverIndex = -1;
+            Cursor = Cursor.Default;
+            InvalidateVisual();
+            return;
+        }
+
+        _hoverIndex = index;
+        Cursor = new Cursor(StandardCursorType.Hand);
+        InvalidateVisual();
+
+        SelectedIndex = index;
+        PointHovered?.Invoke(this, index);
+    }
+
+    /// <summary>回归用：模拟悬停到第 index 列（按列中点换算 x）。</summary>
+    internal void HoverForTest(int index)
+    {
+        var series = Series;
+        if (series is null || series.Count == 0 || index < 0 || index >= series.Count)
+        {
+            return;
+        }
+
+        var plotWidth = Math.Max(1, Bounds.Width - LeftPad - RightPad);
+        var slot = plotWidth / series.Count;
+        Hover(new Point(LeftPad + (slot * index) + (slot / 2), Bounds.Height / 2));
+    }
+
+    private int IndexAt(double x, int count)
+    {
+        var plotWidth = Math.Max(1, Bounds.Width - LeftPad - RightPad);
+        var slot = plotWidth / count;
+        var index = (int)Math.Floor((x - LeftPad) / slot);
+        return index >= 0 && index < count ? index : -1;
     }
 
     private void Pick(Point position)
@@ -247,11 +338,9 @@ public sealed class TrendChart : Control
             return;
         }
 
-        var plotWidth = Math.Max(1, Bounds.Width - LeftPad - RightPad);
-        var slot = plotWidth / series.Count;
-        var index = (int)Math.Floor((position.X - LeftPad) / slot);
+        var index = IndexAt(position.X, series.Count);
 
-        if (index < 0 || index >= series.Count)
+        if (index < 0)
         {
             SelectedIndex = -1;
             PointPicked?.Invoke(this, -1);
