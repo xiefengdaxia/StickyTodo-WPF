@@ -277,7 +277,9 @@ public static class UiStrings
         ["token.calls"] = ["调用", "Calls", "呼び出し", "호출"],
         ["token.cacheRatio"] = ["缓存比", "Cache ratio", "キャッシュ率", "캐시 비율"],
         ["token.trendTitle"] = ["用量趋势 · 柱=token 折线=调用次数 · 数据来自本机", "Usage trend · bars = tokens, line = calls · local data", "使用量推移・棒=Token 線=呼び出し回数・ローカルデータ", "사용량 추세 · 막대=Token 선=호출 수 · 로컬 데이터"],
-        ["token.hideDetail"] = ["收起明细", "Hide details", "詳細を閉じる", "상세 숨기기"],
+        ["token.hideDetail"] = ["收起明细", "Hide details", "詳細を閉じる", "상세 숨기기"],["token.heatmap"] = ["用量热力图 · 周 × 天", "Usage heatmap · week × day", "ヒートマップ・週×日", "사용량 히트맵 · 주×일"],
+
+        
         ["token.byModel"] = ["按模型", "By model", "モデル別", "모델별"],
         ["token.rangeToday"] = ["今天", "Today", "今日", "오늘"],
         ["token.range3"] = ["近3天", "3 days", "3日間", "3일"],

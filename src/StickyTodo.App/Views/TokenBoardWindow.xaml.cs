@@ -99,6 +99,10 @@ public partial class TokenBoardWindow : Window, IStickyWindow
 
     private void Copy_Click(object sender, RoutedEventArgs e) => _viewModel.CopyToClipboardCommand.Execute(null);
 
+    /// <summary>热力图点某天：与趋势图同一条明细链路。</summary>
+    private void HeatMap_DayPicked(object sender, int seriesIndex)
+        => _viewModel.ShowPointDetail(seriesIndex);
+
     private void Agent_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
         // TwoWay 绑定已把 SelectedAgent 写回；这里只负责触发取数。

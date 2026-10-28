@@ -84,6 +84,10 @@ public partial class TokenBoardWindow : StickyWindowBase
 
     private void HideDetail_Click(object? sender, RoutedEventArgs e) => _viewModel.HideDetail();
 
+    /// <summary>热力图点某天：与趋势图同一条明细链路。</summary>
+    private void HeatMap_DayPicked(object? sender, int seriesIndex)
+        => _viewModel.ShowPointDetail(seriesIndex);
+
     private void ToggleTopmost_Click(object? sender, RoutedEventArgs e) => _viewModel.ToggleTopmost();
 
     private void ToggleLock_Click(object? sender, RoutedEventArgs e) => _viewModel.ToggleLock();

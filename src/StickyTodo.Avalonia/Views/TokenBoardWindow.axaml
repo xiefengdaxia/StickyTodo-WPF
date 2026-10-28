@@ -38,7 +38,7 @@
   </Window.Styles>
 
   <Border Name="NoteRoot" Classes="note">
-    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*,Auto">
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto">
 
       <Border Name="TitleBar" Classes="header" CornerRadius="11,11,0,0" Padding="12,8">
         <Grid ColumnDefinitions="*,Auto">
@@ -157,8 +157,10 @@
       <TextBlock Grid.Row="4" Margin="14,6,14,0" Text="{Binding BreakdownText}"
                  Classes="caption" TextWrapping="Wrap" Opacity="0.85" />
 
-      <!-- 趋势 -->
-      <StackPanel Grid.Row="5" Margin="12,6,12,0">
+      <!-- 趋势 + 热力图 + 按模型（整块滚动，窗口小也不挤） -->
+      <ScrollViewer Grid.Row="5" Margin="12,6,12,0"
+                    VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel>
         <Grid Margin="2,0,2,4" ColumnDefinitions="*,Auto">
           <TextBlock Text="{loc:Loc token.trendTitle}" Classes="caption" Opacity="0.75" />
           <Button Grid.Column="1" Classes="link" Content="{loc:Loc token.hideDetail}"
@@ -180,14 +182,22 @@
             <TextBlock Text="{Binding DetailBody}" Classes="caption" TextWrapping="Wrap" Margin="0,3,0,0" />
           </StackPanel>
         </Border>
-      </StackPanel>
 
-      <!-- 按模型 -->
-      <Grid Grid.Row="6" Margin="12,10,12,0" RowDefinitions="Auto,*">
-        <TextBlock Grid.Row="0" Text="{loc:Loc token.byModel}" Classes="caption" Opacity="0.75" Margin="2,0,0,4" />
+        <!-- 热力图（周 × 天） -->
+        <StackPanel Margin="2,14,2,0">
+          <TextBlock Text="{loc:Loc token.heatmap}" Classes="caption" Opacity="0.75" Margin="2,0,0,6" />
+          <Border HorizontalAlignment="Left">
+            <controls:HeatMap Series="{Binding Stats.Series}"
+                              Accent="{DynamicResource Brush.Accent}"
+                              DayPicked="HeatMap_DayPicked" />
+          </Border>
+        </StackPanel>
 
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-          <ItemsControl ItemsSource="{Binding Models}">
+        <!-- 按模型 -->
+        <Grid Margin="2,14,2,0" RowDefinitions="Auto,Auto">
+          <TextBlock Grid.Row="0" Text="{loc:Loc token.byModel}" Classes="caption" Opacity="0.75" Margin="2,0,0,4" />
+
+          <ItemsControl Grid.Row="1" ItemsSource="{Binding Models}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:TokenModelUsageRow">
                 <Grid Margin="0,2" ColumnDefinitions="*,Auto">
@@ -205,11 +215,12 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
-        </ScrollViewer>
-      </Grid>
+        </Grid>
+      </StackPanel>
+      </ScrollViewer>
 
       <!-- 页脚 -->
-      <Border Grid.Row="7" BorderBrush="{DynamicResource Brush.Line}" BorderThickness="0,1,0,0"
+      <Border Grid.Row="6" BorderBrush="{DynamicResource Brush.Line}" BorderThickness="0,1,0,0"
               Padding="12,6" Margin="0,8,0,0">
         <Grid ColumnDefinitions="*,Auto">
           <StackPanel Grid.Column="0">
