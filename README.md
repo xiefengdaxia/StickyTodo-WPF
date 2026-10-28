@@ -116,15 +116,15 @@ TODO / Done 视图切换：
 WPF 版受 .NET 8 限制无法支持 Win7 和 32 位系统。为此仓库里另有一个 **Avalonia 11.3.22 + .NET 6** 的完整移植版，可发布到 **Windows 7 SP1（x64 / x86）**：
 
 ```powershell
-.\tools\publish-avalonia-win7.ps1 -Version 1.2.1
+.\tools\publish-avalonia-win7.ps1 -Version 1.2.2
 ```
 
 产物（self-contained 单文件，目标机无需装 .NET）：
 
 ```
 publish-avalonia/
-  StickyTodo-Avalonia-1.2.1-win-x64-portable.zip   # ~38 MB
-  StickyTodo-Avalonia-1.2.1-win-x86-portable.zip   # ~35 MB
+  StickyTodo-Avalonia-1.2.2-win-x64-portable.zip   # ~38 MB
+  StickyTodo-Avalonia-1.2.2-win-x86-portable.zip   # ~35 MB
 ```
 
 功能与 WPF 版对齐：待办看板、便签、日历（农历/节气/黄历）、Token 用量（含**复制摘要**）、番茄钟、提醒、托盘、全局快捷键、皮肤与透明度、四语言热切换、会话恢复、便携模式，以及 **天气看板**（Open-Meteo 免费接口，唯一联网功能，可自行增删城市）、**世界时钟**（全球十大城市）、**桌面时钟挂件**（阳历/农历/时间/天气轮播，可嵌入桌面）。
