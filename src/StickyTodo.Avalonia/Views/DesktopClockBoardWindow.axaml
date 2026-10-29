@@ -37,9 +37,7 @@
                 PointerReleased="Root_PointerReleased">
 
       <!-- 日期 + 农历：点一下打开日历 -->
-      <Border Classes="clockRow" ToolTip.Tip="点击打开日历"
-              PointerPressed="CalendarArea_PointerPressed"
-              PointerReleased="CalendarArea_PointerReleased">
+      <Border Classes="clockRow" Tag="calendar" ToolTip.Tip="点击打开日历">
         <StackPanel>
           <Grid ColumnDefinitions="*,Auto">
             <TextBlock Grid.Column="0" Text="{Binding SolarDateText}" FontSize="15" FontWeight="SemiBold"
@@ -54,16 +52,15 @@
         </StackPanel>
       </Border>
 
-      <!-- 时间（这一块同时是拖动窗口的把手） -->
-      <TextBlock Text="{Binding TimeText}" FontSize="38" FontWeight="Light"
+      <!-- 时间：点一下打开世界时钟（拖着不动就是拖窗口） -->
+      <TextBlock Text="{Binding TimeText}" FontSize="38" FontWeight="Light" Tag="clock"
+                 ToolTip.Tip="点击打开世界时钟"
                  Foreground="#FFF6EFE4" Margin="0,4,0,0" />
 
       <Border Height="1" Background="#26FFFFFF" Margin="0,10,0,8" />
 
       <!-- 天气（点一下打开天气看板） -->
-      <Border Classes="clockRow" ToolTip.Tip="点击打开天气看板"
-              PointerPressed="WeatherRow_PointerPressed"
-              PointerReleased="WeatherRow_PointerReleased">
+      <Border Classes="clockRow" Tag="weather" ToolTip.Tip="点击打开天气看板">
         <Grid ColumnDefinitions="Auto,*">
           <TextBlock Grid.Column="0" Text="{Binding WeatherLine}" FontSize="12.5"
                      Foreground="#FFE8A85C" VerticalAlignment="Center" />
@@ -73,15 +70,15 @@
         </Grid>
       </Border>
 
-      <!-- 今日日程（点一下打开日历） -->
-      <Border Classes="clockRow" Margin="-3,3" ToolTip.Tip="点击打开日历"
-              PointerPressed="AgendaRow_PointerPressed"
-              PointerReleased="AgendaRow_PointerReleased">
+      <!-- 今日日程：左边点开待办，右边点开 token 看板 -->
+      <Border Classes="clockRow" Margin="-3,3">
         <Grid ColumnDefinitions="*,Auto">
-          <TextBlock Grid.Column="0" Text="{Binding AgendaLine}" FontSize="12"
+          <TextBlock Grid.Column="0" Tag="todo" ToolTip.Tip="点击打开待办"
+                     Text="{Binding AgendaLine}" FontSize="12"
                      Foreground="#FFD9CEC0" VerticalAlignment="Center"
                      TextTrimming="CharacterEllipsis" />
-          <TextBlock Grid.Column="1" Text="{Binding BottomRightText}" FontSize="11"
+          <TextBlock Grid.Column="1" Tag="token" ToolTip.Tip="点击打开 Token 用量看板"
+                     Text="{Binding BottomRightText}" FontSize="11"
                      Foreground="#FF9E9284" Margin="8,0,0,0" VerticalAlignment="Center" />
         </Grid>
       </Border>

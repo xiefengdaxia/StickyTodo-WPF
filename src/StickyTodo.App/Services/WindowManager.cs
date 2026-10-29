@@ -28,6 +28,7 @@ public sealed class WindowManager
     private readonly SkinService _skinService;
     private readonly Core.Abstractions.ITokenStatsProvider _tokenProvider;
     private readonly Weather.WeatherService _weatherService;
+    private readonly Weather.WeatherCache _weatherCache;
     private readonly Dictionary<string, Window> _windows = new();
 
     private string? _activeBoardId;
@@ -50,13 +51,15 @@ public sealed class WindowManager
         AppSettingsService settings,
         SkinService skinService,
         Core.Abstractions.ITokenStatsProvider tokenProvider,
-        Weather.WeatherService weatherService)
+        Weather.WeatherService weatherService,
+        Weather.WeatherCache weatherCache)
     {
         _todoService = todoService;
         _settings = settings;
         _skinService = skinService;
         _tokenProvider = tokenProvider;
         _weatherService = weatherService;
+        _weatherCache = weatherCache;
     }
 
     /// <summary>打开的窗口数变化时触发（托盘菜单据此刷新）。</summary>
@@ -85,10 +88,10 @@ public sealed class WindowManager
                 new TokenBoardViewModel(_tokenProvider, _todoService, board, _settings, _skinService), this),
             // 工具型看板：面板本身不带待办数据，但它是正式看板（进列表、可会话恢复、可重命名/删除）
             BoardKind.Weather => new WeatherWindow(
-                new WeatherViewModel(_weatherService, _settings)),
+                new WeatherViewModel(_weatherService, _settings, _weatherCache)),
             BoardKind.WorldClock => new WorldClockWindow(new WorldClockViewModel()),
             BoardKind.DesktopClock => new DesktopClockWindow(
-                new DesktopClockViewModel(_weatherService, _settings, _todoService, this, _tokenProvider)),
+                new DesktopClockViewModel(_weatherService, _settings, _todoService, this, _tokenProvider, _weatherCache)),
             _ => new BoardWindow(new BoardViewModel(_todoService, board, _settings, _skinService), this),
         };
 
@@ -171,6 +174,19 @@ public sealed class WindowManager
         return window;
     }
 
+    /// <summary>已有的看板：打开（或激活）并贴到 <paramref name="anchor"/> 旁边。</summary>
+    public Window OpenBoardBeside(Board board, Window? anchor)
+    {
+        var window = OpenBoard(board);
+
+        if (anchor is not null)
+        {
+            PlaceBeside(window, anchor);
+        }
+
+        return window;
+    }
+
     /// <summary>
     /// 把 <paramref name="target"/> 贴到 <paramref name="anchor"/> 边上：
     /// 优先放左边（桌面时钟一般在右下角），左边放不下就放右边；底边对齐，最后夹进工作区。
@@ -203,6 +219,14 @@ public sealed class WindowManager
 
         // 底边和时钟对齐：时钟贴着屏幕底部时看起来最自然
         var top = anchor.Top + anchor.ActualHeight - height;
+
+        // 底边对齐会顶出屏幕上沿（看板比时钟高很多时）：改成和时钟顶部对齐，
+        // 别把窗口甩到屏幕最上面去
+        if (top < work.Top)
+        {
+            top = anchor.Top;
+        }
+
         top = Math.Min(Math.Max(top, work.Top), Math.Max(work.Top, work.Bottom - height));
 
         target.Left = left;

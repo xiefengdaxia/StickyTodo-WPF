@@ -41,7 +41,7 @@ public sealed class AppServices : IDisposable
                 string.IsNullOrWhiteSpace(Settings.TokenDatabasePath) ? null : Settings.TokenDatabasePath);
 
         PomodoroEngine = new PomodoroEngine();
-        Windows = new WindowManager(Todos, Settings, Skin, TokenProvider);
+        Windows = new WindowManager(Todos, Settings, Skin, TokenProvider, Weather, WeatherCache);
         HotKeys = new HotKeyService();
         Reminders = new ReminderPump(Todos);
         Tray = new TrayService(Todos, Windows, this);
@@ -146,6 +146,9 @@ public sealed class AppServices : IDisposable
 
     /// <summary>天气服务（惰性创建；只有打开天气/桌面时钟才会用到网络）。</summary>
     public Weather.WeatherService Weather => _weatherService ??= new Weather.WeatherService();
+
+    /// <summary>城市天气缓存（进程内单例）：桌面时钟和天气看板共用，避免重复请求。</summary>
+    public Weather.WeatherCache WeatherCache { get; } = new();
 
     /// <summary>
     /// 打开工具型面板。走「正式看板」路径：没有就建一条 Board 记录，

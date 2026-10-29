@@ -124,14 +124,16 @@ public sealed partial class WeatherViewModel : ObservableObject
 
     private readonly WeatherService _weather;
     private readonly AppSettingsService _settings;
+    private readonly WeatherCache _cache;
 
     /// <summary>最近一次成功取到的报告（来源说明要据此判断是否按市查询）。</summary>
     private WeatherReport? _report;
 
-    public WeatherViewModel(WeatherService weather, AppSettingsService settings)
+    public WeatherViewModel(WeatherService weather, AppSettingsService settings, WeatherCache cache)
     {
         _weather = weather;
         _settings = settings;
+        _cache = cache;
 
         foreach (var city in settings.WeatherCities)
         {
@@ -401,9 +403,9 @@ public sealed partial class WeatherViewModel : ObservableObject
         }
 
         // 缓存命中：直接用上次的报告，连"正在获取"都不闪
-        if (!force && _cache.TryGetValue(city, out var cached))
+        if (!force && _cache.TryGet(city, out var cachedReport, out var cachedAt) && cachedReport is not null)
         {
-            Apply(cached.Report, cached.FetchedAt);
+            Apply(cachedReport, cachedAt);
             IsBusyOverlayVisible = false;
             ErrorText = null;
             NoticeText = string.Empty;
@@ -454,13 +456,10 @@ public sealed partial class WeatherViewModel : ObservableObject
 
         _report = outcome.Report;
         var fetchedAt = DateTime.Now;
-        _cache[city] = (outcome.Report, fetchedAt);
+        _cache.Set(city, outcome.Report, fetchedAt);
         Apply(outcome.Report, fetchedAt);
         IsBusyOverlayVisible = false;
     }
-
-    /// <summary>每个城市最近一次成功取到的报告（键是城市名）。</summary>
-    private readonly Dictionary<string, (WeatherReport Report, DateTime FetchedAt)> _cache = new(StringComparer.Ordinal);
 
     /// <summary>刷新按钮：强制重新请求（缓存不参与）。</summary>
     [RelayCommand]
@@ -600,6 +599,7 @@ public sealed partial class DesktopClockViewModel : ObservableObject
     private readonly TodoService _todos;
     private readonly WindowManager _windows;
     private readonly ITokenStatsProvider _tokens;
+    private readonly WeatherCache _cache;
     private readonly DispatcherTimer _timer;
 
     private IReadOnlyList<string> _cities;
@@ -624,13 +624,15 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         AppSettingsService settings,
         TodoService todos,
         WindowManager windows,
-        ITokenStatsProvider tokens)
+        ITokenStatsProvider tokens,
+        WeatherCache cache)
     {
         _weather = weather;
         _settings = settings;
         _todos = todos;
         _windows = windows;
         _tokens = tokens;
+        _cache = cache;
         _cities = settings.WeatherCities;
         _currentCityIndex = DefaultCityIndex();
 
@@ -647,6 +649,15 @@ public sealed partial class DesktopClockViewModel : ObservableObject
     /// <summary>点天气行：打开天气看板（还没有就建一个）；已经开着就关掉。</summary>
     public void ToggleWeatherBoard() => ToggleBoard(BoardKind.Weather, "天气");
 
+    /// <summary>点日程行：打开待办看板（默认看板）；已经开着就关掉。</summary>
+    public void ToggleAgendaBoard() => ToggleBoard(_todos.EnsureDefaultBoard());
+
+    /// <summary>点 token 区域：打开 token 用量看板；已经开着就关掉。</summary>
+    public void ToggleTokenBoard() => ToggleBoard(BoardKind.Token, "Token");
+
+    /// <summary>点时间区域：打开世界时钟；已经开着就关掉。</summary>
+    public void ToggleWorldClockBoard() => ToggleBoard(BoardKind.WorldClock, "世界时钟");
+
     /// <summary>点日程行：打开日历看板并跳回今天；已经开着就关掉。</summary>
     public void ToggleCalendarBoard() => ToggleBoard(BoardKind.Calendar, "日历");
 
@@ -657,13 +668,25 @@ public sealed partial class DesktopClockViewModel : ObservableObject
     {
         var board = _todos.GetBoards().FirstOrDefault(b => b.Kind == kind);
 
-        if (board is not null && _windows.IsBoardOpen(board.Id))
+        if (board is not null)
+        {
+            ToggleBoard(board);
+            return;
+        }
+
+        _windows.OpenBoardBeside(kind, defaultName, _owner);
+    }
+
+    /// <summary>已有看板：开着就关，没开就贴边打开。</summary>
+    private void ToggleBoard(Board board)
+    {
+        if (_windows.IsBoardOpen(board.Id))
         {
             _windows.CloseBoard(board.Id);
             return;
         }
 
-        _windows.OpenBoardBeside(kind, defaultName, _owner);
+        _windows.OpenBoardBeside(board, _owner);
     }
 
     public void Start()
@@ -948,6 +971,7 @@ public sealed partial class DesktopClockViewModel : ObservableObject
             {
                 _report = outcome.Report;
                 _weatherFailed = false;
+                _cache.Set(city, outcome.Report, DateTime.Now);   // 天气看板打开时直接用这份
                 UpdateWeatherLine();
             }
             else

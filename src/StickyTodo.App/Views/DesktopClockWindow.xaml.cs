@@ -86,32 +86,17 @@ public partial class DesktopClockWindow : Window
     /// <summary>回归用：模拟点天气行。</summary>
     internal void OpenWeatherForTest() => _viewModel.ToggleWeatherBoard();
 
-    // ---------- 联动：点天气行打开天气看板、点日程行打开日历 ----------
-    // 按下时就把事件吃掉，否则会被外层的"拖动窗口"处理器接走（DragMove 会抢焦点）。
+    /// <summary>回归用：模拟点某个区域（calendar / clock / weather / todo / token）。</summary>
+    internal void ClickAreaForTest(string tag) => Activate(tag);
 
-    private void WeatherRow_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => e.Handled = true;
-    private void WeatherRow_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-    {
-        e.Handled = true;
-        _viewModel.ToggleWeatherBoard();
-    }
+    // ---------- 单击 / 拖动：按下先"待定"，移动超过阈值才算拖，否则松开时按区域触发 ----------
 
-    private void AgendaRow_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => e.Handled = true;
+    private const double DragThreshold = 4;   // DIP
 
-    private void AgendaRow_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-    {
-        e.Handled = true;
-        _viewModel.ToggleCalendarBoard();
-    }
-
-    // 日期/农历那片：点一下打开日历
-    private void CalendarArea_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => e.Handled = true;
-
-    private void CalendarArea_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-    {
-        e.Handled = true;
-        _viewModel.ToggleCalendarBoard();
-    }
+    private bool _pressed;
+    private bool _dragging;
+    private Point _lastPoint;
+    private string? _pressedTag;
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
@@ -120,7 +105,7 @@ public partial class DesktopClockWindow : Window
             return;
         }
 
-        // 点在按钮上不拖动
+        // 点在按钮上不处理
         if (e.OriginalSource is DependencyObject source)
         {
             var current = source;
@@ -135,42 +120,99 @@ public partial class DesktopClockWindow : Window
             }
         }
 
-        // 手动拖动：DragMove() 走的是 WM_NCLBUTTONDOWN 的系统移动循环，
-        // 时钟这种"无边框 + 被压到桌面层"的窗口经常直接不生效（表现就是"拖不动"）。
-        // 这里自己算位移，任何窗口样式下都能拖。
-        _dragging = true;
-        _userMoved = true;                 // 用户接手后不再自动贴角
-        _dragOrigin = e.GetPosition(this);
+        _pressed = true;
+        _dragging = false;
+        _lastPoint = e.GetPosition(this);
+        _pressedTag = FindTag(e.OriginalSource as DependencyObject);
         (sender as UIElement)?.CaptureMouse();
         e.Handled = true;
     }
 
-    private bool _dragging;
-    private Point _dragOrigin;
-
     private void Root_MouseMove(object sender, MouseEventArgs e)
     {
-        if (!_dragging)
+        if (!_pressed)
         {
             return;
         }
 
-        // 用当前 Left/Top 累加位移：e.GetPosition 是相对窗口的，窗口移动后它也跟着变，
-        // 这里必须是"当前值 + 本帧位移"，用按下时的 Left 做基准会导致每帧只修正一半误差 → 抖动
         var now = e.GetPosition(this);
-        Left += now.X - _dragOrigin.X;
-        Top += now.Y - _dragOrigin.Y;
+
+        if (!_dragging)
+        {
+            if (Math.Abs(now.X - _lastPoint.X) < DragThreshold && Math.Abs(now.Y - _lastPoint.Y) < DragThreshold)
+            {
+                return;
+            }
+
+            _dragging = true;
+            _userMoved = true;   // 真的拖了才关掉自动贴角
+        }
+
+        // 用当前 Left/Top 累加本帧位移：e.GetPosition 是相对窗口的，窗口移动后它也跟着变，
+        // 用按下时的 Left 做基准会导致每帧只修正一半误差 → 抖动
+        Left += now.X - _lastPoint.X;
+        Top += now.Y - _lastPoint.Y;
+        _lastPoint = now;
     }
 
     private void Root_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
-        if (!_dragging)
+        if (!_pressed)
         {
             return;
         }
 
-        _dragging = false;
+        _pressed = false;
         (sender as UIElement)?.ReleaseMouseCapture();
+
+        // 没拖动 = 单击：按按下时所在的区域触发
+        if (!_dragging)
+        {
+            Activate(_pressedTag);
+        }
+
+        _dragging = false;
+        _pressedTag = null;
+    }
+
+    /// <summary>单击区域 → 对应看板（开着就关）。</summary>
+    private void Activate(string? tag)
+    {
+        switch (tag)
+        {
+            case "calendar":
+                _viewModel.ToggleCalendarBoard();
+                break;
+            case "clock":
+                _viewModel.ToggleWorldClockBoard();
+                break;
+            case "weather":
+                _viewModel.ToggleWeatherBoard();
+                break;
+            case "todo":
+                _viewModel.ToggleAgendaBoard();
+                break;
+            case "token":
+                _viewModel.ToggleTokenBoard();
+                break;
+        }
+    }
+
+    /// <summary>从被点中的元素往上找第一个带字符串 Tag 的元素。</summary>
+    private static string? FindTag(DependencyObject? source)
+    {
+        var current = source;
+        while (current is not null)
+        {
+            if (current is FrameworkElement { Tag: string tag })
+            {
+                return tag;
+            }
+
+            current = current is System.Windows.Media.Visual ? System.Windows.Media.VisualTreeHelper.GetParent(current) : null;
+        }
+
+        return null;
     }
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();

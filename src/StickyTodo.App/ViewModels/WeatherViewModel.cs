@@ -97,13 +97,15 @@ public sealed partial class WeatherViewModel : ObservableObject
 {
     private readonly WeatherService _weather;
     private readonly AppSettingsService _settings;
+    private readonly WeatherCache _cache;
 
     private WeatherReport? _report;
 
-    public WeatherViewModel(WeatherService weather, AppSettingsService settings)
+    public WeatherViewModel(WeatherService weather, AppSettingsService settings, WeatherCache cache)
     {
         _weather = weather;
         _settings = settings;
+        _cache = cache;
 
         foreach (var city in settings.WeatherCities)
         {
@@ -361,10 +363,10 @@ public sealed partial class WeatherViewModel : ObservableObject
         }
 
         // 缓存命中：直接用上次的报告，连"正在获取"都不闪
-        if (!force && _cache.TryGetValue(city, out var cached))
+        if (!force && _cache.TryGet(city, out var cachedReport, out var cachedAt) && cachedReport is not null)
         {
-            _report = cached.Report;
-            Apply(cached.Report, cached.FetchedAt);
+            _report = cachedReport;
+            Apply(cachedReport, cachedAt);
             IsBusyOverlayVisible = false;
             NoticeText = string.Empty;
             return;
@@ -413,13 +415,10 @@ public sealed partial class WeatherViewModel : ObservableObject
 
         _report = outcome.Report;
         var fetchedAt = DateTime.Now;
-        _cache[city] = (outcome.Report, fetchedAt);
+        _cache.Set(city, outcome.Report, fetchedAt);
         Apply(outcome.Report, fetchedAt);
         IsBusyOverlayVisible = false;
     }
-
-    /// <summary>每个城市最近一次成功取到的报告（键是城市名）。</summary>
-    private readonly Dictionary<string, (WeatherReport Report, DateTime FetchedAt)> _cache = new(StringComparer.Ordinal);
 
     /// <summary>输入框的模糊搜索建议（全国省市区县表，最多 8 条）。</summary>
     public IReadOnlyList<DivisionSuggestion> SuggestCities(string query) => ChinaDivisions.Search(query, 8);

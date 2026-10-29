@@ -491,6 +491,7 @@ public partial class App : System.Windows.Application
                 services.AddSingleton<HotKeyService>();
                 services.AddSingleton<AutoStartService>();
                 services.AddSingleton<Weather.WeatherService>();
+            services.AddSingleton<Weather.WeatherCache>();
                 services.AddSingleton<ViewModels.WorldClockViewModel>();
                 services.AddSingleton<ViewModels.DesktopClockViewModel>();
                 services.AddSingleton<Core.Abstractions.ITokenStatsProvider>(sp =>
@@ -1666,6 +1667,52 @@ public partial class App : System.Windows.Application
             var weatherClosed = weather is null || !windows.IsBoardOpen(weather.Id);
             Log.Information("[clock] 再点一次天气：已关闭={Closed}", weatherClosed);
             ok &= weatherClosed;
+
+            // 点各区域 → 对应看板贴边打开；再点关闭
+            async Task CheckAreaAsync(string tag, Func<Board?> resolve, string label)
+            {
+                window.ClickAreaForTest(tag);
+                await Task.Delay(800);
+                var board = resolve();
+                var opened = board is not null && windows.IsBoardOpen(board.Id);
+                window.ClickAreaForTest(tag);
+                await Task.Delay(600);
+                var closed = board is null || !windows.IsBoardOpen(board.Id);
+                Log.Information("[clock] 点{Label}：打开={Opened} 关闭={Closed}", label, opened, closed);
+                ok &= opened && closed;
+            }
+
+            await CheckAreaAsync("todo", () => service.EnsureDefaultBoard(), "待办");
+            await CheckAreaAsync("token", () => service.GetBoards().FirstOrDefault(b => b.Kind == BoardKind.Token), "token");
+            await CheckAreaAsync("clock", () => service.GetBoards().FirstOrDefault(b => b.Kind == BoardKind.WorldClock), "世界时钟");
+
+            // 天气缓存：缓存里有的城市，打开看板要直接用（用一个本来查不到的名字验证，不依赖网络）
+            var weatherCache = _host.Services.GetRequiredService<WeatherCache>();
+            const string cachedCity = "缓存测试城";
+            var citiesNow = settingsService.WeatherCities.ToList();
+            if (!citiesNow.Contains(cachedCity))
+            {
+                citiesNow.Add(cachedCity);
+                settingsService.WeatherCities = citiesNow;
+            }
+
+            weatherCache.Set(cachedCity, new WeatherReport
+            {
+                CityName = cachedCity,
+                Days = [new WeatherDayInfo { DayLabel = "今天", Text = "缓存命中", TempMax = 12 }],
+            }, DateTime.Now.AddHours(-2));
+
+            var cachedVm = new WeatherViewModel(
+                _host.Services.GetRequiredService<WeatherService>(),
+                settingsService,
+                weatherCache);
+            cachedVm.SelectCity(cachedCity);
+            await cachedVm.LoadAsync();
+
+            var cacheHit = !cachedVm.IsBusyOverlayVisible && cachedVm.CurrentText == "缓存命中";
+            Log.Information("[clock] 天气缓存：城市={City} 文本={Text} 遮盖={Busy} 命中={Hit}",
+                cachedVm.CurrentCity, cachedVm.CurrentText, cachedVm.IsBusyOverlayVisible, cacheHit);
+            ok &= cacheHit;
 
             Log.Information("[clock] 总结果={Result}", ok ? "通过" : "失败");
             Log.CloseAndFlush();

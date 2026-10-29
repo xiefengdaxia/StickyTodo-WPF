@@ -43,11 +43,8 @@
                     MouseMove="Root_MouseMove"
                     MouseLeftButtonUp="Root_MouseLeftButtonUp">
 
-            <!-- 日期 + 农历：点一下打开日历（原来的"点击打开日历"提示改到这里） -->
-            <Border Style="{StaticResource ClockRow}"
-                    ToolTip="点击打开日历"
-                    MouseLeftButtonDown="CalendarArea_MouseLeftButtonDown"
-                    MouseLeftButtonUp="CalendarArea_MouseLeftButtonUp">
+            <!-- 日期 + 农历：点一下打开日历 -->
+            <Border Style="{StaticResource ClockRow}" Tag="calendar" ToolTip="点击打开日历">
                 <StackPanel>
                     <Grid>
                         <TextBlock Text="{Binding SolarDateText}" FontSize="15" FontWeight="SemiBold"
@@ -62,17 +59,15 @@
                 </StackPanel>
             </Border>
 
-            <!-- 时间（这一块同时是拖动窗口的把手） -->
-            <TextBlock Text="{Binding TimeText}" FontSize="38" FontWeight="Light"
+            <!-- 时间：点一下打开世界时钟（拖着不动就是拖窗口） -->
+            <TextBlock Text="{Binding TimeText}" FontSize="38" FontWeight="Light" Tag="clock"
+                       ToolTip="点击打开世界时钟"
                        Foreground="#FFF6EFE4" Margin="0,4,0,0" />
 
             <Border Height="1" Background="#26FFFFFF" Margin="0,10,0,8" />
 
             <!-- 天气（点一下打开天气看板） -->
-            <Border Style="{StaticResource ClockRow}"
-                    ToolTip="点击打开天气看板"
-                    MouseLeftButtonDown="WeatherRow_MouseLeftButtonDown"
-                    MouseLeftButtonUp="WeatherRow_MouseLeftButtonUp">
+            <Border Style="{StaticResource ClockRow}" Tag="weather" ToolTip="点击打开天气看板">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -86,20 +81,19 @@
                 </Grid>
             </Border>
 
-            <!-- 今日日程（点一下打开日历） -->
-            <Border Style="{StaticResource ClockRow}" Margin="-3,3"
-                    ToolTip="点击打开日历"
-                    MouseLeftButtonDown="AgendaRow_MouseLeftButtonDown"
-                    MouseLeftButtonUp="AgendaRow_MouseLeftButtonUp">
+            <!-- 今日日程：左边点开待办，右边点开 token 看板 -->
+            <Border Style="{StaticResource ClockRow}" Margin="-3,3">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="{Binding AgendaLine}" FontSize="12"
+                    <TextBlock Grid.Column="0" Tag="todo" ToolTip="点击打开待办"
+                               Text="{Binding AgendaLine}" FontSize="12"
                                Foreground="#FFD9CEC0" VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis" />
-                    <TextBlock Grid.Column="1" Text="{Binding BottomRightText}" FontSize="11"
+                    <TextBlock Grid.Column="1" Tag="token" ToolTip="点击打开 Token 用量看板"
+                               Text="{Binding BottomRightText}" FontSize="11"
                                Foreground="#FF9E9284" Margin="8,0,0,0"
                                VerticalAlignment="Center" />
                 </Grid>

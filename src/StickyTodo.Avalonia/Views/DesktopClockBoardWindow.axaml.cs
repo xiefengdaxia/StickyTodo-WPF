@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using StickyTodo.Notes.Services;
 using StickyTodo.Notes.ViewModels;
 
@@ -111,21 +112,25 @@ public partial class DesktopClockBoardWindow : Window
             return;
         }
 
-        // 手动拖动：BeginMoveDrag() 走的是 WM_NCLBUTTONDOWN 的系统移动循环，
-        // 时钟这种"无边框 + 被压到桌面层"的窗口经常直接不生效（表现就是"拖不动"）。
-        _dragging = true;
-        _userMoved = true;                    // 用户接手后不再自动贴角
+        // 按下先"待定"：移动超过阈值才算拖动，否则松开时按区域触发（点天气/日程/时间…）
+        _pressed = true;
+        _dragging = false;
         _pressPosition = Position;
         _grabX = ScreenPointerX(e);
         _grabY = ScreenPointerY(e);
+        _pressedTag = FindTag(e.Source as Avalonia.Visual);
         e.Pointer.Capture(sender as Avalonia.Input.IInputElement);
         e.Handled = true;
     }
 
+    private const double DragThreshold = 4;   // DIP
+
+    private bool _pressed;
     private bool _dragging;
     private Avalonia.PixelPoint _pressPosition;
     private double _grabX;
     private double _grabY;
+    private string? _pressedTag;
 
     /// <summary>缩放：Position 是物理像素，指针坐标是 DIP，换算要用它。</summary>
     private double Scale => Screens.ScreenFromWindow(this)?.Scaling is { } s and > 0 ? s : 1.0;
@@ -138,13 +143,24 @@ public partial class DesktopClockBoardWindow : Window
 
     private void Root_PointerMoved(object? sender, Avalonia.Input.PointerEventArgs e)
     {
-        if (!_dragging)
+        if (!_pressed)
         {
             return;
         }
 
         var dx = ScreenPointerX(e) - _grabX;
         var dy = ScreenPointerY(e) - _grabY;
+
+        if (!_dragging)
+        {
+            if (Math.Abs(dx) < DragThreshold && Math.Abs(dy) < DragThreshold)
+            {
+                return;
+            }
+
+            _dragging = true;
+            _userMoved = true;   // 真的拖了才关掉自动贴角
+        }
 
         Position = new Avalonia.PixelPoint(
             (int)Math.Round(_pressPosition.X + (dx * Scale)),
@@ -153,75 +169,63 @@ public partial class DesktopClockBoardWindow : Window
 
     private void Root_PointerReleased(object? sender, Avalonia.Input.PointerReleasedEventArgs e)
     {
-        if (!_dragging)
+        if (!_pressed)
         {
             return;
+        }
+
+        _pressed = false;
+        e.Pointer.Capture(null);
+
+        // 没拖动 = 单击：按按下时所在的区域触发
+        if (!_dragging)
+        {
+            Activate(_pressedTag);
         }
 
         _dragging = false;
-        e.Pointer.Capture(null);
+        _pressedTag = null;
+    }
+
+    /// <summary>单击区域 → 对应看板（开着就关）。</summary>
+    private void Activate(string? tag)
+    {
+        switch (tag)
+        {
+            case "calendar":
+                _viewModel.ToggleCalendarBoard();
+                break;
+            case "clock":
+                _viewModel.ToggleWorldClockBoard();
+                break;
+            case "weather":
+                _viewModel.ToggleWeatherBoard();
+                break;
+            case "todo":
+                _viewModel.ToggleAgendaBoard();
+                break;
+            case "token":
+                _viewModel.ToggleTokenBoard();
+                break;
+        }
+    }
+
+    /// <summary>从被点中的元素往上找第一个带字符串 Tag 的元素。</summary>
+    private static string? FindTag(Avalonia.Visual? source)
+    {
+        var current = source;
+        while (current is not null)
+        {
+            if (current is Avalonia.Controls.Control { Tag: string tag })
+            {
+                return tag;
+            }
+
+            current = current.GetVisualParent();
+        }
+
+        return null;
     }
 
     private void Close_Click(object? sender, RoutedEventArgs e) => Close();
-
-    // ---------- 联动：点天气行打开天气看板、点日程行打开日历 ----------
-    // 按下时就把事件吃掉，否则会被外层的"拖动窗口"处理器接走（BeginMoveDrag 会抢指针）。
-
-    // 日期/农历那片：点一下打开日历
-    private void CalendarArea_PointerPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
-    {
-        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
-        {
-            e.Handled = true;
-        }
-    }
-
-    private void CalendarArea_PointerReleased(object? sender, Avalonia.Input.PointerReleasedEventArgs e)
-    {
-        if (e.InitialPressMouseButton != Avalonia.Input.MouseButton.Left)
-        {
-            return;
-        }
-
-        e.Handled = true;
-        _viewModel.ToggleCalendarBoard();
-    }
-
-    private void WeatherRow_PointerPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
-    {
-        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
-        {
-            e.Handled = true;
-        }
-    }
-
-    private void WeatherRow_PointerReleased(object? sender, Avalonia.Input.PointerReleasedEventArgs e)
-    {
-        if (e.InitialPressMouseButton != Avalonia.Input.MouseButton.Left)
-        {
-            return;
-        }
-
-        e.Handled = true;
-        _viewModel.ToggleWeatherBoard();
-    }
-
-    private void AgendaRow_PointerPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
-    {
-        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
-        {
-            e.Handled = true;
-        }
-    }
-
-    private void AgendaRow_PointerReleased(object? sender, Avalonia.Input.PointerReleasedEventArgs e)
-    {
-        if (e.InitialPressMouseButton != Avalonia.Input.MouseButton.Left)
-        {
-            return;
-        }
-
-        e.Handled = true;
-        _viewModel.ToggleCalendarBoard();
-    }
 }

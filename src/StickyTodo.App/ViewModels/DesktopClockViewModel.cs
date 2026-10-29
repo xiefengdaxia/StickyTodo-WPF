@@ -23,6 +23,7 @@ public sealed partial class DesktopClockViewModel : ObservableObject
     private readonly TodoService _todos;
     private readonly WindowManager _windows;
     private readonly ITokenStatsProvider _tokens;
+    private readonly WeatherCache _cache;
 
     private IReadOnlyList<string> _cities;
     private int _currentCityIndex;
@@ -49,13 +50,15 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         AppSettingsService settings,
         TodoService todos,
         WindowManager windows,
-        ITokenStatsProvider tokens)
+        ITokenStatsProvider tokens,
+        WeatherCache cache)
     {
         _weather = weather;
         _settings = settings;
         _todos = todos;
         _windows = windows;
         _tokens = tokens;
+        _cache = cache;
         _cities = settings.WeatherCities;
         _currentCityIndex = DefaultCityIndex();
 
@@ -210,6 +213,15 @@ public sealed partial class DesktopClockViewModel : ObservableObject
     /// <summary>点日程行：打开日历看板并跳回今天；已经开着就关掉。</summary>
     public void ToggleCalendarBoard() => ToggleBoard(BoardKind.Calendar, "日历");
 
+    /// <summary>点日程行：打开待办看板（默认看板）；已经开着就关掉。</summary>
+    public void ToggleAgendaBoard() => ToggleBoard(_todos.EnsureDefaultBoard());
+
+    /// <summary>点 token 区域：打开 token 用量看板；已经开着就关掉。</summary>
+    public void ToggleTokenBoard() => ToggleBoard(BoardKind.Token, "Token");
+
+    /// <summary>点时间区域：打开世界时钟；已经开着就关掉。</summary>
+    public void ToggleWorldClockBoard() => ToggleBoard(BoardKind.WorldClock, "世界时钟");
+
     /// <summary>
     /// 贴边打开 / 关闭对应看板：没开就建好并贴在时钟旁边，已经开着就关掉。
     /// </summary>
@@ -217,13 +229,25 @@ public sealed partial class DesktopClockViewModel : ObservableObject
     {
         var board = _todos.GetBoards().FirstOrDefault(b => b.Kind == kind);
 
-        if (board is not null && _windows.IsBoardOpen(board.Id))
+        if (board is not null)
+        {
+            ToggleBoard(board);
+            return;
+        }
+
+        _windows.OpenBoardBeside(kind, defaultName, _owner);
+    }
+
+    /// <summary>已有看板：开着就关，没开就贴边打开。</summary>
+    private void ToggleBoard(Board board)
+    {
+        if (_windows.IsBoardOpen(board.Id))
         {
             _windows.CloseBoard(board.Id);
             return;
         }
 
-        _windows.OpenBoardBeside(kind, defaultName, _owner);
+        _windows.OpenBoardBeside(board, _owner);
     }
 
     // ---------- 天气轮播 ----------
@@ -367,6 +391,7 @@ public sealed partial class DesktopClockViewModel : ObservableObject
             _report = outcome.Report;
             _weatherReady = true;
             _failedUntil = null;
+            _cache.Set(city, outcome.Report, DateTime.Now);   // 天气看板打开时直接用这份
             UpdateWeatherLine();
             return;
         }
