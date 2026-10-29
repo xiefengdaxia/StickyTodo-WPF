@@ -120,9 +120,10 @@ public partial class App : Application
 
         StartReminderPump(services);
 
-        // 先刷掉上次被强杀进程留下的托盘图标，再挂自己的图标
+        // 先刷掉上次被强杀进程留下的托盘图标，再挂自己的图标；2 秒后再补一次
         TrayRefresher.Refresh();
         services.Tray.Start();
+        Avalonia.Threading.DispatcherTimer.RunOnce(() => TrayRefresher.Refresh(), TimeSpan.FromSeconds(2));
         AttachHotKeys(services);
         services.AutoStart.Sync(services.Settings.AutoStart);
 
