@@ -542,17 +542,22 @@ public sealed class WeatherService
                 currentWind = $"{WeatherCode.WindDirection(wd.GetDouble())}{WeatherCode.WindLevel(ws.GetDouble())}";
             }
 
-            // 实时温度与天气码覆盖"今天"这一格，保证现在=此刻
+            // 实时温度与天气码覆盖"今天"这一格，保证现在=此刻。
+            // 注意文案和图标要一起换：只换文案会出现「阴」配雾图标这种自相矛盾
             if (current.TryGetProperty("temperature_2m", out var t) && t.ValueKind == JsonValueKind.Number)
             {
                 var todayIndex = days.FindIndex(d => d.Date == today);
                 if (todayIndex >= 0)
                 {
                     var todayInfo = days[todayIndex];
+                    var currentInfo = WeatherCode.Describe(
+                        current.TryGetProperty("weather_code", out var c) ? c.GetInt32() : 0);
+
                     days[todayIndex] = todayInfo with
                     {
                         TempMax = Math.Max(todayInfo.TempMax, t.GetDouble()),
-                        Text = WeatherCode.Describe(current.TryGetProperty("weather_code", out var c) ? c.GetInt32() : 0).Text,
+                        Text = currentInfo.Text,
+                        Icon = currentInfo.Icon,
                     };
                 }
             }

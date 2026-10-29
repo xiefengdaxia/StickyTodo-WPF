@@ -264,7 +264,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="{Binding CurrentIconGlyph}" FontSize="46"
                                    VerticalAlignment="Center" Margin="0,0,14,0"
-                                   FontFamily="Segoe UI Emoji, Segoe UI Symbol, Microsoft YaHei UI"
+                                   FontFamily="Segoe UI Symbol, Microsoft YaHei UI"
                                    Foreground="#FFFFB300" />
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="{Binding CurrentTempText}" FontSize="40" FontWeight="Light"
@@ -336,7 +336,7 @@
                                                        HorizontalAlignment="Center" Margin="0,4,0,10" />
                                             <TextBlock Text="{Binding IconGlyph}" FontSize="34"
                                                        HorizontalAlignment="Center"
-                                                       FontFamily="Segoe UI Emoji, Segoe UI Symbol, Microsoft YaHei UI"
+                                                       FontFamily="Segoe UI Symbol, Microsoft YaHei UI"
                                                        Foreground="#FFFFB300" />
                                             <TextBlock Text="{Binding Text}" FontSize="13"
                                                        HorizontalAlignment="Center" Margin="0,6,0,0"
@@ -361,7 +361,7 @@
                                         <StackPanel HorizontalAlignment="Center">
                                             <TextBlock Text="{Binding IconGlyph2}" FontSize="28"
                                                        HorizontalAlignment="Center"
-                                                       FontFamily="Segoe UI Emoji, Segoe UI Symbol, Microsoft YaHei UI"
+                                                       FontFamily="Segoe UI Symbol, Microsoft YaHei UI"
                                                        Foreground="#FFFFB300" />
                                             <TextBlock Text="{Binding Text}" FontSize="13"
                                                        HorizontalAlignment="Center" Margin="0,6,0,0"
