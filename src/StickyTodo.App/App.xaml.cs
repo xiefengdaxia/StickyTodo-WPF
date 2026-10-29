@@ -301,6 +301,9 @@ public partial class App : System.Windows.Application
             }
 
             var tray = _host.Services.GetRequiredService<TrayService>();
+
+            // 先刷掉上次被强杀进程留下的托盘图标，再挂自己的图标
+            TrayRefresher.Refresh();
             tray.Start();
 
             StartReminderPump(tray);
@@ -1613,25 +1616,56 @@ public partial class App : System.Windows.Application
                      && state.Contains("14:00 交周报")
                      && state.Contains("已完成 1/");
 
-            // 点"今日日程"：本来没有日历看板，要自动建一个并打开
+            // 改默认城市：时钟要在几秒内换过来（不用等 30 分钟）；同时验证贴边打开/再点关闭
+            var settingsService = _host.Services.GetRequiredService<AppSettingsService>();
+            var targetCity = settingsService.WeatherCities[^1];
+            settingsService.WeatherDefaultCity = targetCity;
+            await Task.Delay(7000);
+            Log.Information("[clock] 默认城市改成 {City} 后，时钟取数城市={Now}",
+                targetCity, window.LoadedCityForTest);
+            ok &= string.Equals(window.LoadedCityForTest, targetCity, StringComparison.Ordinal);
+
+            // 点"今日日程"：贴着时钟打开
             window.OpenCalendarForTest();
-            await Task.Delay(600);
+            await Task.Delay(900);
 
             var calendar = service.GetBoards().FirstOrDefault(b => b.Kind == BoardKind.Calendar);
             var calendarOpened = calendar is not null && windows.IsBoardOpen(calendar.Id);
-            Log.Information("[clock] 点日程后：日历看板={Board} 打开={Opened}",
-                calendar?.Name ?? "(无)", calendarOpened);
-            ok &= calendarOpened;
+            var calendarWindow = Application.Current.Windows.OfType<CalendarWindow>().FirstOrDefault();
 
-            // 点"天气"：同样自动建出天气看板（网络不通也要能开窗，只是数据为空）
+            // 贴在时钟左边（左边放不下才会放到右边）：两者不能压在一起
+            var besideClock = calendarWindow is not null
+                              && (calendarWindow.Left + calendarWindow.ActualWidth <= window.Left + 1
+                                  || calendarWindow.Left >= window.Left + window.ActualWidth - 1);
+
+            Log.Information("[clock] 点日程后：日历看板={Board} 打开={Opened} 位置={Pos} 贴边={Beside}",
+                calendar?.Name ?? "(无)", calendarOpened,
+                calendarWindow is null ? "(无窗口)" : $"{calendarWindow.Left:0},{calendarWindow.Top:0}",
+                besideClock);
+            ok &= calendarOpened && besideClock;
+
+            // 再点一次：应该关掉
+            window.OpenCalendarForTest();
+            await Task.Delay(700);
+            var calendarClosed = calendar is null || !windows.IsBoardOpen(calendar.Id);
+            Log.Information("[clock] 再点一次日程：已关闭={Closed}", calendarClosed);
+            ok &= calendarClosed;
+
+            // 点"天气"：同样贴边打开，再点关闭
             window.OpenWeatherForTest();
-            await Task.Delay(600);
+            await Task.Delay(900);
 
             var weather = service.GetBoards().FirstOrDefault(b => b.Kind == BoardKind.Weather);
             var weatherOpened = weather is not null && windows.IsBoardOpen(weather.Id);
             Log.Information("[clock] 点天气后：天气看板={Board} 打开={Opened}",
                 weather?.Name ?? "(无)", weatherOpened);
             ok &= weatherOpened;
+
+            window.OpenWeatherForTest();
+            await Task.Delay(700);
+            var weatherClosed = weather is null || !windows.IsBoardOpen(weather.Id);
+            Log.Information("[clock] 再点一次天气：已关闭={Closed}", weatherClosed);
+            ok &= weatherClosed;
 
             Log.Information("[clock] 总结果={Result}", ok ? "通过" : "失败");
             Log.CloseAndFlush();

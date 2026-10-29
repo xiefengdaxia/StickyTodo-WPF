@@ -1,3 +1,4 @@
+using System.Windows;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using StickyTodo.App.Services;
@@ -32,6 +33,12 @@ public sealed partial class DesktopClockViewModel : ObservableObject
 
     private string _lunarText = string.Empty;
 
+    /// <summary>最后一次取数用的城市（用户改默认城市后要立刻换）。</summary>
+    private string _loadedCity = string.Empty;
+
+    /// <summary>时钟窗口本身（点"打开天气/日历"时要贴着它放）。</summary>
+    private Window? _owner;
+
     /// <summary>天气全列表失败后的下次重试时间；null = 不需要急着重试。</summary>
     private DateTime? _failedUntil;
 
@@ -51,6 +58,9 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _timer.Tick += async (_, _) => await TickAsync();
     }
+
+    /// <summary>窗口建好后把自己交给 ViewModel：点天气/日历时按它的位置摆放。</summary>
+    public void AttachWindow(Window window) => _owner = window;
 
     /// <summary>时钟开始走 + 首次算好农历/日程并加载天气。</summary>
     public void Start()
@@ -161,13 +171,27 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         return clean.Length <= max ? clean : clean[..max] + "…";
     }
 
-    /// <summary>点天气行：打开天气看板（还没有就建一个）。</summary>
-    public void OpenWeatherBoard()
-        => _windows.OpenBoardByKind(BoardKind.Weather, "天气");
+    /// <summary>点天气行：打开天气看板（还没有就建一个）；已经开着就关掉。</summary>
+    public void ToggleWeatherBoard() => ToggleBoard(BoardKind.Weather, "天气");
 
-    /// <summary>点日程行：打开日历看板并跳回今天。</summary>
-    public void OpenCalendarBoard()
-        => _windows.OpenBoardByKind(BoardKind.Calendar, "日历");
+    /// <summary>点日程行：打开日历看板并跳回今天；已经开着就关掉。</summary>
+    public void ToggleCalendarBoard() => ToggleBoard(BoardKind.Calendar, "日历");
+
+    /// <summary>
+    /// 贴边打开 / 关闭对应看板：没开就建好并贴在时钟旁边，已经开着就关掉。
+    /// </summary>
+    private void ToggleBoard(BoardKind kind, string defaultName)
+    {
+        var board = _todos.GetBoards().FirstOrDefault(b => b.Kind == kind);
+
+        if (board is not null && _windows.IsBoardOpen(board.Id))
+        {
+            _windows.CloseBoard(board.Id);
+            return;
+        }
+
+        _windows.OpenBoardBeside(kind, defaultName, _owner);
+    }
 
     // ---------- 天气轮播 ----------
 
@@ -200,6 +224,16 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         }
 
         UpdateWeatherLine();
+
+        // 用户在看板里改了默认城市：不用等 30 分钟，5 秒内就换过来
+        // （放在失败重试判断之前：用户主动改的，不该被"60 秒后再试"挡着）
+        if (_rotation % 5 == 0
+            && !string.Equals(_settings.EffectiveWeatherDefaultCity ?? string.Empty, _loadedCity, StringComparison.Ordinal))
+        {
+            _failedUntil = null;
+            await LoadWeatherAsync();
+            return;
+        }
 
         if (_failedUntil is { } until && DateTime.Now < until)
         {
@@ -249,9 +283,11 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         return string.Join(" · ", parts);
     }
 
+    /// <summary>回归用：当前取数用的城市。</summary>
+    internal string LoadedCityForTest => _loadedCity;
+
     /// <summary>默认城市在列表里的下标（没设置 / 找不到就是 0）。</summary>
-    private int DefaultCityIndex()
-    {
+    private int DefaultCityIndex()    {
         var defaultCity = _settings.EffectiveWeatherDefaultCity;
         if (string.IsNullOrEmpty(defaultCity))
         {
@@ -284,6 +320,7 @@ public sealed partial class DesktopClockViewModel : ObservableObject
 
         // 只看默认城市：查不到就明确说"暂无数据"，不拿别的城市的天气顶上
         var city = _cities[Math.Min(_currentCityIndex, _cities.Count - 1)];
+        _loadedCity = city;
         var outcome = await Task.Run(() => _weather.FetchWithOutcomeAsync(city));
 
         if (outcome.Success && outcome.Report is { Days.Count: > 0 })

@@ -119,6 +119,9 @@ public partial class App : Application
         }
 
         StartReminderPump(services);
+
+        // 先刷掉上次被强杀进程留下的托盘图标，再挂自己的图标
+        TrayRefresher.Refresh();
         services.Tray.Start();
         AttachHotKeys(services);
         services.AutoStart.Sync(services.Settings.AutoStart);

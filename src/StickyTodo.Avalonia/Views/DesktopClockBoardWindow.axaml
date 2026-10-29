@@ -31,7 +31,10 @@
   <Border Name="NoteRoot" Background="#F02F2A26" CornerRadius="12"
           BorderBrush="#59FFFFFF" BorderThickness="1"
           BoxShadow="0 3 16 0 #59000000">
-    <StackPanel Margin="16,12,16,14" PointerPressed="Root_PointerPressed">
+    <StackPanel Margin="16,12,16,14"
+                PointerPressed="Root_PointerPressed"
+                PointerMoved="Root_PointerMoved"
+                PointerReleased="Root_PointerReleased">
 
       <Grid ColumnDefinitions="*,Auto">
         <TextBlock Grid.Column="0" Text="{Binding SolarDateText}" FontSize="15" FontWeight="SemiBold"

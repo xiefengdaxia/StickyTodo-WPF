@@ -582,6 +582,12 @@ public sealed partial class DesktopClockViewModel : ObservableObject
 
     private string _lunarText = string.Empty;
 
+    /// <summary>最后一次取数用的城市（用户改默认城市后要立刻换）。</summary>
+    private string _loadedCity = string.Empty;
+
+    /// <summary>时钟窗口本身（点"打开天气/日历"时要贴着它放）。</summary>
+    private Window? _owner;
+
     public DesktopClockViewModel(
         WeatherService weather,
         AppSettingsService settings,
@@ -597,6 +603,34 @@ public sealed partial class DesktopClockViewModel : ObservableObject
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _timer.Tick += async (_, _) => await TickAsync();
+    }
+
+    /// <summary>窗口建好后把自己交给 ViewModel：点天气/日历时按它的位置摆放。</summary>
+    public void AttachWindow(Window window) => _owner = window;
+
+    /// <summary>回归用：当前取数用的城市。</summary>
+    internal string LoadedCityForTest => _loadedCity;
+
+    /// <summary>点天气行：打开天气看板（还没有就建一个）；已经开着就关掉。</summary>
+    public void ToggleWeatherBoard() => ToggleBoard(BoardKind.Weather, "天气");
+
+    /// <summary>点日程行：打开日历看板并跳回今天；已经开着就关掉。</summary>
+    public void ToggleCalendarBoard() => ToggleBoard(BoardKind.Calendar, "日历");
+
+    /// <summary>
+    /// 贴边打开 / 关闭对应看板：没开就建好并贴在时钟旁边，已经开着就关掉。
+    /// </summary>
+    private void ToggleBoard(BoardKind kind, string defaultName)
+    {
+        var board = _todos.GetBoards().FirstOrDefault(b => b.Kind == kind);
+
+        if (board is not null && _windows.IsBoardOpen(board.Id))
+        {
+            _windows.CloseBoard(board.Id);
+            return;
+        }
+
+        _windows.OpenBoardBeside(kind, defaultName, _owner);
     }
 
     public void Start()
@@ -739,6 +773,16 @@ public sealed partial class DesktopClockViewModel : ObservableObject
             RefreshAgenda(_day);
         }
 
+        // 用户在看板里改了默认城市：不用等 30 分钟，5 秒内就换过来
+        // （放在失败重试判断之前：用户主动改的，不该被"60 秒后再试"挡着）
+        if (_rotation % 5 == 0
+            && !string.Equals(_settings.EffectiveWeatherDefaultCity ?? string.Empty, _loadedCity, StringComparison.Ordinal))
+        {
+            _weatherFailed = false;
+            await LoadWeatherAsync();
+            return;
+        }
+
         // 天气数据每 30 分钟刷新一次；失败时 60 秒后重试
         if ((!_weatherFailed && _rotation % 1800 == 0) || (_weatherFailed && _rotation % 60 == 0))
         {
@@ -829,6 +873,7 @@ public sealed partial class DesktopClockViewModel : ObservableObject
 
             // 只看默认城市：查不到就明确说"暂无数据"，不拿别的城市的天气顶上
             var city = _cities[Math.Min(_currentCityIndex, _cities.Count - 1)];
+            _loadedCity = city;
             var outcome = await Task.Run(() => _weather.FetchWithOutcomeAsync(city));
 
             if (outcome.Success && outcome.Report is { Days.Count: > 0 })

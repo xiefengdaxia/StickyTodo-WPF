@@ -17,6 +17,9 @@ public partial class DesktopClockBoardWindow : Window
         InitializeComponent();
         DataContext = viewModel;
 
+        // 点天气/日历要把看板贴到这个窗口旁边，所以得知道自己是谁
+        viewModel.AttachWindow(this);
+
         // 首次布局后挪到右下角并嵌入桌面层；启动时钟与天气轮播
         Opened += (_, _) =>
         {
@@ -108,17 +111,55 @@ public partial class DesktopClockBoardWindow : Window
             return;
         }
 
-        try
-        {
-            BeginMoveDrag(e);
+        // 手动拖动：BeginMoveDrag() 走的是 WM_NCLBUTTONDOWN 的系统移动循环，
+        // 时钟这种"无边框 + 被压到桌面层"的窗口经常直接不生效（表现就是"拖不动"）。
+        _dragging = true;
+        _userMoved = true;                    // 用户接手后不再自动贴角
+        _pressPosition = Position;
+        _grabX = ScreenPointerX(e);
+        _grabY = ScreenPointerY(e);
+        e.Pointer.Capture(sender as Avalonia.Input.IInputElement);
+        e.Handled = true;
+    }
 
-            // 拖完就把"自动贴角"关掉，否则尺寸一变又被拉回右下角
-            _userMoved = true;
-        }
-        catch (Exception)
+    private bool _dragging;
+    private Avalonia.PixelPoint _pressPosition;
+    private double _grabX;
+    private double _grabY;
+
+    /// <summary>缩放：Position 是物理像素，指针坐标是 DIP，换算要用它。</summary>
+    private double Scale => Screens.ScreenFromWindow(this)?.Scaling is { } s and > 0 ? s : 1.0;
+
+    // 指针的屏幕坐标（DIP）= 窗口屏幕位置 / 缩放 + 指针在窗口内的位置。
+    // 拖动过程中窗口在动，但这两项互相抵消，得到的始终是指针的真实屏幕位置。
+    private double ScreenPointerX(Avalonia.Input.PointerEventArgs e) => Position.X / Scale + e.GetPosition(this).X;
+
+    private double ScreenPointerY(Avalonia.Input.PointerEventArgs e) => Position.Y / Scale + e.GetPosition(this).Y;
+
+    private void Root_PointerMoved(object? sender, Avalonia.Input.PointerEventArgs e)
+    {
+        if (!_dragging)
         {
-            // 忽略
+            return;
         }
+
+        var dx = ScreenPointerX(e) - _grabX;
+        var dy = ScreenPointerY(e) - _grabY;
+
+        Position = new Avalonia.PixelPoint(
+            (int)Math.Round(_pressPosition.X + (dx * Scale)),
+            (int)Math.Round(_pressPosition.Y + (dy * Scale)));
+    }
+
+    private void Root_PointerReleased(object? sender, Avalonia.Input.PointerReleasedEventArgs e)
+    {
+        if (!_dragging)
+        {
+            return;
+        }
+
+        _dragging = false;
+        e.Pointer.Capture(null);
     }
 
     private void Close_Click(object? sender, RoutedEventArgs e) => Close();
@@ -142,7 +183,7 @@ public partial class DesktopClockBoardWindow : Window
         }
 
         e.Handled = true;
-        _viewModel.OpenWeatherBoard();
+        _viewModel.ToggleWeatherBoard();
     }
 
     private void AgendaRow_PointerPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
@@ -161,6 +202,6 @@ public partial class DesktopClockBoardWindow : Window
         }
 
         e.Handled = true;
-        _viewModel.OpenCalendarBoard();
+        _viewModel.ToggleCalendarBoard();
     }
 }

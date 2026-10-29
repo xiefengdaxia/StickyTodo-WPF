@@ -156,6 +156,59 @@ public sealed class WindowManager
         return window;
     }
 
+    /// <summary>
+    /// 按类型打开看板并贴到 <paramref name="anchor"/> 旁边（桌面时钟点天气/日历用）。
+    /// </summary>
+    public Window? OpenBoardBeside(BoardKind kind, string defaultName, Window? anchor)
+    {
+        var window = OpenBoardByKind(kind, defaultName);
+
+        if (window is not null && anchor is not null)
+        {
+            PlaceBeside(window, anchor);
+        }
+
+        return window;
+    }
+
+    /// <summary>
+    /// 把 <paramref name="target"/> 贴到 <paramref name="anchor"/> 边上：
+    /// 优先放左边（桌面时钟一般在右下角），左边放不下就放右边；底边对齐，最后夹进工作区。
+    /// </summary>
+    public static void PlaceBeside(Window target, Window anchor)
+    {
+        var work = SystemParameters.WorkArea;
+
+        var width = target.ActualWidth > 0 ? target.ActualWidth : target.Width;
+        var height = target.ActualHeight > 0 ? target.ActualHeight : target.Height;
+        if (double.IsNaN(width) || width <= 0)
+        {
+            width = 760;
+        }
+
+        if (double.IsNaN(height) || height <= 0)
+        {
+            height = 560;
+        }
+
+        const double gap = 12;
+
+        var left = anchor.Left - width - gap;
+        if (left < work.Left)
+        {
+            left = anchor.Left + anchor.ActualWidth + gap;
+        }
+
+        left = Math.Min(Math.Max(left, work.Left), Math.Max(work.Left, work.Right - width));
+
+        // 底边和时钟对齐：时钟贴着屏幕底部时看起来最自然
+        var top = anchor.Top + anchor.ActualHeight - height;
+        top = Math.Min(Math.Max(top, work.Top), Math.Max(work.Top, work.Bottom - height));
+
+        target.Left = left;
+        target.Top = top;
+    }
+
     /// <summary>把会话记录写进设置，下次启动据此恢复。</summary>
     public void PersistSession()
     {

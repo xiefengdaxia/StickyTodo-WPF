@@ -38,7 +38,10 @@
             <DropShadowEffect BlurRadius="16" ShadowDepth="3" Opacity="0.35" Color="#FF000000" Direction="270" />
         </Border.Effect>
 
-        <StackPanel Margin="16,12,16,14" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+        <StackPanel Margin="16,12,16,14"
+                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown"
+                    MouseMove="Root_MouseMove"
+                    MouseLeftButtonUp="Root_MouseLeftButtonUp">
 
             <!-- 日期与星期 -->
             <Grid>

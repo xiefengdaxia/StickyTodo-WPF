@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using StickyTodo.Core.Entities;
 using StickyTodo.Core.Geometry;
@@ -155,6 +156,71 @@ public sealed class WindowManager
         }
 
         return window;
+    }
+
+    /// <summary>
+    /// 按类型打开看板并贴到 <paramref name="anchor"/> 旁边（桌面时钟点天气/日历用）。
+    /// </summary>
+    public Window? OpenBoardBeside(BoardKind kind, string defaultName, Window? anchor)
+    {
+        var window = OpenBoardByKind(kind, defaultName);
+
+        if (window is not null && anchor is not null)
+        {
+            PlaceBeside(window, anchor);
+        }
+
+        return window;
+    }
+
+    /// <summary>
+    /// 把 <paramref name="target"/> 贴到 <paramref name="anchor"/> 边上：
+    /// 优先放左边（桌面时钟一般在右下角），左边放不下就放右边；底边对齐，最后夹进工作区。
+    /// Avalonia 的 Position / WorkingArea 是物理像素，Bounds 是 DIP，要乘缩放。
+    /// </summary>
+    public static void PlaceBeside(Window target, Window anchor)
+    {
+        var screen = anchor.Screens.ScreenFromWindow(anchor) ?? anchor.Screens.Primary;
+        if (screen is null)
+        {
+            return;
+        }
+
+        var scale = screen.Scaling > 0 ? screen.Scaling : 1.0;
+        var work = screen.WorkingArea;
+
+        var width = (target.Bounds.Width > 0 ? target.Bounds.Width : target.Width) * scale;
+        var height = (target.Bounds.Height > 0 ? target.Bounds.Height : target.Height) * scale;
+        if (double.IsNaN(width) || width <= 0)
+        {
+            width = 760 * scale;
+        }
+
+        if (double.IsNaN(height) || height <= 0)
+        {
+            height = 560 * scale;
+        }
+
+        var anchorX = (double)anchor.Position.X;
+        var anchorY = (double)anchor.Position.Y;
+        var anchorWidth = anchor.Bounds.Width * scale;
+        var anchorHeight = anchor.Bounds.Height * scale;
+
+        var gap = 12 * scale;
+
+        var left = anchorX - width - gap;
+        if (left < work.X)
+        {
+            left = anchorX + anchorWidth + gap;
+        }
+
+        left = Math.Min(Math.Max(left, work.X), Math.Max(work.X, work.X + work.Width - width));
+
+        // 底边和时钟对齐：时钟贴着屏幕底部时看起来最自然
+        var top = anchorY + anchorHeight - height;
+        top = Math.Min(Math.Max(top, work.Y), Math.Max(work.Y, work.Y + work.Height - height));
+
+        target.Position = new PixelPoint((int)Math.Round(left), (int)Math.Round(top));
     }
 
     /// <summary>把会话记录写进设置，下次启动据此恢复。</summary>
