@@ -18,9 +18,25 @@ public sealed class WeatherDayRow
         Text = info.Text;
         TempMaxText = $"{info.TempMax:0}°C";
         TempMinText = $"{info.TempMin:0}°C";
+        TempMax = info.TempMax;
+        TempMin = info.TempMin;
         Wind = info.Wind;
         IconGlyph = WeatherGlyph.For(info.Icon);
         IconGlyph2 = WeatherGlyph.For(info.Icon);
+
+        // 「北风转东北风2级」→ 风向 / 风级 两段，曲线图下面分行显示
+        var index = (info.Wind ?? string.Empty).IndexOfAny(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']);
+        if (index > 0 && index < info.Wind!.Length)
+        {
+            // 「北3级」→ 风向「北风」+ 风级「3级」（参考排版里风向要带"风"字）
+            WindDirection = info.Wind[..index] + "风";
+            WindLevel = info.Wind[index..];
+        }
+        else
+        {
+            WindDirection = info.Wind ?? string.Empty;
+            WindLevel = string.Empty;
+        }
     }
 
     public string DayLabel { get; }
@@ -33,7 +49,19 @@ public sealed class WeatherDayRow
 
     public string TempMinText { get; }
 
+    /// <summary>最高温（数值，曲线图用）。</summary>
+    public double TempMax { get; }
+
+    /// <summary>最低温（数值，曲线图用）。</summary>
+    public double TempMin { get; }
+
     public string Wind { get; }
+
+    /// <summary>风向，如「北风」「东北风」。空字符串表示接口没给。</summary>
+    public string WindDirection { get; }
+
+    /// <summary>风级，如「2级」。</summary>
+    public string WindLevel { get; }
 
     public string IconGlyph { get; }
 

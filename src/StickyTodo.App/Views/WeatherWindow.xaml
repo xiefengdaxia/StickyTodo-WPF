@@ -1,6 +1,7 @@
 <Window x:Class="StickyTodo.App.Views.WeatherWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:StickyTodo.App.Controls"
         Title="{Binding BoardName}"
         Icon="/Assets/stickytodo.ico"
         Width="880" Height="700"
@@ -122,107 +123,117 @@
                             Click="ToggleCityEditor_Click" />
                 </Grid>
 
-                <!-- 城市行：输入（模糊搜索 + 下拉建议） + 操作按钮（点上面的按钮才展开） -->
-                <Grid Grid.Row="1" Margin="58,0,2,8"
-                      Visibility="{Binding IsCityEditorOpen, Converter={StaticResource BoolToVis}}">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
+                <!-- 城市管理面板（点「＋ 城市」才展开） -->
+                <Border Grid.Row="1" Margin="0,0,0,10" Padding="12,10" CornerRadius="8"
+                        Background="{DynamicResource Brush.Surface}"
+                        BorderBrush="{DynamicResource Brush.Line}" BorderThickness="1"
+                        Visibility="{Binding IsCityEditorOpen, Converter={StaticResource BoolToVis}}">
+                    <StackPanel>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
 
-                    <Grid Grid.Column="0" Width="190">
-                        <TextBox x:Name="NewCityBox"
-                                 Style="{StaticResource TextBox.Flat}"
-                                 FontSize="12" Padding="10,5"
-                                 TextChanged="NewCity_TextChanged"
-                                 PreviewKeyDown="NewCity_PreviewKeyDown" />
-                        <TextBlock Text="城市名，如 长沙 / 浏阳" FontSize="12" IsHitTestVisible="False"
-                                   Foreground="{DynamicResource Brush.InkSoft}"
-                                   VerticalAlignment="Center" Margin="12,0,0,0">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Text, ElementName=NewCityBox}" Value="">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-
-                        <!-- 模糊搜索下拉：输一个字就按省市区县表给候选 -->
-                        <Popup x:Name="CityPopup"
-                               PlacementTarget="{Binding ElementName=NewCityBox}"
-                               Placement="Bottom" VerticalOffset="4"
-                               StaysOpen="False" AllowsTransparency="True"
-                               PopupAnimation="Fade">
-                            <Border Width="250" MaxHeight="250" Margin="0,0,10,10"
-                                    Background="{DynamicResource Brush.Surface}"
-                                    BorderBrush="{DynamicResource Brush.Line}" BorderThickness="1"
-                                    CornerRadius="8" Padding="4">
-                                <Border.Effect>
-                                    <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.28"
-                                                      Color="#FF000000" Direction="270" />
-                                </Border.Effect>
-                                <ListBox x:Name="CitySuggestionList" MaxHeight="240"
-                                         Background="Transparent" BorderThickness="0"
-                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                         MouseLeftButtonUp="CitySuggestion_Click">
-                                    <ListBox.ItemContainerStyle>
-                                        <Style TargetType="ListBoxItem">
-                                            <Setter Property="Padding" Value="8,5" />
-                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                            <Setter Property="Template">
-                                                <Setter.Value>
-                                                    <ControlTemplate TargetType="ListBoxItem">
-                                                        <Border x:Name="Bd" CornerRadius="5" Background="Transparent"
-                                                                Padding="{TemplateBinding Padding}">
-                                                            <ContentPresenter />
-                                                        </Border>
-                                                        <ControlTemplate.Triggers>
-                                                            <Trigger Property="IsMouseOver" Value="True">
-                                                                <Setter TargetName="Bd" Property="Background" Value="#14000000" />
-                                                            </Trigger>
-                                                            <Trigger Property="IsSelected" Value="True">
-                                                                <Setter TargetName="Bd" Property="Background"
-                                                                        Value="{DynamicResource Brush.AccentSoft}" />
-                                                            </Trigger>
-                                                        </ControlTemplate.Triggers>
-                                                    </ControlTemplate>
-                                                </Setter.Value>
-                                            </Setter>
+                            <Grid Grid.Column="0" Width="260">
+                                <TextBox x:Name="NewCityBox"
+                                         Style="{StaticResource TextBox.Flat}"
+                                         FontSize="12" Padding="10,5"
+                                         TextChanged="NewCity_TextChanged"
+                                         PreviewKeyDown="NewCity_PreviewKeyDown" />
+                                <TextBlock Text="城市名，如 长沙 / 浏阳" FontSize="12" IsHitTestVisible="False"
+                                           Foreground="{DynamicResource Brush.InkSoft}"
+                                           VerticalAlignment="Center" Margin="12,0,0,0">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Text, ElementName=NewCityBox}" Value="">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
                                         </Style>
-                                    </ListBox.ItemContainerStyle>
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding Label}" FontSize="12"
-                                                       Foreground="{DynamicResource Brush.Ink}"
-                                                       TextTrimming="CharacterEllipsis" />
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
-                            </Border>
-                        </Popup>
-                    </Grid>
+                                    </TextBlock.Style>
+                                </TextBlock>
 
-                    <Button Grid.Column="1" Content="添加" Margin="8,0,0,0" Padding="14,5" FontSize="12"
-                            VerticalAlignment="Center" Style="{StaticResource Button.Primary}"
-                            Click="AddCity_Click" />
-                    <Button Grid.Column="2" Content="设为默认" Margin="6,0,0,0" Padding="14,5" FontSize="12"
-                            VerticalAlignment="Center" Style="{StaticResource Button.Ghost}"
-                            Click="SetDefaultCity_Click"
-                            ToolTip="桌面时钟优先显示这个城市" />
-                    <Button Grid.Column="3" Content="移除当前" Margin="6,0,0,0" Padding="14,5" FontSize="12"
-                            VerticalAlignment="Center" Style="{StaticResource Button.Ghost}"
-                            IsEnabled="{Binding CanRemoveCity}"
-                            Click="RemoveCity_Click" />
-                    <TextBlock Grid.Column="4" Text="{Binding NoticeText}" Style="{StaticResource Text.Caption}"
-                               VerticalAlignment="Center" Margin="10,0,0,0" TextTrimming="CharacterEllipsis" />
-                </Grid>
+                                <!-- 模糊搜索下拉：输一个字就按省市区县表给候选 -->
+                                <Popup x:Name="CityPopup"
+                                       PlacementTarget="{Binding ElementName=NewCityBox}"
+                                       Placement="Bottom" VerticalOffset="4"
+                                       StaysOpen="False" AllowsTransparency="True"
+                                       PopupAnimation="Fade">
+                                    <Border Width="250" MaxHeight="250" Margin="0,0,10,10"
+                                            Background="{DynamicResource Brush.Surface}"
+                                            BorderBrush="{DynamicResource Brush.Line}" BorderThickness="1"
+                                            CornerRadius="8" Padding="4">
+                                        <Border.Effect>
+                                            <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.28"
+                                                              Color="#FF000000" Direction="270" />
+                                        </Border.Effect>
+                                        <ListBox x:Name="CitySuggestionList" MaxHeight="240"
+                                                 Background="Transparent" BorderThickness="0"
+                                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                 MouseLeftButtonUp="CitySuggestion_Click">
+                                            <ListBox.ItemContainerStyle>
+                                                <Style TargetType="ListBoxItem">
+                                                    <Setter Property="Padding" Value="8,5" />
+                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="ListBoxItem">
+                                                                <Border x:Name="Bd" CornerRadius="5" Background="Transparent"
+                                                                        Padding="{TemplateBinding Padding}">
+                                                                    <ContentPresenter />
+                                                                </Border>
+                                                                <ControlTemplate.Triggers>
+                                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                                        <Setter TargetName="Bd" Property="Background" Value="#14000000" />
+                                                                    </Trigger>
+                                                                    <Trigger Property="IsSelected" Value="True">
+                                                                        <Setter TargetName="Bd" Property="Background"
+                                                                                Value="{DynamicResource Brush.AccentSoft}" />
+                                                                    </Trigger>
+                                                                </ControlTemplate.Triggers>
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Style>
+                                            </ListBox.ItemContainerStyle>
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding Label}" FontSize="12"
+                                                               Foreground="{DynamicResource Brush.Ink}"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                    </Border>
+                                </Popup>
+                            </Grid>
+
+                            <Button Grid.Column="1" Content="添加" Margin="8,0,0,0" Padding="16,5" FontSize="12"
+                                    VerticalAlignment="Center" Style="{StaticResource Button.Primary}"
+                                    Click="AddCity_Click" />
+
+                            <!-- 这两个操作作用于"当前选中的城市"，靠右放，和添加分开 -->
+                            <Button Grid.Column="3" Content="设为默认" Padding="14,5" FontSize="12"
+                                    VerticalAlignment="Center" Style="{StaticResource Button.Ghost}"
+                                    Click="SetDefaultCity_Click"
+                                    ToolTip="桌面时钟优先显示这个城市" />
+                            <Button Grid.Column="4" Content="移除当前" Margin="6,0,0,0" Padding="14,5" FontSize="12"
+                                    VerticalAlignment="Center" Style="{StaticResource Button.Ghost}"
+                                    IsEnabled="{Binding CanRemoveCity}"
+                                    Click="RemoveCity_Click" />
+                        </Grid>
+
+                        <TextBlock Text="{Binding NoticeText}" Style="{StaticResource Text.Caption}"
+                                   Margin="2,8,0,0" TextTrimming="CharacterEllipsis"
+                                   Visibility="{Binding NoticeText, Converter={StaticResource NullToCollapsed}}" />
+                    </StackPanel>
+                </Border>
 
                 <Grid Grid.Row="2" Margin="2,0,2,10">
                     <Grid.ColumnDefinitions>
@@ -253,6 +264,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="{Binding CurrentIconGlyph}" FontSize="46"
                                    VerticalAlignment="Center" Margin="0,0,14,0"
+                                   FontFamily="Segoe UI Emoji, Segoe UI Symbol, Microsoft YaHei UI"
                                    Foreground="#FFFFB300" />
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="{Binding CurrentTempText}" FontSize="40" FontWeight="Light"
@@ -296,45 +308,78 @@
                 </StackPanel>
 
                 <!-- 预报 -->
-                <StackPanel Grid.Row="4">
-                    <TextBlock Text="天气预报" Style="{StaticResource Text.Section}" Margin="0,0,0,10" />
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <ItemsControl ItemsSource="{Binding Days}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <UniformGrid Columns="7" />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel Margin="2,0" HorizontalAlignment="Center">
-                                        <TextBlock Text="{Binding DayLabel}" FontSize="14" HorizontalAlignment="Center"
-                                                   Foreground="{DynamicResource Brush.Ink}" />
-                                        <TextBlock Text="{Binding DateLabel}" Style="{StaticResource Text.Caption}"
-                                                   HorizontalAlignment="Center" Margin="0,2,0,8" />
-                                        <TextBlock Text="{Binding IconGlyph}" FontSize="26" HorizontalAlignment="Center"
-                                                   Foreground="#FFFFB300" />
-                                        <TextBlock Text="{Binding Text}" FontSize="12" HorizontalAlignment="Center"
-                                                   Foreground="{DynamicResource Brush.Ink}" Margin="0,6,0,0" />
+                <Grid Grid.Row="4" Margin="0,0,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
 
-                                        <!-- 高低温折线用文本代替：上高下低 -->
-                                        <TextBlock Text="{Binding TempMaxText}" FontSize="13" HorizontalAlignment="Center"
-                                                   Foreground="#FFE67E22" Margin="0,14,0,0" />
-                                        <TextBlock Text="{Binding TempMinText}" FontSize="13" HorizontalAlignment="Center"
-                                                   Foreground="#FF3498DB" Margin="0,18,0,0" />
+                    <TextBlock Grid.Row="0" Text="天气预报" Style="{StaticResource Text.Section}" Margin="0,0,0,10" />
 
-                                        <TextBlock Text="{Binding IconGlyph2}" FontSize="26" HorizontalAlignment="Center"
-                                                   Foreground="#FFFFB300" Margin="0,14,0,0" />
-                                        <TextBlock Text="{Binding Text}" FontSize="12" HorizontalAlignment="Center"
-                                                   Foreground="{DynamicResource Brush.Ink}" Margin="0,6,0,0" />
-                                        <TextBlock Text="{Binding Wind}" Style="{StaticResource Text.Caption}"
-                                                   HorizontalAlignment="Center" Margin="0,4,0,0" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                                  VerticalContentAlignment="Center">
+                        <StackPanel VerticalAlignment="Center">
+                            <!-- 第一排：星期 / 日期 / 图标 / 天气 -->
+                            <ItemsControl ItemsSource="{Binding Days}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Columns="7" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <TextBlock Text="{Binding DayLabel}" FontSize="16"
+                                                       HorizontalAlignment="Center"
+                                                       Foreground="{DynamicResource Brush.Ink}" />
+                                            <TextBlock Text="{Binding DateLabel}" Style="{StaticResource Text.Caption}"
+                                                       HorizontalAlignment="Center" Margin="0,4,0,10" />
+                                            <TextBlock Text="{Binding IconGlyph}" FontSize="34"
+                                                       HorizontalAlignment="Center"
+                                                       FontFamily="Segoe UI Emoji, Segoe UI Symbol, Microsoft YaHei UI"
+                                                       Foreground="#FFFFB300" />
+                                            <TextBlock Text="{Binding Text}" FontSize="13"
+                                                       HorizontalAlignment="Center" Margin="0,6,0,0"
+                                                       Foreground="{DynamicResource Brush.Ink}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <!-- 高低温曲线：列中心和上下两排对齐 -->
+                            <controls:TempChart Days="{Binding Days}" Height="120" Margin="4,8" />
+
+                            <!-- 第二排：图标 / 天气 / 风向 / 风级 -->
+                            <ItemsControl ItemsSource="{Binding Days}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Columns="7" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <TextBlock Text="{Binding IconGlyph2}" FontSize="28"
+                                                       HorizontalAlignment="Center"
+                                                       FontFamily="Segoe UI Emoji, Segoe UI Symbol, Microsoft YaHei UI"
+                                                       Foreground="#FFFFB300" />
+                                            <TextBlock Text="{Binding Text}" FontSize="13"
+                                                       HorizontalAlignment="Center" Margin="0,6,0,0"
+                                                       Foreground="{DynamicResource Brush.Ink}" />
+                                            <TextBlock Text="{Binding WindDirection}" FontSize="12"
+                                                       HorizontalAlignment="Center" Margin="0,8,0,0"
+                                                       TextWrapping="Wrap" TextAlignment="Center"
+                                                       Foreground="{DynamicResource Brush.InkSoft}" />
+                                            <TextBlock Text="{Binding WindLevel}" Style="{StaticResource Text.Caption}"
+                                                       HorizontalAlignment="Center" Margin="0,2,0,0" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
                     </ScrollViewer>
-                </StackPanel>
+                </Grid>
+
 
                 <!-- 加载中 / 获取失败：只盖天气内容区（第 3~4 行），城市栏仍可点击切换 -->
                 <Border Grid.Row="3" Grid.RowSpan="2" Background="{DynamicResource Brush.PaperOpaque}"
