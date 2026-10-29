@@ -33,9 +33,17 @@ public interface IAgentTokenSource
     IEnumerable<AgentUsageEntry> ReadEntries(DateOnly fromDay);
 }
 
-/// <summary>一次模型调用的最小用量记录。</summary>
+/// <summary>
+/// 一次「模型调用」的最小聚合记录。
+/// <para>
+/// <c>Steps</c> = 这条记录代表多少次调用：大多数源一条记录就是一次调用（默认 1），
+/// 但 opencode 是在 SQL 里按「天 × 小时 × 模型」分组的，一条记录可能是几十次调用，
+/// 必须把真实次数带上来；否则看板的「调用次数」会按分组个数算，严重偏小。
+/// </para>
+/// </summary>
 public sealed record AgentUsageEntry(
     DateTimeOffset Timestamp,
     string ModelId,
     string ProviderId,
-    TokenUsage Usage);
+    TokenUsage Usage,
+    long Steps = 1);

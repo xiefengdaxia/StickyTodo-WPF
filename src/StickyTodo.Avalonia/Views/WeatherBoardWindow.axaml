@@ -182,7 +182,7 @@
           <StackPanel Grid.Column="1" Orientation="Horizontal">
             <TextBlock Text="{Binding UpdatedText}" Classes="caption" VerticalAlignment="Center" />
             <Button Classes="chrome" Content="⟳" FontSize="13" VerticalAlignment="Center"
-                    Margin="6,0,0,0" Command="{Binding LoadCommand}" />
+                    Margin="6,0,0,0" Command="{Binding RefreshCommand}" />
           </StackPanel>
         </Grid>
 
@@ -294,7 +294,7 @@
                        TextAlignment="Center" Foreground="{DynamicResource Brush.InkSoft}"
                        HorizontalAlignment="Center" />
             <Button Content="重试" Classes="primary" Margin="0,14,0,0"
-                    HorizontalAlignment="Center" Command="{Binding LoadCommand}" />
+                    HorizontalAlignment="Center" Command="{Binding RefreshCommand}" />
           </StackPanel>
         </Border>
       </Grid>

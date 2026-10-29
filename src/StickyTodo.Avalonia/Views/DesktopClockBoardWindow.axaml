@@ -36,17 +36,25 @@
                 PointerMoved="Root_PointerMoved"
                 PointerReleased="Root_PointerReleased">
 
-      <Grid ColumnDefinitions="*,Auto">
-        <TextBlock Grid.Column="0" Text="{Binding SolarDateText}" FontSize="15" FontWeight="SemiBold"
-                   Foreground="#FFF0E6D8" />
-        <TextBlock Grid.Column="1" Text="{Binding WeekdayText}" FontSize="13"
-                   Foreground="#FFCFC3B4" />
-      </Grid>
+      <!-- 日期 + 农历：点一下打开日历 -->
+      <Border Classes="clockRow" ToolTip.Tip="点击打开日历"
+              PointerPressed="CalendarArea_PointerPressed"
+              PointerReleased="CalendarArea_PointerReleased">
+        <StackPanel>
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Grid.Column="0" Text="{Binding SolarDateText}" FontSize="15" FontWeight="SemiBold"
+                       Foreground="#FFF0E6D8" />
+            <TextBlock Grid.Column="1" Text="{Binding WeekdayText}" FontSize="13"
+                       Foreground="#FFCFC3B4" />
+          </Grid>
 
-      <!-- 农历 + 节气/节日 -->
-      <TextBlock Text="{Binding LunarText}" FontSize="11.5" Foreground="#FF9E9284" Margin="0,4,0,0"
-                 TextTrimming="CharacterEllipsis" />
+          <!-- 农历 + 节气/节日 -->
+          <TextBlock Text="{Binding LunarText}" FontSize="11.5" Foreground="#FF9E9284" Margin="0,4,0,0"
+                     TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+      </Border>
 
+      <!-- 时间（这一块同时是拖动窗口的把手） -->
       <TextBlock Text="{Binding TimeText}" FontSize="38" FontWeight="Light"
                  Foreground="#FFF6EFE4" Margin="0,4,0,0" />
 
@@ -73,7 +81,7 @@
           <TextBlock Grid.Column="0" Text="{Binding AgendaLine}" FontSize="12"
                      Foreground="#FFD9CEC0" VerticalAlignment="Center"
                      TextTrimming="CharacterEllipsis" />
-          <TextBlock Grid.Column="1" Text="{Binding AgendaDetail}" FontSize="11"
+          <TextBlock Grid.Column="1" Text="{Binding BottomRightText}" FontSize="11"
                      Foreground="#FF9E9284" Margin="8,0,0,0" VerticalAlignment="Center" />
         </Grid>
       </Border>

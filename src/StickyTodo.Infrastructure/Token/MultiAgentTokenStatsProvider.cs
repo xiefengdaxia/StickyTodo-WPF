@@ -124,7 +124,7 @@ public sealed class MultiAgentTokenStatsProvider : ITokenStatsProvider
         foreach (var entry in entries)
         {
             total = TokenUsage.Add(total, entry.Usage);
-            steps++;
+            steps += entry.Steps;
         }
 
         var models = entries
@@ -132,7 +132,7 @@ public sealed class MultiAgentTokenStatsProvider : ITokenStatsProvider
             .Select(g => new TokenModelUsage(
                 g.Key.ModelId,
                 g.Key.ProviderId,
-                g.Count(),
+                g.Sum(e => e.Steps),
                 g.Aggregate(TokenUsage.Empty, (acc, e) => TokenUsage.Add(acc, e.Usage))))
             .OrderByDescending(m => m.Total)
             .ToList();
@@ -146,7 +146,7 @@ public sealed class MultiAgentTokenStatsProvider : ITokenStatsProvider
                 .GroupBy(e => e.Timestamp.Hour)
                 .ToDictionary(
                     g => g.Key,
-                    g => (Steps: g.Count(), Usage: g.Aggregate(TokenUsage.Empty, (a, e) => TokenUsage.Add(a, e.Usage))));
+                    g => (Steps: g.Sum(e => e.Steps), Usage: g.Aggregate(TokenUsage.Empty, (a, e) => TokenUsage.Add(a, e.Usage))));
 
             for (var hour = 0; hour < 24; hour++)
             {
@@ -164,7 +164,7 @@ public sealed class MultiAgentTokenStatsProvider : ITokenStatsProvider
                 .GroupBy(e => DateOnly.FromDateTime(e.Timestamp.LocalDateTime))
                 .ToDictionary(
                     g => g.Key,
-                    g => (Steps: g.Count(), Usage: g.Aggregate(TokenUsage.Empty, (a, e) => TokenUsage.Add(a, e.Usage))));
+                    g => (Steps: g.Sum(e => e.Steps), Usage: g.Aggregate(TokenUsage.Empty, (a, e) => TokenUsage.Add(a, e.Usage))));
 
             for (var day = fromDay; day <= today; day = day.AddDays(1))
             {

@@ -64,7 +64,7 @@ public partial class WeatherWindow : Window
         }
     }
 
-    private async void Refresh_Click(object sender, RoutedEventArgs e) => await _viewModel.LoadAsync();
+    private async void Refresh_Click(object sender, RoutedEventArgs e) => await _viewModel.LoadAsync(force: true);
 
     private void AddCity_Click(object sender, RoutedEventArgs e) => AddCurrentCity();
 

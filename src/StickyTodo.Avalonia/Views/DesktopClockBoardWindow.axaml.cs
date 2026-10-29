@@ -167,6 +167,26 @@ public partial class DesktopClockBoardWindow : Window
     // ---------- 联动：点天气行打开天气看板、点日程行打开日历 ----------
     // 按下时就把事件吃掉，否则会被外层的"拖动窗口"处理器接走（BeginMoveDrag 会抢指针）。
 
+    // 日期/农历那片：点一下打开日历
+    private void CalendarArea_PointerPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
+    {
+        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            e.Handled = true;
+        }
+    }
+
+    private void CalendarArea_PointerReleased(object? sender, Avalonia.Input.PointerReleasedEventArgs e)
+    {
+        if (e.InitialPressMouseButton != Avalonia.Input.MouseButton.Left)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        _viewModel.ToggleCalendarBoard();
+    }
+
     private void WeatherRow_PointerPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
     {
         if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)

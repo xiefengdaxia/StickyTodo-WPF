@@ -348,11 +348,25 @@ public sealed partial class WeatherViewModel : ObservableObject
     /// <summary>请求序号：只让"最后一次点击"的结果落到界面上。</summary>
     private int _requestId;
 
-    public async Task LoadAsync()
+    /// <summary>
+    /// 取天气。<paramref name="force"/> = false 时，取过的城市直接用缓存
+    /// （切城市 / 重开看板都不重新请求）；点刷新按钮才传 true。
+    /// </summary>
+    public async Task LoadAsync(bool force = false)
     {
         var city = SelectedCity?.Name ?? Cities.FirstOrDefault()?.Name;
         if (string.IsNullOrEmpty(city))
         {
+            return;
+        }
+
+        // 缓存命中：直接用上次的报告，连"正在获取"都不闪
+        if (!force && _cache.TryGetValue(city, out var cached))
+        {
+            _report = cached.Report;
+            Apply(cached.Report, cached.FetchedAt);
+            IsBusyOverlayVisible = false;
+            NoticeText = string.Empty;
             return;
         }
 
@@ -398,16 +412,21 @@ public sealed partial class WeatherViewModel : ObservableObject
         }
 
         _report = outcome.Report;
-        Apply(_report);
+        var fetchedAt = DateTime.Now;
+        _cache[city] = (outcome.Report, fetchedAt);
+        Apply(outcome.Report, fetchedAt);
         IsBusyOverlayVisible = false;
     }
+
+    /// <summary>每个城市最近一次成功取到的报告（键是城市名）。</summary>
+    private readonly Dictionary<string, (WeatherReport Report, DateTime FetchedAt)> _cache = new(StringComparer.Ordinal);
 
     /// <summary>输入框的模糊搜索建议（全国省市区县表，最多 8 条）。</summary>
     public IReadOnlyList<DivisionSuggestion> SuggestCities(string query) => ChinaDivisions.Search(query, 8);
 
-    private void Apply(WeatherReport report)
+    private void Apply(WeatherReport report, DateTime fetchedAt)
     {
-        UpdatedText = $"{DateTime.Now:HH:mm:ss} 更新";
+        UpdatedText = $"{fetchedAt:HH:mm:ss} 更新";
 
         var today = report.Days.FirstOrDefault(d => d.DayLabel == "今天") ?? report.Days.FirstOrDefault();
         if (today is not null)

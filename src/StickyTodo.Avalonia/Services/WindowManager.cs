@@ -92,7 +92,7 @@ public sealed class WindowManager
             BoardKind.WorldClock => new WorldClockBoardWindow(
                 new WorldClockViewModel()),
             BoardKind.DesktopClock => new DesktopClockBoardWindow(
-                new DesktopClockViewModel(_weatherService, _settings, _todoService, this)),
+                new DesktopClockViewModel(_weatherService, _settings, _todoService, this, _tokenProvider)),
             _ => new BoardWindow(new BoardViewModel(_todoService, board, _settings, _skinService), this),
         };
 

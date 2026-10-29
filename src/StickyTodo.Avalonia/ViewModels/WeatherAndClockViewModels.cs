@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StickyTodo.Core.Abstractions;
 using StickyTodo.Core.Calendar;
 using StickyTodo.Core.Entities;
 using StickyTodo.Core.Services;
@@ -387,11 +388,25 @@ public sealed partial class WeatherViewModel : ObservableObject
     /// <summary>请求序号：只让"最后一次点击"的结果落到界面上。</summary>
     private int _requestId;
 
-    public async Task LoadCoreAsync()
+    /// <summary>
+    /// 取天气。<paramref name="force"/> = false 时，取过的城市直接用缓存
+    /// （切城市 / 重开看板都不重新请求）；点刷新按钮才传 true。
+    /// </summary>
+    public async Task LoadCoreAsync(bool force = false)
     {
         var city = SelectedCity?.Name ?? Cities.FirstOrDefault()?.Name;
         if (string.IsNullOrEmpty(city))
         {
+            return;
+        }
+
+        // 缓存命中：直接用上次的报告，连"正在获取"都不闪
+        if (!force && _cache.TryGetValue(city, out var cached))
+        {
+            Apply(cached.Report, cached.FetchedAt);
+            IsBusyOverlayVisible = false;
+            ErrorText = null;
+            NoticeText = string.Empty;
             return;
         }
 
@@ -437,17 +452,32 @@ public sealed partial class WeatherViewModel : ObservableObject
             return;
         }
 
-        Apply(outcome.Report);
+        _report = outcome.Report;
+        var fetchedAt = DateTime.Now;
+        _cache[city] = (outcome.Report, fetchedAt);
+        Apply(outcome.Report, fetchedAt);
         IsBusyOverlayVisible = false;
     }
+
+    /// <summary>每个城市最近一次成功取到的报告（键是城市名）。</summary>
+    private readonly Dictionary<string, (WeatherReport Report, DateTime FetchedAt)> _cache = new(StringComparer.Ordinal);
+
+    /// <summary>刷新按钮：强制重新请求（缓存不参与）。</summary>
+    [RelayCommand]
+    private Task RefreshAsync() => LoadCoreAsync(force: true);
 
     /// <summary>输入框的模糊搜索建议（全国省市区县表，最多 8 条）。</summary>
     public IReadOnlyList<DivisionSuggestion> SuggestCities(string query) => ChinaDivisions.Search(query, 8);
 
     private void Apply(WeatherReport report)
     {
+        Apply(report, DateTime.Now);
+    }
+
+    private void Apply(WeatherReport report, DateTime fetchedAt)
+    {
         _report = report;
-        UpdatedText = $"{DateTime.Now:HH:mm:ss} 更新";
+        UpdatedText = $"{fetchedAt:HH:mm:ss} 更新";
 
         var today = report.Days.FirstOrDefault(d => d.DayLabel == "今天") ?? report.Days.FirstOrDefault();
         if (today is not null)
@@ -569,6 +599,7 @@ public sealed partial class DesktopClockViewModel : ObservableObject
     private readonly AppSettingsService _settings;
     private readonly TodoService _todos;
     private readonly WindowManager _windows;
+    private readonly ITokenStatsProvider _tokens;
     private readonly DispatcherTimer _timer;
 
     private IReadOnlyList<string> _cities;
@@ -592,12 +623,14 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         WeatherService weather,
         AppSettingsService settings,
         TodoService todos,
-        WindowManager windows)
+        WindowManager windows,
+        ITokenStatsProvider tokens)
     {
         _weather = weather;
         _settings = settings;
         _todos = todos;
         _windows = windows;
+        _tokens = tokens;
         _cities = settings.WeatherCities;
         _currentCityIndex = DefaultCityIndex();
 
@@ -636,6 +669,7 @@ public sealed partial class DesktopClockViewModel : ObservableObject
     public void Start()
     {
         RefreshDayTexts();
+        _ = RefreshTokensAsync();
         _timer.Start();
         _ = LoadWeatherAsync();
     }
@@ -658,6 +692,34 @@ public sealed partial class DesktopClockViewModel : ObservableObject
 
     [ObservableProperty]
     private string _agendaDetail = string.Empty;
+
+    /// <summary>今天的 token 用量摘要，如「3.2亿 · 783 次」；没有数据时为空。</summary>
+    [ObservableProperty]
+    private string _tokenSummary = string.Empty;
+
+    /// <summary>底部那一行的右侧文字：有 token 数据就显示 token，否则退回完成进度。</summary>
+    public string BottomRightText => string.IsNullOrEmpty(TokenSummary) ? AgendaDetail : TokenSummary;
+
+    partial void OnTokenSummaryChanged(string value) => OnPropertyChanged(nameof(BottomRightText));
+
+    partial void OnAgendaDetailChanged(string value) => OnPropertyChanged(nameof(BottomRightText));
+
+    /// <summary>取今天的 token 用量（本机各客户端账本，不联网）。</summary>
+    private async Task RefreshTokensAsync()
+    {
+        try
+        {
+            var stats = await _tokens.FetchAsync(0, "hour");
+            TokenSummary = stats.Total.Total > 0
+                ? $"{TokenBoardViewModel.FormatTokens(stats.Total.Total)} · {stats.Steps:N0} 次"
+                : string.Empty;
+        }
+        catch (Exception)
+        {
+            // 账本读不到就当作今天没有数据，别让挂件报错
+            TokenSummary = string.Empty;
+        }
+    }
 
     private void RefreshDayTexts()
     {
@@ -711,7 +773,7 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         if (snapshot.IsEmpty)
         {
             AgendaLine = "今天没有安排";
-            AgendaDetail = "点击打开日历";
+            AgendaDetail = string.Empty;   // 打开日历的入口改到日期/农历上了，这里不再放提示
             return;
         }
 
@@ -771,6 +833,12 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         else if (_rotation % 30 == 0)
         {
             RefreshAgenda(_day);
+        }
+
+        // token 用量每 2 分钟刷一次（今天的数据一直在变）
+        if (_rotation % 120 == 0)
+        {
+            _ = RefreshTokensAsync();
         }
 
         // 用户在看板里改了默认城市：不用等 30 分钟，5 秒内就换过来

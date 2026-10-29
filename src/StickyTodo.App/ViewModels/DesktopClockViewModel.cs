@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using StickyTodo.App.Services;
+using StickyTodo.Core.Abstractions;
 using StickyTodo.Core.Calendar;
 using StickyTodo.Core.Entities;
 using StickyTodo.Core.Services;
@@ -21,6 +22,7 @@ public sealed partial class DesktopClockViewModel : ObservableObject
     private readonly AppSettingsService _settings;
     private readonly TodoService _todos;
     private readonly WindowManager _windows;
+    private readonly ITokenStatsProvider _tokens;
 
     private IReadOnlyList<string> _cities;
     private int _currentCityIndex;
@@ -46,12 +48,14 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         WeatherService weather,
         AppSettingsService settings,
         TodoService todos,
-        WindowManager windows)
+        WindowManager windows,
+        ITokenStatsProvider tokens)
     {
         _weather = weather;
         _settings = settings;
         _todos = todos;
         _windows = windows;
+        _tokens = tokens;
         _cities = settings.WeatherCities;
         _currentCityIndex = DefaultCityIndex();
 
@@ -62,10 +66,11 @@ public sealed partial class DesktopClockViewModel : ObservableObject
     /// <summary>窗口建好后把自己交给 ViewModel：点天气/日历时按它的位置摆放。</summary>
     public void AttachWindow(Window window) => _owner = window;
 
-    /// <summary>时钟开始走 + 首次算好农历/日程并加载天气。</summary>
+    /// <summary>时钟开始走 + 首次算好农历/日程并加载天气、token。</summary>
     public void Start()
     {
         RefreshDayTexts();
+        _ = RefreshTokensAsync();
         _timer.Start();
         _ = LoadWeatherAsync();
     }
@@ -90,6 +95,34 @@ public sealed partial class DesktopClockViewModel : ObservableObject
 
     [ObservableProperty]
     private string _agendaDetail = string.Empty;
+
+    /// <summary>今天的 token 用量摘要，如「3.2亿 · 783 次」；没有数据时为空。</summary>
+    [ObservableProperty]
+    private string _tokenSummary = string.Empty;
+
+    /// <summary>底部那一行的右侧文字：有 token 数据就显示 token，否则退回完成进度。</summary>
+    public string BottomRightText => string.IsNullOrEmpty(TokenSummary) ? AgendaDetail : TokenSummary;
+
+    partial void OnTokenSummaryChanged(string value) => OnPropertyChanged(nameof(BottomRightText));
+
+    partial void OnAgendaDetailChanged(string value) => OnPropertyChanged(nameof(BottomRightText));
+
+    /// <summary>取今天的 token 用量（本机各客户端账本，不联网）。</summary>
+    private async Task RefreshTokensAsync()
+    {
+        try
+        {
+            var stats = await _tokens.FetchAsync(0, "hour").ConfigureAwait(true);
+            TokenSummary = stats.Total.Total > 0
+                ? $"{TokenBoardViewModel.FormatTokens(stats.Total.Total)} · {stats.Steps:N0} 次"
+                : string.Empty;
+        }
+        catch (Exception)
+        {
+            // 账本读不到就当作今天没有数据，别让挂件报错
+            TokenSummary = string.Empty;
+        }
+    }
 
     /// <summary>重新算农历 + 节气/节日 + 今日日程。</summary>
     private void RefreshDayTexts()
@@ -144,7 +177,7 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         if (snapshot.IsEmpty)
         {
             AgendaLine = "今天没有安排";
-            AgendaDetail = "点击打开日历";
+            AgendaDetail = string.Empty;   // 打开日历的入口改到日期/农历上了，这里不再放提示
             return;
         }
 
@@ -224,6 +257,12 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         }
 
         UpdateWeatherLine();
+
+        // token 用量每 2 分钟刷一次（今天的数据一直在变）
+        if (_rotation % 120 == 0)
+        {
+            _ = RefreshTokensAsync();
+        }
 
         // 用户在看板里改了默认城市：不用等 30 分钟，5 秒内就换过来
         // （放在失败重试判断之前：用户主动改的，不该被"60 秒后再试"挡着）

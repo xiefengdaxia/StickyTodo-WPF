@@ -90,7 +90,6 @@ public partial class DesktopClockWindow : Window
     // 按下时就把事件吃掉，否则会被外层的"拖动窗口"处理器接走（DragMove 会抢焦点）。
 
     private void WeatherRow_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => e.Handled = true;
-
     private void WeatherRow_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         e.Handled = true;
@@ -100,6 +99,15 @@ public partial class DesktopClockWindow : Window
     private void AgendaRow_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => e.Handled = true;
 
     private void AgendaRow_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        _viewModel.ToggleCalendarBoard();
+    }
+
+    // 日期/农历那片：点一下打开日历
+    private void CalendarArea_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => e.Handled = true;
+
+    private void CalendarArea_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         e.Handled = true;
         _viewModel.ToggleCalendarBoard();
@@ -133,16 +141,12 @@ public partial class DesktopClockWindow : Window
         _dragging = true;
         _userMoved = true;                 // 用户接手后不再自动贴角
         _dragOrigin = e.GetPosition(this);
-        _dragLeft = Left;
-        _dragTop = Top;
         (sender as UIElement)?.CaptureMouse();
         e.Handled = true;
     }
 
     private bool _dragging;
     private Point _dragOrigin;
-    private double _dragLeft;
-    private double _dragTop;
 
     private void Root_MouseMove(object sender, MouseEventArgs e)
     {
@@ -151,9 +155,11 @@ public partial class DesktopClockWindow : Window
             return;
         }
 
+        // 用当前 Left/Top 累加位移：e.GetPosition 是相对窗口的，窗口移动后它也跟着变，
+        // 这里必须是"当前值 + 本帧位移"，用按下时的 Left 做基准会导致每帧只修正一半误差 → 抖动
         var now = e.GetPosition(this);
-        Left = _dragLeft + (now.X - _dragOrigin.X);
-        Top = _dragTop + (now.Y - _dragOrigin.Y);
+        Left += now.X - _dragOrigin.X;
+        Top += now.Y - _dragOrigin.Y;
     }
 
     private void Root_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)

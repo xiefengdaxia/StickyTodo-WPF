@@ -141,7 +141,9 @@ public sealed class OpenCodeAgentTokenSource : IAgentTokenSource
                         reader.GetInt64(6),
                         reader.GetInt64(7),
                         reader.GetInt64(8),
-                        reader.GetInt64(9)));
+                        reader.GetInt64(9)),
+                    // 这一格里有几次 assistant 消息 = 几次模型调用
+                    reader.GetInt64(4));
 
                 if (!fresh.TryGetValue(day, out var list))
                 {
