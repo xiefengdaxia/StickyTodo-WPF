@@ -166,6 +166,17 @@ public sealed partial class WeatherViewModel : ObservableObject
     [ObservableProperty]
     private string _noticeText = string.Empty;
 
+    /// <summary>城市管理行（输入框 / 添加 / 设为默认 / 移除）是否展开；默认收起。</summary>
+    [ObservableProperty]
+    private bool _isCityEditorOpen;
+
+    /// <summary>展开按钮上的文字。</summary>
+    public string CityEditorToggleText => IsCityEditorOpen ? "收起" : "＋ 城市";
+
+    partial void OnIsCityEditorOpenChanged(bool value) => OnPropertyChanged(nameof(CityEditorToggleText));
+
+    public void ToggleCityEditor() => IsCityEditorOpen = !IsCityEditorOpen;
+
     [ObservableProperty]
     private WeatherCityViewModel? _selectedCity;
 

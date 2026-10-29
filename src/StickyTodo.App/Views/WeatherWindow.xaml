@@ -67,6 +67,7 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <TextBlock Grid.Column="0" Text="所有城市"
                                Style="{StaticResource Text.Section}"
@@ -110,10 +111,20 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+
+                    <!-- 城市管理入口：默认收起，点它才展开下面那一行 -->
+                    <Button Grid.Column="2" x:Name="CityEditorToggle"
+                            Style="{StaticResource Button.Ghost}"
+                            Content="{Binding CityEditorToggleText}"
+                            FontSize="12" Padding="10,5" Margin="0,0,0,8"
+                            VerticalAlignment="Top"
+                            ToolTip="添加 / 删除城市、设置默认城市"
+                            Click="ToggleCityEditor_Click" />
                 </Grid>
 
-                <!-- 城市行：输入（模糊搜索 + 下拉建议） + 操作按钮 -->
-                <Grid Grid.Row="1" Margin="58,0,2,8">
+                <!-- 城市行：输入（模糊搜索 + 下拉建议） + 操作按钮（点上面的按钮才展开） -->
+                <Grid Grid.Row="1" Margin="58,0,2,8"
+                      Visibility="{Binding IsCityEditorOpen, Converter={StaticResource BoolToVis}}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />

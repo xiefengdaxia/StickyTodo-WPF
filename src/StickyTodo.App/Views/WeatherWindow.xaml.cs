@@ -135,6 +135,23 @@ public partial class WeatherWindow : Window
 
     private void SetDefaultCity_Click(object sender, RoutedEventArgs e) => _viewModel.SetDefaultCity();
 
+    /// <summary>展开/收起城市管理行（输入框、添加、设为默认、移除）。</summary>
+    private void ToggleCityEditor_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.ToggleCityEditor();
+
+        if (_viewModel.IsCityEditorOpen)
+        {
+            // 展开后光标直接落在输入框，省一次点击
+            NewCityBox.Focus();
+        }
+        else
+        {
+            CityPopup.IsOpen = false;
+        }
+    }
+
+
     private void Appearance_Click(object sender, RoutedEventArgs e)
     {
         // 与其它看板共用外观菜单（皮肤 + 背景透明度 + 整窗透明度）

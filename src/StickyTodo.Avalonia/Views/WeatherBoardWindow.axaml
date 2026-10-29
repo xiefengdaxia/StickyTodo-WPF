@@ -110,6 +110,7 @@
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
           </Grid.ColumnDefinitions>
           <TextBlock Grid.Column="0" Text="所有城市" Classes="h2" VerticalAlignment="Top" Margin="0,8,10,0" />
           <ItemsControl Grid.Column="1" ItemsSource="{Binding Cities}">
@@ -123,9 +124,17 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
+
+          <!-- 城市管理入口：默认收起，点它才展开下面那一行 -->
+          <Button Grid.Column="2" x:Name="CityEditorToggle" Classes="ghost"
+                  Content="{Binding CityEditorToggleText}" FontSize="12" Padding="10,5"
+                  Margin="0,0,0,8" VerticalAlignment="Top"
+                  ToolTip.Tip="添加 / 删除城市、设置默认城市"
+                  Click="ToggleCityEditor_Click" />
         </Grid>
 
-        <Grid Grid.Row="1" Margin="58,0,2,10" ColumnDefinitions="Auto,Auto,Auto,Auto,*">
+        <Grid Grid.Row="1" Margin="58,0,2,10" ColumnDefinitions="Auto,Auto,Auto,Auto,*"
+              IsVisible="{Binding IsCityEditorOpen}">
           <Grid Grid.Column="0" Width="190">
             <TextBox x:Name="NewCityBox" Classes="flat" FontSize="12" Padding="10,5"
                      Text="{Binding NewCityName}" Watermark="城市名，如 长沙 / 浏阳"
