@@ -50,7 +50,10 @@ public partial class CalendarWindow : StickyWindowBase
         await RefreshSelectionAsync();
     }
 
-    private async void Today_Click(object? sender, RoutedEventArgs e)
+    private async void Today_Click(object? sender, RoutedEventArgs e) => await GoToTodayAsync();
+
+    /// <summary>跳回今天（桌面时钟的"今日日程"点开时也走这里）。</summary>
+    public async Task GoToTodayAsync()
     {
         await _viewModel.GoToTodayAsync();
         await RefreshSelectionAsync();

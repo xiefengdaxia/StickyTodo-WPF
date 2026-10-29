@@ -88,7 +88,7 @@ public sealed class WindowManager
                 new WeatherViewModel(_weatherService, _settings)),
             BoardKind.WorldClock => new WorldClockWindow(new WorldClockViewModel()),
             BoardKind.DesktopClock => new DesktopClockWindow(
-                new DesktopClockViewModel(_weatherService, _settings)),
+                new DesktopClockViewModel(_weatherService, _settings, _todoService, this)),
             _ => new BoardWindow(new BoardViewModel(_todoService, board, _settings, _skinService), this),
         };
 
@@ -119,6 +119,40 @@ public sealed class WindowManager
 
         BoardsChanged?.Invoke(this, EventArgs.Empty);
         PersistSession();
+        return window;
+    }
+
+    /// <summary>
+    /// 按类型打开看板：已经有就激活，没有就按默认名建一个再打开。
+    /// 桌面时钟点"天气/今日日程"时走这里——用户不用先去面板里手动建看板。
+    /// </summary>
+    public Window? OpenBoardByKind(BoardKind kind, string defaultName)
+    {
+        var board = _todoService.GetBoards().FirstOrDefault(b => b.Kind == kind);
+
+        if (board is null)
+        {
+            try
+            {
+                board = _todoService.CreateBoard(defaultName, kind);
+            }
+            catch (Exception ex)
+            {
+                // 看板数已达上限之类：打日志就好，别在挂件上弹错误框
+                Serilog.Log.Warning(ex, "[board] 自动创建 {Kind} 看板失败", kind);
+                return null;
+            }
+        }
+
+        var alreadyOpen = _windows.ContainsKey(board.Id);
+        var window = OpenBoard(board);
+
+        // 日历已经在别的月份：点"今日日程"要能直接看到今天
+        if (alreadyOpen && window is CalendarWindow calendar)
+        {
+            _ = calendar.GoToTodayAsync();
+        }
+
         return window;
     }
 

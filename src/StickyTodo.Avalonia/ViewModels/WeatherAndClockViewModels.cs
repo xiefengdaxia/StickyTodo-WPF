@@ -4,7 +4,10 @@ using Avalonia.Controls;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StickyTodo.Core.Calendar;
+using StickyTodo.Core.Entities;
 using StickyTodo.Core.Services;
+using StickyTodo.Notes.Services;
 using StickyTodo.Weather;
 
 namespace StickyTodo.Notes.ViewModels;
@@ -445,11 +448,16 @@ public sealed class WorldClockViewModel
     }
 }
 
-/// <summary>桌面悬浮时钟：阳历 + 农历 + 时间 + 天气轮播。</summary>
+/// <summary>
+/// 桌面悬浮时钟：阳历 + 农历（含节气/节日）+ 时间，下面是今日天气和今日日程——
+/// 点天气行打开天气看板、点日程行打开日历看板。
+/// </summary>
 public sealed partial class DesktopClockViewModel : ObservableObject
 {
     private readonly WeatherService _weather;
     private readonly AppSettingsService _settings;
+    private readonly TodoService _todos;
+    private readonly WindowManager _windows;
     private readonly DispatcherTimer _timer;
 
     private IReadOnlyList<string> _cities;
@@ -458,10 +466,21 @@ public sealed partial class DesktopClockViewModel : ObservableObject
     private WeatherReport? _report;
     private bool _fetching;
 
-    public DesktopClockViewModel(WeatherService weather, AppSettingsService settings)
+    /// <summary>当前显示的是哪一天：跨天后农历、节气、日程都要整体重算。</summary>
+    private DateOnly _day = DateOnly.FromDateTime(DateTime.Now);
+
+    private string _lunarText = string.Empty;
+
+    public DesktopClockViewModel(
+        WeatherService weather,
+        AppSettingsService settings,
+        TodoService todos,
+        WindowManager windows)
     {
         _weather = weather;
         _settings = settings;
+        _todos = todos;
+        _windows = windows;
         _cities = settings.WeatherCities;
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
@@ -470,6 +489,7 @@ public sealed partial class DesktopClockViewModel : ObservableObject
 
     public void Start()
     {
+        RefreshDayTexts();
         _timer.Start();
         _ = LoadWeatherAsync();
     }
@@ -482,19 +502,103 @@ public sealed partial class DesktopClockViewModel : ObservableObject
 
     public string TimeText => DateTime.Now.ToString("HH:mm:ss");
 
-    public string LunarText
-    {
-        get
-        {
-            var lunar = Core.Calendar.LunarCalendar.SolarToLunar(DateOnly.FromDateTime(DateTime.Now));
-            if (!lunar.IsValid)
-            {
-                return string.Empty;
-            }
+    /// <summary>农历 + 干支 + 生肖；今天有节日/节气就追加在末尾（每天只算一次）。</summary>
+    public string LunarText => _lunarText;
 
-            return $"农历{lunar.MonthName}月{lunar.DayName} · {Core.Calendar.LunarCalendar.YearGanZhi(lunar.Year)}年{Core.Calendar.LunarCalendar.YearZodiac(lunar.Year)}年";
-        }
+    // ---------- 今日日程（点一下打开日历） ----------
+
+    [ObservableProperty]
+    private string _agendaLine = "正在读取日程…";
+
+    [ObservableProperty]
+    private string _agendaDetail = string.Empty;
+
+    private void RefreshDayTexts()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        _day = today;
+
+        _lunarText = BuildLunarText(today);
+        OnPropertyChanged(nameof(LunarText));
+
+        RefreshAgenda(today);
     }
+
+    private static string BuildLunarText(DateOnly day)
+    {
+        var lunar = LunarCalendar.SolarToLunar(day);
+        var text = lunar.IsValid
+            ? $"农历{lunar.MonthName}月{lunar.DayName} · {LunarCalendar.YearGanZhi(lunar.Year)}年{LunarCalendar.YearZodiac(lunar.Year)}年"
+            : string.Empty;
+
+        // 节日优先于节气（节日更容易和"今天的安排"对上）；都没有就不追加
+        var almanac = Almanac.Describe(day);
+        var extra = !string.IsNullOrEmpty(almanac.HolidayName)
+            ? almanac.HolidayName
+            : almanac.SolarTerm;
+
+        if (string.IsNullOrEmpty(extra))
+        {
+            return text;
+        }
+
+        return text.Length == 0 ? extra : text + " · " + extra;
+    }
+
+    private void RefreshAgenda(DateOnly day)
+    {
+        AgendaSnapshot snapshot;
+        try
+        {
+            var from = new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue));
+            var to = new DateTimeOffset(day.AddDays(1).ToDateTime(TimeOnly.MinValue)).AddTicks(-1);
+            snapshot = AgendaSummary.Build(
+                _todos.GetCalendarEntries(from, to, includeDone: true), day, DateTimeOffset.Now);
+        }
+        catch (Exception ex)
+        {
+            AgendaLine = "日程读取失败";
+            AgendaDetail = ex.Message;
+            return;
+        }
+
+        if (snapshot.IsEmpty)
+        {
+            AgendaLine = "今天没有安排";
+            AgendaDetail = "点击打开日历";
+            return;
+        }
+
+        if (snapshot.AllDone)
+        {
+            AgendaLine = $"今日 {snapshot.Total} 项 · 已全部完成";
+            AgendaDetail = string.Empty;
+            return;
+        }
+
+        var next = snapshot.Next!;
+        var time = next.Occurrence.LocalDateTime.TimeOfDay == TimeSpan.Zero
+            ? string.Empty
+            : next.Occurrence.LocalDateTime.ToString("HH:mm") + " ";
+
+        AgendaLine = $"今日 {snapshot.Total} 项 · {time}{Clip(next.Todo.Title)}";
+        AgendaDetail = $"已完成 {snapshot.Done}/{snapshot.Total}";
+    }
+
+    /// <summary>标题太长会把这一行挤爆，截到 12 个字。</summary>
+    private static string Clip(string text, int max = 12)
+    {
+        var clean = (text ?? string.Empty).Replace('\r', ' ').Replace('\n', ' ').Trim();
+        return clean.Length <= max ? clean : clean[..max] + "…";
+    }
+
+    /// <summary>点天气行：打开天气看板（还没有就建一个）。</summary>
+    public void OpenWeatherBoard() => _windows.OpenBoardByKind(BoardKind.Weather, "天气");
+
+    /// <summary>点日程行：打开日历看板并跳回今天。</summary>
+    public void OpenCalendarBoard() => _windows.OpenBoardByKind(BoardKind.Calendar, "日历");
+
+    // ---------- 天气轮播 ----------
 
     [ObservableProperty]
     private string _weatherLine = "正在获取天气…";
@@ -510,9 +614,18 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         OnPropertyChanged(nameof(SolarDateText));
         OnPropertyChanged(nameof(WeekdayText));
         OnPropertyChanged(nameof(TimeText));
-        OnPropertyChanged(nameof(LunarText));
 
         _rotation++;
+
+        // 跨天：农历/节气/日程一起换；没跨天就每 30 秒刷一次日程
+        if (DateOnly.FromDateTime(DateTime.Now) != _day)
+        {
+            RefreshDayTexts();
+        }
+        else if (_rotation % 30 == 0)
+        {
+            RefreshAgenda(_day);
+        }
 
         // 天气数据每 30 分钟刷新一次；失败时 60 秒后重试
         if ((!_weatherFailed && _rotation % 1800 == 0) || (_weatherFailed && _rotation % 60 == 0))
@@ -535,15 +648,38 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         var cycle = _rotation % 12;
         if (cycle < 9)
         {
+            // 前 9 秒：当前城市的今天天气（不放图标：☁ 这类符号在部分字体里会变方块）
             var day = _report.Days.FirstOrDefault(d => d.DayLabel == "今天") ?? _report.Days[0];
             WeatherLine = $"{_report.CityName} {day.TempMax:0}°C {day.Text}";
-            WeatherDetail = day.Wind;
+            WeatherDetail = BuildWeatherDetail(day);
         }
         else
         {
             WeatherLine = _cities.Count > 0 ? _cities[_currentCityIndex % _cities.Count] : string.Empty;
-            WeatherDetail = "轮播";
+            WeatherDetail = "点击打开天气看板";
         }
+    }
+
+    /// <summary>风况 + 降水（概率高才提）或湿度，一行放得下。</summary>
+    private string BuildWeatherDetail(WeatherDayInfo day)
+    {
+        var parts = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(day.Wind))
+        {
+            parts.Add(day.Wind);
+        }
+
+        if (day.PrecipitationProbability >= 30)
+        {
+            parts.Add($"降水{day.PrecipitationProbability}%");
+        }
+        else if (_report?.Humidity is { } humidity)
+        {
+            parts.Add($"湿度{humidity}%");
+        }
+
+        return string.Join(" · ", parts);
     }
 
     private async Task LoadWeatherAsync()

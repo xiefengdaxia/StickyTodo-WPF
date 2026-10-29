@@ -69,6 +69,36 @@ public partial class DesktopClockWindow : Window
     /// <summary>用户手动拖过之后不再自动贴角。</summary>
     private bool _userMoved;
 
+    /// <summary>回归用：把挂件当前内容收成一行日志。</summary>
+    internal string DescribeForTest() =>
+        $"农历={_viewModel.LunarText} | 天气={_viewModel.WeatherLine} | 天气细节={_viewModel.WeatherDetail} " +
+        $"| 日程={_viewModel.AgendaLine} | 日程细节={_viewModel.AgendaDetail}";
+
+    /// <summary>回归用：模拟点"今日日程"。</summary>
+    internal void OpenCalendarForTest() => _viewModel.OpenCalendarBoard();
+
+    /// <summary>回归用：模拟点天气行。</summary>
+    internal void OpenWeatherForTest() => _viewModel.OpenWeatherBoard();
+
+    // ---------- 联动：点天气行打开天气看板、点日程行打开日历 ----------
+    // 按下时就把事件吃掉，否则会被外层的"拖动窗口"处理器接走（DragMove 会抢焦点）。
+
+    private void WeatherRow_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => e.Handled = true;
+
+    private void WeatherRow_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        _viewModel.OpenWeatherBoard();
+    }
+
+    private void AgendaRow_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) => e.Handled = true;
+
+    private void AgendaRow_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        e.Handled = true;
+        _viewModel.OpenCalendarBoard();
+    }
+
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ButtonState != MouseButtonState.Pressed)

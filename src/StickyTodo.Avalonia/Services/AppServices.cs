@@ -167,10 +167,7 @@ public sealed class AppServices : IDisposable
             return;
         }
 
-        var board = Todos.GetBoards().FirstOrDefault(b => b.Kind == boardKind)
-            ?? Todos.CreateBoard(defaultName, boardKind);
-
-        Windows.OpenBoard(board);
+        Windows.OpenBoardByKind(boardKind, defaultName);
     }
 
     /// <summary>退出：先固化会话，再关窗，最后清理托盘与快捷键。</summary>

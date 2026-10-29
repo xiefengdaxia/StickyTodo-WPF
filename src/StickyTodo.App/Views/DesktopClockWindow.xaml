@@ -12,6 +12,22 @@
         FontFamily="Microsoft YaHei UI"
         UseLayoutRounding="True">
 
+    <Window.Resources>
+        <!-- 可点击的一行：悬停时淡淡亮一下，提示"这里能点" -->
+        <Style x:Key="ClockRow" TargetType="Border">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="CornerRadius" Value="5" />
+            <Setter Property="Padding" Value="3,2" />
+            <Setter Property="Margin" Value="-3,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#1AFFFFFF" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
     <Border x:Name="NoteRoot"
             Margin="8"
             CornerRadius="12"
@@ -32,23 +48,52 @@
                            Foreground="#FFCFC3B4" HorizontalAlignment="Right" />
             </Grid>
 
-            <!-- 农历 -->
+            <!-- 农历 + 节气/节日 -->
             <TextBlock Text="{Binding LunarText}" FontSize="11.5"
-                       Foreground="#FF9E9284" Margin="0,4,0,0" />
+                       Foreground="#FF9E9284" Margin="0,4,0,0" TextTrimming="CharacterEllipsis" />
 
             <!-- 时间 -->
             <TextBlock Text="{Binding TimeText}" FontSize="38" FontWeight="Light"
                        Foreground="#FFF6EFE4" Margin="0,4,0,0" />
 
-            <!-- 天气（就绪后轮播） -->
             <Border Height="1" Background="#26FFFFFF" Margin="0,10,0,8" />
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Text="{Binding WeatherLine}" FontSize="12.5"
-                           Foreground="#FFE8A85C" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding WeatherDetail}" FontSize="11"
-                           Foreground="#FF9E9284" Margin="8,0,0,0"
-                           VerticalAlignment="Center" />
-            </StackPanel>
+
+            <!-- 天气（点一下打开天气看板） -->
+            <Border Style="{StaticResource ClockRow}"
+                    ToolTip="点击打开天气看板"
+                    MouseLeftButtonDown="WeatherRow_MouseLeftButtonDown"
+                    MouseLeftButtonUp="WeatherRow_MouseLeftButtonUp">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="{Binding WeatherLine}" FontSize="12.5"
+                               Foreground="#FFE8A85C" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="{Binding WeatherDetail}" FontSize="11"
+                               Foreground="#FF9E9284" Margin="8,0,0,0"
+                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                </Grid>
+            </Border>
+
+            <!-- 今日日程（点一下打开日历） -->
+            <Border Style="{StaticResource ClockRow}" Margin="-3,3"
+                    ToolTip="点击打开日历"
+                    MouseLeftButtonDown="AgendaRow_MouseLeftButtonDown"
+                    MouseLeftButtonUp="AgendaRow_MouseLeftButtonUp">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="{Binding AgendaLine}" FontSize="12"
+                               Foreground="#FFD9CEC0" VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="1" Text="{Binding AgendaDetail}" FontSize="11"
+                               Foreground="#FF9E9284" Margin="8,0,0,0"
+                               VerticalAlignment="Center" />
+                </Grid>
+            </Border>
         </StackPanel>
     </Border>
 </Window>

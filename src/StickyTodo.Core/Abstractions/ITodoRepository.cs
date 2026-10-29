@@ -76,6 +76,10 @@ public interface ITodoRepository
 
     void AddCompletion(string todoId, DateTimeOffset occurrenceAt, DateTimeOffset completedAt);
 
-    /// <summary>所有看板中目标日期落在区间内的待办（日历用）。</summary>
-    IReadOnlyList<TodoItem> GetTodosWithDue(DateTimeOffset from, DateTimeOffset to);
+    /// <summary>
+    /// 所有看板中目标日期落在区间内的待办（日历用）。
+    /// <paramref name="includeDone"/> = true 时连已完成的也返回——桌面时钟的
+    /// 「今日已完成 x/y」需要它；日历看板保持只看未完成。
+    /// </summary>
+    IReadOnlyList<TodoItem> GetTodosWithDue(DateTimeOffset from, DateTimeOffset to, bool includeDone = false);
 }

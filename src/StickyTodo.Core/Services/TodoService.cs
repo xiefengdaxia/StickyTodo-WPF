@@ -250,9 +250,9 @@ public sealed class TodoService
 
     // ---------- 日历 ----------
 
-    public IReadOnlyList<CalendarEntry> GetCalendarEntries(DateTimeOffset from, DateTimeOffset to)
+    public IReadOnlyList<CalendarEntry> GetCalendarEntries(DateTimeOffset from, DateTimeOffset to, bool includeDone = false)
     {
-        var todos = _repository.GetTodosWithDue(from, to);
+        var todos = _repository.GetTodosWithDue(from, to, includeDone);
         return CalendarProjection.Project(todos, from, to);
     }
 

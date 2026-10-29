@@ -164,6 +164,13 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        // 桌面时钟联动回归：今日日程摘要 + 点日程/天气自动建看板并打开
+        if (e.Args.Contains("--clock-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunClockDemo();
+            return;
+        }
+
         // 会话恢复回归：打开若干看板 → 重启 → 验证窗口数量与位置都回来了
         if (e.Args.Contains("--session-demo", StringComparer.OrdinalIgnoreCase))
         {
@@ -548,11 +555,7 @@ public partial class App : System.Windows.Application
             return;
         }
 
-        var todos = services.GetRequiredService<TodoService>();
-        var board = todos.GetBoards().FirstOrDefault(b => b.Kind == boardKind)
-            ?? todos.CreateBoard(defaultName, boardKind);
-
-        services.GetRequiredService<WindowManager>().OpenBoard(board);
+        services.GetRequiredService<WindowManager>().OpenBoardByKind(boardKind, defaultName);
     }
 
     /// <summary>
@@ -1553,6 +1556,90 @@ public partial class App : System.Windows.Application
         catch (Exception ex)
         {
             Log.Fatal(ex, "[token] 异常");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
+    /// --clock-demo：桌面时钟 × 天气 × 日历的联动回归。
+    /// 种两条今天的安排（一条已完成）→ 验证农历/今日日程摘要 →
+    /// 点日程/点天气都要能自动建出对应看板并打开。
+    /// </summary>
+    private async void RunClockDemo()
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+        InstallGlobalExceptionHandlers();
+
+        try
+        {
+            _host = BuildHost();
+            await _host.StartAsync();
+
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+
+            ApplyLanguageForCurrentRun();
+
+            var service = _host.Services.GetRequiredService<TodoService>();
+            var windows = _host.Services.GetRequiredService<WindowManager>();
+
+            var board = service.EnsureDefaultBoard();
+            var today = DateTimeOffset.Now.Date;
+
+            var morning = service.AddTodo(board.Id, "晨会纪要");
+            service.SetDueAt(morning.Id, today.AddHours(9));
+            service.SetDone(morning.Id, true);
+
+            var afternoon = service.AddTodo(board.Id, "交周报");
+            service.SetDueAt(afternoon.Id, today.AddHours(14));
+
+            // 没有目标日期的待办不该进"今日日程"
+            service.AddTodo(board.Id, "买牛奶");
+
+            var clockBoard = service.GetBoards().FirstOrDefault(b => b.Kind == BoardKind.DesktopClock)
+                ?? service.CreateBoard("桌面时钟", BoardKind.DesktopClock);
+
+            var window = (DesktopClockWindow)windows.OpenBoard(clockBoard);
+            MainWindow = window;
+
+            await Task.Delay(1500);
+            var state = window.DescribeForTest();
+            Log.Information("[clock] 首屏：{State}", state);
+
+            var ok = state.Contains("农历=农历")
+                     && state.Contains("日程=今日 ")
+                     && state.Contains("14:00 交周报")
+                     && state.Contains("已完成 1/");
+
+            // 点"今日日程"：本来没有日历看板，要自动建一个并打开
+            window.OpenCalendarForTest();
+            await Task.Delay(600);
+
+            var calendar = service.GetBoards().FirstOrDefault(b => b.Kind == BoardKind.Calendar);
+            var calendarOpened = calendar is not null && windows.IsBoardOpen(calendar.Id);
+            Log.Information("[clock] 点日程后：日历看板={Board} 打开={Opened}",
+                calendar?.Name ?? "(无)", calendarOpened);
+            ok &= calendarOpened;
+
+            // 点"天气"：同样自动建出天气看板（网络不通也要能开窗，只是数据为空）
+            window.OpenWeatherForTest();
+            await Task.Delay(600);
+
+            var weather = service.GetBoards().FirstOrDefault(b => b.Kind == BoardKind.Weather);
+            var weatherOpened = weather is not null && windows.IsBoardOpen(weather.Id);
+            Log.Information("[clock] 点天气后：天气看板={Board} 打开={Opened}",
+                weather?.Name ?? "(无)", weatherOpened);
+            ok &= weatherOpened;
+
+            Log.Information("[clock] 总结果={Result}", ok ? "通过" : "失败");
+            Log.CloseAndFlush();
+            Shutdown(ok ? 0 : 2);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[clock] 异常");
             Log.CloseAndFlush();
             Shutdown(1);
         }

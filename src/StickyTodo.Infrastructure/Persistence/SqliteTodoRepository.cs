@@ -525,20 +525,20 @@ public sealed class SqliteTodoRepository : ITodoRepository
     /// 重复规则只在「目标日期早于区间」时才会有跨界展开，因此这里额外把有规则的待办也带上，
     /// 由 <c>CalendarProjection</c> 负责展开。
     /// </summary>
-    public IReadOnlyList<TodoItem> GetTodosWithDue(DateTimeOffset from, DateTimeOffset to)
+    public IReadOnlyList<TodoItem> GetTodosWithDue(DateTimeOffset from, DateTimeOffset to, bool includeDone = false)
     {
         using var connection = Open();
         return connection.Query<TodoRow>(
                 """
                 SELECT * FROM todo
-                 WHERE is_done = 0
+                 WHERE (@includeDone = 1 OR is_done = 0)
                    AND (
                         (due_at IS NOT NULL AND due_at BETWEEN @from AND @to)
                      OR (recurrence IS NOT NULL AND due_at IS NOT NULL AND due_at <= @to)
                    )
                  ORDER BY due_at;
                 """,
-                new { from = ToUnix(from), to = ToUnix(to) })
+                new { from = ToUnix(from), to = ToUnix(to), includeDone = includeDone ? 1 : 0 })
             .Select(ToTodo)
             .ToList();
     }
