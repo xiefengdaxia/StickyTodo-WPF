@@ -252,6 +252,32 @@ public sealed class AppSettingsService
         set => _repository.SetSetting(WeatherCitiesKey, string.Join(",", value));
     }
 
+    public const string WeatherDefaultCityKey = "weather.defaultCity";
+
+    /// <summary>
+    /// 默认城市：桌面时钟优先显示它，天气看板打开时也默认选中它。
+    /// null = 用城市列表的第一个；设过的城市被删掉后自动作废（返回 null）。
+    /// </summary>
+    public string? WeatherDefaultCity
+    {
+        get
+        {
+            var raw = GetString(WeatherDefaultCityKey, null);
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return null;
+            }
+
+            var clean = raw.Trim();
+            return WeatherCities.Contains(clean, StringComparer.Ordinal) ? clean : null;
+        }
+        set => _repository.SetSetting(WeatherDefaultCityKey, value?.Trim() ?? string.Empty);
+    }
+
+    /// <summary>实际生效的默认城市：没设置（或已失效）就是列表第一个。</summary>
+    public string? EffectiveWeatherDefaultCity =>
+        WeatherDefaultCity ?? WeatherCities.FirstOrDefault();
+
     /// <summary>
     /// 默认城市列表（与参考 UI 一致）。
     /// 这些名字都收录在天气模块的内置坐标表里，所以即便 Open-Meteo 的中文地理编码

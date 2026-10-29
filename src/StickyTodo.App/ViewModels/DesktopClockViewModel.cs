@@ -46,6 +46,7 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         _todos = todos;
         _windows = windows;
         _cities = settings.WeatherCities;
+        _currentCityIndex = DefaultCityIndex();
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _timer.Tick += async (_, _) => await TickAsync();
@@ -219,21 +220,11 @@ public sealed partial class DesktopClockViewModel : ObservableObject
             return;
         }
 
-        var cycle = _rotation % 12;
-        if (cycle < 9)
-        {
-            // 前 9 秒：当前城市的今天天气（不放图标：☁ 这类符号在部分字体里会变方块）
-            var day = _report.Days.FirstOrDefault(d => d.DayLabel == "今天") ?? _report.Days[0];
-            WeatherLine = $"{_report.CityName} {day.TempMax:0}°C {day.Text}";
-            WeatherDetail = BuildWeatherDetail(day);
-        }
-        else
-        {
-            // 后 3 秒：显示城市列表里当前选中的城市
-            var city = _cities.Count > 0 ? _cities[_currentCityIndex % _cities.Count] : string.Empty;
-            WeatherLine = city;
-            WeatherDetail = "点击打开天气看板";
-        }
+        // 只看默认城市（没有默认就用列表第一个）；区县查不到时会自动用所属市，
+        // 这里显示的是实际查到数据的城市名。
+        var day = _report.Days.FirstOrDefault(d => d.DayLabel == "今天") ?? _report.Days[0];
+        WeatherLine = $"{_report.CityName} {day.TempMax:0}°C {day.Text}";
+        WeatherDetail = BuildWeatherDetail(day);
     }
 
     /// <summary>风况 + 降水（概率高才提）或湿度，一行放得下。</summary>
@@ -258,36 +249,44 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         return string.Join(" · ", parts);
     }
 
+    /// <summary>默认城市在列表里的下标（没设置 / 找不到就是 0）。</summary>
+    private int DefaultCityIndex()
+    {
+        var defaultCity = _settings.EffectiveWeatherDefaultCity;
+        if (string.IsNullOrEmpty(defaultCity))
+        {
+            return 0;
+        }
+
+        for (var i = 0; i < _cities.Count; i++)
+        {
+            if (string.Equals(_cities[i], defaultCity, StringComparison.Ordinal))
+            {
+                return i;
+            }
+        }
+
+        return 0;
+    }
+
     private async Task LoadWeatherAsync()
     {
-        // 每次都重新读设置：用户在天气看板里加/删城市后，轮播立刻跟上
+        // 每次都重新读设置：用户在天气看板里加/删城市、改默认城市后，立刻跟上
         _cities = _settings.WeatherCities;
+        _currentCityIndex = DefaultCityIndex();
 
         if (_cities.Count == 0)
         {
-            WeatherLine = "没有可显示的城市";
-            WeatherDetail = "在天气看板里添加城市";
+            WeatherLine = "还没有城市";
+            WeatherDetail = "在天气看板里添加";
             return;
         }
 
-        // 逐个试：内置坐标的城市基本不会失败；在线解析查不到的跳过试下一个
-        WeatherFetchOutcome? outcome = null;
+        // 只看默认城市：查不到就明确说"暂无数据"，不拿别的城市的天气顶上
+        var city = _cities[Math.Min(_currentCityIndex, _cities.Count - 1)];
+        var outcome = await Task.Run(() => _weather.FetchWithOutcomeAsync(city));
 
-        for (var attempt = 0; attempt < _cities.Count; attempt++)
-        {
-            var city = _cities[_currentCityIndex % _cities.Count];
-            var result = await Task.Run(() => _weather.FetchWithOutcomeAsync(city));
-            if (result.Success)
-            {
-                outcome = result;
-                break;
-            }
-
-            _currentCityIndex = (_currentCityIndex + 1) % _cities.Count;
-            outcome = result;
-        }
-
-        if (outcome?.Success == true)
+        if (outcome.Success && outcome.Report is { Days.Count: > 0 })
         {
             _report = outcome.Report;
             _weatherReady = true;
@@ -296,9 +295,11 @@ public sealed partial class DesktopClockViewModel : ObservableObject
             return;
         }
 
-        // 全列表都失败：60 秒后再试，别一秒一秒地砸接口
+        // 失败：清掉旧数据，显示"暂无"，60 秒后再试
+        _report = null;
+        _weatherReady = false;
         _failedUntil = DateTime.Now.AddSeconds(60);
-        WeatherLine = "天气获取失败";
-        WeatherDetail = "60 秒后自动重试";
+        WeatherLine = $"{city} 暂无天气数据";
+        WeatherDetail = outcome.Error ?? "60 秒后自动重试";
     }
 }

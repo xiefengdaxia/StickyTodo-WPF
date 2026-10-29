@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- ��Ŀ���� Core һ�£�net8.0 �� WPF �棬net6.0 �� Avalonia �� -->
+    <!-- ��Ŀ���� Core һ�£�net8.0 �� WPF �棬net6.0 �� Avalonia �� -->
     <TargetFrameworks>net8.0;net6.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -10,6 +10,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\StickyTodo.Core\StickyTodo.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 全国省/市/区县表（源自 modood/Administrative-divisions-of-China，见文件头注释）。
+         嵌入 dll，不额外带文件；区县查不到天气时靠它回退到所属地级市。 -->
+    <EmbeddedResource Include="Data\china-divisions.json" />
   </ItemGroup>
 
 </Project>

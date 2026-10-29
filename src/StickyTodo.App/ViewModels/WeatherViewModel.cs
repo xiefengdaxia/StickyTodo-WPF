@@ -82,7 +82,43 @@ public sealed partial class WeatherViewModel : ObservableObject
             Cities.Add(new WeatherCityViewModel(city));
         }
 
+        RefreshDefaultFlags();
         _boardName = "天气";
+    }
+
+    /// <summary>选中默认城市（打开看板时用；没设过就是列表第一个）。</summary>
+    public void SelectDefaultCity()
+    {
+        var defaultCity = _settings.EffectiveWeatherDefaultCity;
+
+        SelectedCity = Cities.FirstOrDefault(c => string.Equals(c.Name, defaultCity, StringComparison.Ordinal))
+                       ?? Cities.FirstOrDefault();
+    }
+
+    /// <summary>把当前城市设为默认（桌面时钟优先显示它，下次打开也选中它）。</summary>
+    public bool SetDefaultCity()
+    {
+        var current = SelectedCity;
+        if (current is null)
+        {
+            return false;
+        }
+
+        _settings.WeatherDefaultCity = current.Name;
+        RefreshDefaultFlags();
+        NoticeText = $"「{current.Name}」已设为默认城市";
+        return true;
+    }
+
+    /// <summary>把"默认"标记刷到城市胶囊上（★）。</summary>
+    private void RefreshDefaultFlags()
+    {
+        var defaultCity = _settings.EffectiveWeatherDefaultCity;
+
+        foreach (var city in Cities)
+        {
+            city.IsDefault = string.Equals(city.Name, defaultCity, StringComparison.Ordinal);
+        }
     }
 
     [ObservableProperty]
@@ -97,7 +133,7 @@ public sealed partial class WeatherViewModel : ObservableObject
 
     public string CurrentCity => SelectedCity?.Name ?? "未选择城市";
 
-    /// <summary>城市来源说明：内置坐标 / 在线解析。</summary>
+    /// <summary>城市来源说明：内置坐标 / 在线解析 / 区县按所属市查询。</summary>
     public string CurrentCityNote
     {
         get
@@ -108,7 +144,18 @@ public sealed partial class WeatherViewModel : ObservableObject
                 return string.Empty;
             }
 
-            return WeatherService.IsKnownCity(city) ? "（内置坐标）" : "（在线解析）";
+            // 区县查不到时按所属地级市查的：明确告诉用户看的是哪个市的数据
+            if (_report is { } report
+                && !string.IsNullOrEmpty(report.CityName)
+                && !string.Equals(report.CityName, city, StringComparison.Ordinal))
+            {
+                return $"（按 {report.CityName}）";
+            }
+
+            // 内置坐标表 / 省市区县表能离线定位的都算"内置坐标"
+            return WeatherService.TryResolveOffline(city, out _, out _, out _)
+                ? "（内置坐标）"
+                : "（在线解析）";
         }
     }
 
@@ -218,6 +265,7 @@ public sealed partial class WeatherViewModel : ObservableObject
         var row = new WeatherCityViewModel(clean);
         Cities.Add(row);
         PersistCities();
+        RefreshDefaultFlags();
         OnPropertyChanged(nameof(CanRemoveCity));
         NoticeText = $"已添加「{clean}」";
         SelectedCity = row;
@@ -236,7 +284,15 @@ public sealed partial class WeatherViewModel : ObservableObject
 
         var index = Cities.IndexOf(current);
         Cities.Remove(current);
+
+        // 删掉的正好是默认城市：清掉设置，自动回落到列表第一个
+        if (string.Equals(_settings.WeatherDefaultCity, current.Name, StringComparison.Ordinal))
+        {
+            _settings.WeatherDefaultCity = null;
+        }
+
         PersistCities();
+        RefreshDefaultFlags();
         OnPropertyChanged(nameof(CanRemoveCity));
         NoticeText = $"已移除「{current.Name}」";
 
@@ -291,9 +347,14 @@ public sealed partial class WeatherViewModel : ObservableObject
             return;
         }
 
-        if (outcome.Report is null)
+        if (outcome.Report is null || outcome.Report.Days.Count == 0)
         {
-            BusyText = $"获取 {city} 的天气失败：{outcome.Error}";
+            // 查不到 / 没有数据：明确提示，不拿别的城市顶上
+            _report = null;
+            OnPropertyChanged(nameof(CurrentCityNote));
+            IsBusyOverlayVisible = true;
+            BusyText = $"「{city}」暂无天气数据";
+            NoticeText = outcome.Error ?? string.Empty;
             return;
         }
 
@@ -301,6 +362,9 @@ public sealed partial class WeatherViewModel : ObservableObject
         Apply(_report);
         IsBusyOverlayVisible = false;
     }
+
+    /// <summary>输入框的模糊搜索建议（全国省市区县表，最多 8 条）。</summary>
+    public IReadOnlyList<DivisionSuggestion> SuggestCities(string query) => ChinaDivisions.Search(query, 8);
 
     private void Apply(WeatherReport report)
     {
@@ -324,6 +388,9 @@ public sealed partial class WeatherViewModel : ObservableObject
         {
             Days.Add(new WeatherDayRow(day));
         }
+
+        // 区县按所属市查的时候，来源说明要跟着变
+        OnPropertyChanged(nameof(CurrentCityNote));
     }
 }
 
@@ -336,4 +403,13 @@ public sealed partial class WeatherCityViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isSelected;
+
+    /// <summary>是不是默认城市（桌面时钟优先显示它）。</summary>
+    [ObservableProperty]
+    private bool _isDefault;
+
+    /// <summary>胶囊上的文字：默认城市带个 ★。</summary>
+    public string DisplayName => IsDefault ? Name + " ★" : Name;
+
+    partial void OnIsDefaultChanged(bool value) => OnPropertyChanged(nameof(DisplayName));
 }

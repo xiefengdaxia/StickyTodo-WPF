@@ -124,4 +124,33 @@ public sealed class AppSettingsServiceTests : DatabaseTestBase
         // 否则 NoteSkin 会走到带 alpha 的分支，看起来仍然半透明
         Assert.Equal("1", Repository.GetSettings()[AppSettingsService.OpacityKey]);
     }
+
+    [Fact]
+    public void WeatherDefaultCity_FallsBackToFirstCity_AndRoundTrips()
+    {
+        var settings = CreateService();
+
+        // 没设过：生效值就是城市列表的第一个
+        Assert.Null(settings.WeatherDefaultCity);
+        Assert.Equal(settings.WeatherCities[0], settings.EffectiveWeatherDefaultCity);
+
+        settings.WeatherDefaultCity = "苏州";
+
+        var reloaded = new AppSettingsService(Repository);
+        Assert.Equal("苏州", reloaded.WeatherDefaultCity);
+        Assert.Equal("苏州", reloaded.EffectiveWeatherDefaultCity);
+    }
+
+    [Fact]
+    public void WeatherDefaultCity_ExpiresWhenThatCityIsRemoved()
+    {
+        var settings = CreateService();
+        settings.WeatherDefaultCity = "苏州";
+
+        settings.WeatherCities = ["长沙", "杭州"];
+
+        // 默认城市被删掉：设置自动失效，回落到列表第一个
+        Assert.Null(settings.WeatherDefaultCity);
+        Assert.Equal("长沙", settings.EffectiveWeatherDefaultCity);
+    }
 }

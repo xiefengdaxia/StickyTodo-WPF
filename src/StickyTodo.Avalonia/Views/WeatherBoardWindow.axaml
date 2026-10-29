@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:loc="using:StickyTodo.Notes.Localization"
         xmlns:vm="using:StickyTodo.Notes.ViewModels"
+        xmlns:wx="using:StickyTodo.Weather"
         x:Class="StickyTodo.Notes.Views.WeatherBoardWindow"
         Title="天气"
         Width="880" Height="700"
@@ -71,6 +72,18 @@
       <Setter Property="Background" Value="#11FFFFFF" />
       <Setter Property="Margin" Value="4,0" />
     </Style>
+
+    <!-- 城市模糊搜索下拉 -->
+    <Style Selector="ListBox.suggestions ListBoxItem">
+      <Setter Property="Padding" Value="8,5" />
+      <Setter Property="CornerRadius" Value="5" />
+    </Style>
+    <Style Selector="ListBox.suggestions ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#14000000" />
+    </Style>
+    <Style Selector="ListBox.suggestions ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource Brush.AccentSoft}" />
+    </Style>
   </Window.Styles>
 
   <Border Name="NoteRoot" Classes="note">
@@ -106,21 +119,46 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:WeatherCityRow">
                 <Button Classes="cityTab" Classes.selected="{Binding IsSelected}"
-                        Content="{Binding Name}" Click="City_Click" Tag="{Binding}" />
+                        Content="{Binding DisplayName}" Click="City_Click" Tag="{Binding}" />
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
         </Grid>
 
-        <Grid Grid.Row="1" Margin="58,0,2,10" ColumnDefinitions="Auto,Auto,Auto,*">
-          <TextBox Grid.Column="0" Text="{Binding NewCityName}" Width="150" FontSize="12"
-                   VerticalContentAlignment="Center" Watermark="城市名，如 长沙"
-                   KeyDown="NewCity_KeyDown" />
-          <Button Grid.Column="1" Classes="cityAction" Content="添加" Margin="8,0,0,0"
-                  Command="{Binding AddCityFromInputCommand}" />
-          <Button Grid.Column="2" Classes="cityAction" Content="移除当前" Margin="6,0,0,0"
-                  IsEnabled="{Binding CanRemoveCity}" Command="{Binding RemoveCityCommand}" />
-          <TextBlock Grid.Column="3" Text="{Binding NoticeText}" Classes="caption"
+        <Grid Grid.Row="1" Margin="58,0,2,10" ColumnDefinitions="Auto,Auto,Auto,Auto,*">
+          <Grid Grid.Column="0" Width="190">
+            <TextBox x:Name="NewCityBox" Classes="flat" FontSize="12" Padding="10,5"
+                     Text="{Binding NewCityName}" Watermark="城市名，如 长沙 / 浏阳"
+                     TextChanged="NewCity_TextChanged" KeyDown="NewCity_KeyDown" />
+
+            <!-- 模糊搜索下拉：输一个字就按省市区县表给候选 -->
+            <Popup x:Name="CityPopup" Placement="Bottom" IsLightDismissEnabled="True" IsOpen="False">
+              <Border Width="250" MaxHeight="250" Margin="0,0,10,10" Padding="4" CornerRadius="8"
+                      Background="{DynamicResource Brush.Surface}"
+                      BorderBrush="{DynamicResource Brush.Line}" BorderThickness="1"
+                      BoxShadow="0 2 12 0 #40000000">
+                <ListBox x:Name="CitySuggestionList" Classes="suggestions" MaxHeight="240"
+                         Background="Transparent" BorderThickness="0"
+                         SelectionChanged="CitySuggestion_SelectionChanged">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="wx:DivisionSuggestion">
+                      <TextBlock Text="{Binding Label}" FontSize="12"
+                                 TextTrimming="CharacterEllipsis" />
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </Border>
+            </Popup>
+          </Grid>
+
+          <Button Grid.Column="1" Classes="primary" Content="添加" Margin="8,0,0,0" Padding="14,5"
+                  FontSize="12" Click="AddCity_Click" />
+          <Button Grid.Column="2" Classes="ghost" Content="设为默认" Margin="6,0,0,0" Padding="14,5"
+                  FontSize="12" ToolTip.Tip="桌面时钟优先显示这个城市"
+                  Command="{Binding SetDefaultCityFromUiCommand}" />
+          <Button Grid.Column="3" Classes="ghost" Content="移除当前" Margin="6,0,0,0" Padding="14,5"
+                  FontSize="12" IsEnabled="{Binding CanRemoveCity}" Command="{Binding RemoveCityCommand}" />
+          <TextBlock Grid.Column="4" Text="{Binding NoticeText}" Classes="caption"
                      VerticalAlignment="Center" Margin="10,0,0,0" TextTrimming="CharacterEllipsis" />
         </Grid>
 

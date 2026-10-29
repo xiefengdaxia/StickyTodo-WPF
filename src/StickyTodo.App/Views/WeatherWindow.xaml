@@ -83,7 +83,7 @@
                                         Padding="18,5"
                                         Click="City_Click"
                                         Tag="{Binding}"
-                                        Content="{Binding Name}">
+                                        Content="{Binding DisplayName}">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
                                             <Setter Property="Background" Value="#66FFFFFF" />
@@ -112,20 +112,25 @@
                     </ItemsControl>
                 </Grid>
 
-                <!-- 城市行：位置 + 更新时间 -->
+                <!-- 城市行：输入（模糊搜索 + 下拉建议） + 操作按钮 -->
                 <Grid Grid.Row="1" Margin="58,0,2,8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <Grid Grid.Column="0" Width="150">
-                        <TextBox x:Name="NewCityBox" FontSize="12"
-                                 VerticalContentAlignment="Center" KeyDown="NewCity_KeyDown" />
-                        <TextBlock Text="城市名，如 长沙" FontSize="12" IsHitTestVisible="False"
+
+                    <Grid Grid.Column="0" Width="190">
+                        <TextBox x:Name="NewCityBox"
+                                 Style="{StaticResource TextBox.Flat}"
+                                 FontSize="12" Padding="10,5"
+                                 TextChanged="NewCity_TextChanged"
+                                 PreviewKeyDown="NewCity_PreviewKeyDown" />
+                        <TextBlock Text="城市名，如 长沙 / 浏阳" FontSize="12" IsHitTestVisible="False"
                                    Foreground="{DynamicResource Brush.InkSoft}"
-                                   VerticalAlignment="Center" Margin="10,0,0,0">
+                                   VerticalAlignment="Center" Margin="12,0,0,0">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
                                     <Setter Property="Visibility" Value="Collapsed" />
@@ -137,13 +142,74 @@
                                 </Style>
                             </TextBlock.Style>
                         </TextBlock>
+
+                        <!-- 模糊搜索下拉：输一个字就按省市区县表给候选 -->
+                        <Popup x:Name="CityPopup"
+                               PlacementTarget="{Binding ElementName=NewCityBox}"
+                               Placement="Bottom" VerticalOffset="4"
+                               StaysOpen="False" AllowsTransparency="True"
+                               PopupAnimation="Fade">
+                            <Border Width="250" MaxHeight="250" Margin="0,0,10,10"
+                                    Background="{DynamicResource Brush.Surface}"
+                                    BorderBrush="{DynamicResource Brush.Line}" BorderThickness="1"
+                                    CornerRadius="8" Padding="4">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.28"
+                                                      Color="#FF000000" Direction="270" />
+                                </Border.Effect>
+                                <ListBox x:Name="CitySuggestionList" MaxHeight="240"
+                                         Background="Transparent" BorderThickness="0"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                         MouseLeftButtonUp="CitySuggestion_Click">
+                                    <ListBox.ItemContainerStyle>
+                                        <Style TargetType="ListBoxItem">
+                                            <Setter Property="Padding" Value="8,5" />
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="ListBoxItem">
+                                                        <Border x:Name="Bd" CornerRadius="5" Background="Transparent"
+                                                                Padding="{TemplateBinding Padding}">
+                                                            <ContentPresenter />
+                                                        </Border>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter TargetName="Bd" Property="Background" Value="#14000000" />
+                                                            </Trigger>
+                                                            <Trigger Property="IsSelected" Value="True">
+                                                                <Setter TargetName="Bd" Property="Background"
+                                                                        Value="{DynamicResource Brush.AccentSoft}" />
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </ListBox.ItemContainerStyle>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Label}" FontSize="12"
+                                                       Foreground="{DynamicResource Brush.Ink}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Border>
+                        </Popup>
                     </Grid>
-                    <Button Grid.Column="1" Content="添加" Margin="8,0,0,0" Padding="12,5" FontSize="12"
-                            VerticalAlignment="Center" Click="AddCity_Click" />
-                    <Button Grid.Column="2" Content="移除当前" Margin="6,0,0,0" Padding="12,5" FontSize="12"
-                            VerticalAlignment="Center" IsEnabled="{Binding CanRemoveCity}"
+
+                    <Button Grid.Column="1" Content="添加" Margin="8,0,0,0" Padding="14,5" FontSize="12"
+                            VerticalAlignment="Center" Style="{StaticResource Button.Primary}"
+                            Click="AddCity_Click" />
+                    <Button Grid.Column="2" Content="设为默认" Margin="6,0,0,0" Padding="14,5" FontSize="12"
+                            VerticalAlignment="Center" Style="{StaticResource Button.Ghost}"
+                            Click="SetDefaultCity_Click"
+                            ToolTip="桌面时钟优先显示这个城市" />
+                    <Button Grid.Column="3" Content="移除当前" Margin="6,0,0,0" Padding="14,5" FontSize="12"
+                            VerticalAlignment="Center" Style="{StaticResource Button.Ghost}"
+                            IsEnabled="{Binding CanRemoveCity}"
                             Click="RemoveCity_Click" />
-                    <TextBlock Grid.Column="3" Text="{Binding NoticeText}" Style="{StaticResource Text.Caption}"
+                    <TextBlock Grid.Column="4" Text="{Binding NoticeText}" Style="{StaticResource Text.Caption}"
                                VerticalAlignment="Center" Margin="10,0,0,0" TextTrimming="CharacterEllipsis" />
                 </Grid>
 

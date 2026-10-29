@@ -1,6 +1,8 @@
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using StickyTodo.App.ViewModels;
+using StickyTodo.Weather;
 
 namespace StickyTodo.App.Views;
 
@@ -17,7 +19,8 @@ public partial class WeatherWindow : Window
 
         if (viewModel.Cities.Count > 0)
         {
-            viewModel.SelectedCity = viewModel.Cities[0];
+            // 打开时选中默认城市（没设过就是第一个）
+            viewModel.SelectDefaultCity();
         }
 
         Loaded += async (_, _) =>
@@ -63,26 +66,74 @@ public partial class WeatherWindow : Window
 
     private async void Refresh_Click(object sender, RoutedEventArgs e) => await _viewModel.LoadAsync();
 
-    private void AddCity_Click(object sender, RoutedEventArgs e)
+    private void AddCity_Click(object sender, RoutedEventArgs e) => AddCurrentCity();
+
+    /// <summary>把输入框里的城市加进列表（下拉里选中了就用选中那条）。</summary>
+    private void AddCurrentCity()
     {
-        if (_viewModel.AddCity(NewCityBox.Text))
+        var name = CitySuggestionList.SelectedItem is DivisionSuggestion suggestion
+            ? suggestion.Name
+            : NewCityBox.Text;
+
+        if (_viewModel.AddCity(name))
         {
             NewCityBox.Clear();
+            CityPopup.IsOpen = false;
         }
 
         NewCityBox.Focus();
     }
 
-    private void RemoveCity_Click(object sender, RoutedEventArgs e) => _viewModel.RemoveSelectedCity();
-
-    private void NewCity_KeyDown(object sender, KeyEventArgs e)
+    /// <summary>边输边给建议：全国省市区县表里模糊匹配。</summary>
+    private void NewCity_TextChanged(object sender, TextChangedEventArgs e)
     {
-        if (e.Key == Key.Enter)
+        var items = _viewModel.SuggestCities(NewCityBox.Text);
+        CitySuggestionList.ItemsSource = items;
+        CitySuggestionList.SelectedIndex = -1;
+        CityPopup.IsOpen = items.Count > 0;
+    }
+
+    private void NewCity_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        switch (e.Key)
         {
-            AddCity_Click(sender, e);
-            e.Handled = true;
+            case Key.Down when CityPopup.IsOpen && CitySuggestionList.Items.Count > 0:
+                CitySuggestionList.SelectedIndex =
+                    Math.Min(CitySuggestionList.SelectedIndex + 1, CitySuggestionList.Items.Count - 1);
+                e.Handled = true;
+                break;
+
+            case Key.Up when CityPopup.IsOpen && CitySuggestionList.Items.Count > 0:
+                CitySuggestionList.SelectedIndex = Math.Max(CitySuggestionList.SelectedIndex - 1, 0);
+                e.Handled = true;
+                break;
+
+            case Key.Escape:
+                CityPopup.IsOpen = false;
+                e.Handled = true;
+                break;
+
+            case Key.Enter:
+                AddCurrentCity();
+                e.Handled = true;
+                break;
         }
     }
+
+    private void CitySuggestion_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (CitySuggestionList.SelectedItem is not DivisionSuggestion suggestion)
+        {
+            return;
+        }
+
+        NewCityBox.Text = suggestion.Name;
+        AddCurrentCity();
+    }
+
+    private void RemoveCity_Click(object sender, RoutedEventArgs e) => _viewModel.RemoveSelectedCity();
+
+    private void SetDefaultCity_Click(object sender, RoutedEventArgs e) => _viewModel.SetDefaultCity();
 
     private void Appearance_Click(object sender, RoutedEventArgs e)
     {
