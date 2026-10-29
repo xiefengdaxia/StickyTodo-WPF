@@ -146,13 +146,65 @@ public partial class DesktopClockWindow : Window
 
             _dragging = true;
             _userMoved = true;   // 真的拖了才关掉自动贴角
+            BeginFastDrag();
         }
 
-        // 用当前 Left/Top 累加本帧位移：e.GetPosition 是相对窗口的，窗口移动后它也跟着变，
-        // 用按下时的 Left 做基准会导致每帧只修正一半误差 → 抖动
-        Left += now.X - _lastPoint.X;
-        Top += now.Y - _lastPoint.Y;
-        _lastPoint = now;
+        // 用"指针的屏幕坐标差"算位移：e.GetPosition 是相对窗口的，窗口一动它也跟着变，
+        // 拿它做增量会来回震荡（就是抖动）。这里换算成屏幕坐标，再用按下时的窗口位置 + 总位移，
+        // 不做累积，所以不会有误差累积/来回抖。
+        var screen = PointToScreen(now);
+        var scale = DpiScale;
+        var left = _pressLeft + ((screen.X - _pressScreen.X) / scale);
+        var top = _pressTop + ((screen.Y - _pressScreen.Y) / scale);
+
+        // 不足 1 个物理像素的位移不设置窗口：透明窗口每次 SetWindowPos 都要重组图层，
+        // 亚像素级的连续设置正是"看着在抖"的来源
+        if (Math.Abs(left - Left) * scale < 1 && Math.Abs(top - Top) * scale < 1)
+        {
+            return;
+        }
+
+        Left = left;
+        Top = top;
+    }
+
+    /// <summary>当前窗口的 DPI 缩放（物理像素 / DIP）。</summary>
+    private double DpiScale
+    {
+        get
+        {
+            var source = PresentationSource.FromVisual(this);
+            var scale = source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+            return scale > 0 ? scale : 1.0;
+        }
+    }
+
+    /// <summary>拖动期间先摘掉投影：分层窗口（AllowsTransparency）带 Effect 时每次移动都要重绘阴影，很容易掉帧发飘。</summary>
+    private void BeginFastDrag()
+    {
+        if (NoteRoot.Effect is not null)
+        {
+            _parkedEffect = NoteRoot.Effect;
+            NoteRoot.Effect = null;
+        }
+
+        _pressScreen = PointToScreen(_lastPoint);
+        _pressLeft = Left;
+        _pressTop = Top;
+    }
+
+    private System.Windows.Media.Effects.Effect? _parkedEffect;
+    private Point _pressScreen;
+    private double _pressLeft;
+    private double _pressTop;
+
+    private void EndFastDrag()
+    {
+        if (_parkedEffect is not null)
+        {
+            NoteRoot.Effect = _parkedEffect;
+            _parkedEffect = null;
+        }
     }
 
     private void Root_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -169,6 +221,10 @@ public partial class DesktopClockWindow : Window
         if (!_dragging)
         {
             Activate(_pressedTag);
+        }
+        else
+        {
+            EndFastDrag();
         }
 
         _dragging = false;

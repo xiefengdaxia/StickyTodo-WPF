@@ -20,7 +20,8 @@ public sealed class TrayService : IDisposable
     private readonly WindowManager _windows;
     private readonly IServiceProvider _services;
 
-    private WinForms.NotifyIcon? _notifyIcon;
+    private TrayIconHost? _tray;
+    private WinForms.ContextMenuStrip? _menu;
     private WinForms.ToolStripMenuItem? _boardsMenu;
     private PomodoroWindow? _pomodoroWindow;
 
@@ -48,12 +49,13 @@ public sealed class TrayService : IDisposable
 
     public void Start()
     {
-        if (_notifyIcon is not null)
+        if (_tray is not null)
         {
             return;
         }
 
         var menu = new WinForms.ContextMenuStrip();
+        _menu = menu;
 
         var manager = new WinForms.ToolStripMenuItem(Loc.T("tray.manager"));
         manager.Click += (_, _) => ShowManager();
@@ -93,14 +95,8 @@ public sealed class TrayService : IDisposable
         exit.Click += (_, _) => ExitApplication();
         menu.Items.Add(exit);
 
-        _notifyIcon = new WinForms.NotifyIcon
-        {
-            Icon = AppIcon.TrayIcon,
-            Text = "StickyTodo",
-            Visible = true,
-            ContextMenuStrip = menu,
-        };
-        _notifyIcon.DoubleClick += (_, _) => ShowManager();
+        // 用固定 GUID 登记：被杀掉的旧进程留下的图标会被这次登记接管，不再有僵尸图标
+        _tray = new TrayIconHost(AppIcon.TrayIcon, "StickyTodo", ShowManager, ShowMenuAtCursor);
 
         RebuildBoardsMenu();
         _windows.BoardsChanged += (_, _) => RebuildBoardsMenu();
@@ -148,20 +144,31 @@ public sealed class TrayService : IDisposable
     /// <summary>托盘气泡通知（提醒用，纯本地，不经过任何网络）。</summary>
     public void Notify(string title, string text)
     {
-        if (_notifyIcon is null)
+        if (_tray is null)
         {
             return;
         }
 
         try
         {
-            _notifyIcon.BalloonTipTitle = title;
-            _notifyIcon.BalloonTipText = text;
-            _notifyIcon.ShowBalloonTip(6000);
+            _tray.ShowBalloon(title, text);
         }
         catch (Exception)
         {
             // 通知失败不影响主流程
+        }
+    }
+
+    /// <summary>右键托盘图标：在鼠标位置弹菜单。</summary>
+    private void ShowMenuAtCursor()
+    {
+        try
+        {
+            _menu?.Show(WinForms.Cursor.Position);
+        }
+        catch (Exception)
+        {
+            // 菜单弹不出来不影响主流程
         }
     }
 
@@ -189,13 +196,9 @@ public sealed class TrayService : IDisposable
 
     public void Dispose()
     {
-        if (_notifyIcon is null)
-        {
-            return;
-        }
-
-        _notifyIcon.Visible = false;
-        _notifyIcon.Dispose();
-        _notifyIcon = null;
+        _tray?.Dispose();
+        _tray = null;
+        _menu?.Dispose();
+        _menu = null;
     }
 }

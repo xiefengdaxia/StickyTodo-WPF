@@ -160,11 +160,28 @@ public partial class DesktopClockBoardWindow : Window
 
             _dragging = true;
             _userMoved = true;   // 真的拖了才关掉自动贴角
+
+            // 拖动期间先摘掉阴影：透明窗口每次移动都要重绘阴影，很容易掉帧发飘
+            _parkedShadow = NoteRoot.BoxShadow;
+            NoteRoot.BoxShadow = default;
         }
 
-        Position = new Avalonia.PixelPoint(
-            (int)Math.Round(_pressPosition.X + (dx * Scale)),
-            (int)Math.Round(_pressPosition.Y + (dy * Scale)));
+        // 不足 1 个物理像素的位移不移动窗口（亚像素级的连续 SetWindowPos 正是抖动的来源）
+        var nextX = (int)Math.Round(_pressPosition.X + (dx * Scale));
+        var nextY = (int)Math.Round(_pressPosition.Y + (dy * Scale));
+        if (nextX == Position.X && nextY == Position.Y)
+        {
+            return;
+        }
+
+        Position = new Avalonia.PixelPoint(nextX, nextY);
+    }
+
+    private Avalonia.Media.BoxShadows _parkedShadow;
+
+    private void EndFastDrag()
+    {
+        NoteRoot.BoxShadow = _parkedShadow;
     }
 
     private void Root_PointerReleased(object? sender, Avalonia.Input.PointerReleasedEventArgs e)
@@ -181,6 +198,10 @@ public partial class DesktopClockBoardWindow : Window
         if (!_dragging)
         {
             Activate(_pressedTag);
+        }
+        else
+        {
+            EndFastDrag();
         }
 
         _dragging = false;
