@@ -398,11 +398,11 @@ public sealed class WeatherService
         }
         catch (TaskCanceledException)
         {
-            return WeatherFetchOutcome.Fail("请求超时");
+            return WeatherFetchOutcome.Fail("请求超时：连不上天气接口，请检查网络或代理");
         }
         catch (HttpRequestException ex)
         {
-            return WeatherFetchOutcome.Fail("网络错误：" + ex.Message);
+            return WeatherFetchOutcome.Fail("连不上天气接口（可能是网络/代理拦截）：" + ex.Message);
         }
         catch (Exception ex)
         {

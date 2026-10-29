@@ -408,7 +408,7 @@ public sealed partial class WeatherViewModel : ObservableObject
             _report = null;
             OnPropertyChanged(nameof(CurrentCityNote));
             IsBusyOverlayVisible = true;
-            BusyText = $"「{city}」暂无天气数据";
+            BusyText = $"「{city}」暂无天气数据\n{outcome.Error}";
             NoticeText = outcome.Error ?? string.Empty;
             return;
         }
