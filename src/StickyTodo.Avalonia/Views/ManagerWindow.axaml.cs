@@ -1,9 +1,12 @@
 using Avalonia.Controls;
+using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using StickyTodo.Core.Entities;
 using StickyTodo.Core.Localization;
+using StickyTodo.Notes.Localization;
 using StickyTodo.Notes.ViewModels;
+using StickyTodo.Updates;
 
 namespace StickyTodo.Notes.Views;
 
@@ -11,10 +14,13 @@ namespace StickyTodo.Notes.Views;
 public partial class ManagerWindow : Window
 {
     private readonly ManagerViewModel _viewModel;
+    private readonly GitHubUpdateChecker _updates;
+    private bool _checkingUpdate;
 
-    public ManagerWindow(ManagerViewModel viewModel)
+    public ManagerWindow(ManagerViewModel viewModel, GitHubUpdateChecker updates)
     {
         _viewModel = viewModel;
+        _updates = updates;
 
         InitializeComponent();
         DataContext = viewModel;
@@ -257,6 +263,40 @@ public partial class ManagerWindow : Window
     private void Hide_Click(object? sender, RoutedEventArgs e) => Hide();
 
     private void OpenSettings_Click(object? sender, RoutedEventArgs e) => App.Services?.ShowSettings();
+
+    /// <summary>
+    /// 检查更新：问 GitHub 仓库的最新 release，结果交给 <see cref="UpdateDialog"/>。
+    /// 检查期间按钮变灰并显示「正在检查」，避免连点。
+    /// </summary>
+    private async void CheckUpdates_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_checkingUpdate || sender is not Button button)
+        {
+            return;
+        }
+
+        _checkingUpdate = true;
+        button.IsEnabled = false;
+        SetButtonText(button, "update.checking");
+
+        try
+        {
+            var result = await _updates.CheckAsync();
+            UpdateDialog.ShowResult(this, result, _updates.Repository);
+        }
+        finally
+        {
+            SetButtonText(button, "update.check");
+            button.IsEnabled = true;
+            _checkingUpdate = false;
+        }
+    }
+
+    /// <summary>按钮文案走 LocalizedString 绑定，切语言时能跟着刷新。</summary>
+    private static void SetButtonText(Button button, string key) =>
+        button.Bind(
+            ContentControl.ContentProperty,
+            new Binding(nameof(LocalizedString.Value)) { Source = LocalizedString.Get(key) });
 
     private void Exit_Click(object? sender, RoutedEventArgs e) => App.Services?.ExitApplication();
 }

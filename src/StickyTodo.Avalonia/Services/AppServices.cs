@@ -9,6 +9,7 @@ using StickyTodo.Infrastructure.Persistence;
 using StickyTodo.Infrastructure.Token;
 using StickyTodo.Notes.ViewModels;
 using StickyTodo.Notes.Views;
+using StickyTodo.Updates;
 
 namespace StickyTodo.Notes.Services;
 
@@ -50,7 +51,9 @@ public sealed class AppServices : IDisposable
         SettingsViewModel = new SettingsViewModel(Skin, Settings, Todos, Entitlement, Windows, AutoStart, Localization);
         PomodoroViewModel = new PomodoroViewModel(Settings, PomodoroEngine);
 
-        Manager = new ManagerWindow(ManagerViewModel);
+        Updates = new GitHubUpdateChecker();
+
+        Manager = new ManagerWindow(ManagerViewModel, Updates);
         SettingsWindow = new SettingsWindow(SettingsViewModel);
         AttachManagerAutoRefresh();
     }
@@ -72,6 +75,9 @@ public sealed class AppServices : IDisposable
     public ITokenStatsProvider TokenProvider { get; }
 
     public PomodoroEngine PomodoroEngine { get; }
+
+    /// <summary>检查更新（按仓库地址问 GitHub 最新 release）。</summary>
+    public GitHubUpdateChecker Updates { get; }
 
     public WindowManager Windows { get; }
 

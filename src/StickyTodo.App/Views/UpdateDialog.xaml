@@ -1,0 +1,92 @@
+<Window x:Class="StickyTodo.App.Views.UpdateDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{Binding Converter={StaticResource Loc}, ConverterParameter=update.title}"
+        Icon="/Assets/stickytodo.ico"
+        Width="470"
+        SizeToContent="Height"
+        MaxHeight="620"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        FontFamily="Microsoft YaHei UI"
+        UseLayoutRounding="True">
+    <Border Margin="12"
+            CornerRadius="12"
+            Background="{DynamicResource Brush.Paper}"
+            BorderBrush="#59FFFFFF"
+            BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="22" ShadowDepth="3" Opacity="0.34" Color="#FF000000" Direction="270" />
+        </Border.Effect>
+
+        <StackPanel Margin="18,16,18,16">
+            <Grid MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <TextBlock x:Name="HeadingText"
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource Brush.Ink}"
+                           VerticalAlignment="Center" />
+                <Button HorizontalAlignment="Right"
+                        Style="{StaticResource Button.Chrome}"
+                        Content="✕"
+                        FontSize="10"
+                        Click="Close_Click" />
+            </Grid>
+
+            <TextBlock x:Name="VersionsText"
+                       Margin="0,10,0,0"
+                       FontSize="12.5"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource Brush.InkSoft}" />
+
+            <TextBlock x:Name="ReleaseMetaText"
+                       Margin="0,6,0,0"
+                       FontSize="11"
+                       TextWrapping="Wrap"
+                       Opacity="0.75"
+                       Foreground="{DynamicResource Brush.InkSoft}"
+                       Visibility="Collapsed" />
+
+            <Border x:Name="NotesBox"
+                    Margin="0,12,0,0"
+                    Padding="10,8"
+                    CornerRadius="8"
+                    Background="#1F000000"
+                    Visibility="Collapsed">
+                <ScrollViewer MaxHeight="220"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <TextBlock x:Name="NotesText"
+                               FontSize="11.5"
+                               TextWrapping="Wrap"
+                               LineHeight="18"
+                               Foreground="{DynamicResource Brush.Ink}" />
+                </ScrollViewer>
+            </Border>
+
+            <TextBlock x:Name="SourceText"
+                       Margin="0,10,0,0"
+                       FontSize="10.5"
+                       TextWrapping="Wrap"
+                       Opacity="0.7"
+                       Foreground="{DynamicResource Brush.InkSoft}" />
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+                <Button x:Name="DownloadButton"
+                        Style="{StaticResource Button.Primary}"
+                        Margin="0,0,8,0"
+                        Click="Download_Click"
+                        Visibility="Collapsed" />
+                <Button Content="{Binding Converter={StaticResource Loc}, ConverterParameter=common.close}"
+                        Style="{StaticResource Button.Ghost}"
+                        Click="Close_Click"
+                        IsCancel="True"
+                        IsDefault="True" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

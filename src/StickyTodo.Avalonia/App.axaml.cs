@@ -8,6 +8,7 @@ using StickyTodo.Infrastructure;
 using StickyTodo.Notes.Services;
 using StickyTodo.Notes.ViewModels;
 using StickyTodo.Notes.Views;
+using StickyTodo.Updates;
 
 namespace StickyTodo.Notes;
 
@@ -55,6 +56,52 @@ public partial class App : Application
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>
+    /// --update-demo：检查更新弹窗回归。用一条假的新版本（不联网，截图可重复）；
+    /// 加 <c>--fail</c> 时改成假的失败态，验证失败文案与细节展示。
+    /// </summary>
+    private static void ShowUpdateDemo(AppServices services, bool fail)
+    {
+        var repository = services.Updates.Repository;
+
+        if (fail)
+        {
+            UpdateDialog.ShowResult(
+                null,
+                UpdateCheckResult.Failed(
+                    AppVersionInfo.Current,
+                    UpdateFailure.Network,
+                    "The SSL connection could not be established, see inner exception. (示例)"),
+                repository);
+            return;
+        }
+
+        var notes = string.Join("\n",
+            "### 新增",
+            "- 检查更新：按仓库地址比对最新 Release，不再靠手动看版本号",
+            "- 待办行内容垂直居中",
+            "- 标签与完成/删除按钮共用右侧位置，鼠标悬停互换",
+            string.Empty,
+            "### 修复",
+            "- 天气接口连不上时明确显示「暂无数据」，不拿别的城市顶替");
+
+        var release = new UpdateRelease(
+            "v9.9.9",
+            new Version(9, 9, 9),
+            "StickyTodo 9.9.9",
+            notes,
+            repository.ReleasesPageUrl + "/tag/v9.9.9",
+            repository.ReleasesPageUrl,
+            DateTimeOffset.UtcNow);
+
+        UpdateDialog.ShowResult(
+            null,
+            UpdateCheckResult.Available(AppVersionInfo.Current, new Version(9, 9, 9), release),
+            repository);
+
+        Log.Info("[update] 已弹出假的新版本弹窗（当前 " + AppVersionInfo.Display(AppVersionInfo.Current) + "）");
     }
 
     private void Start(
@@ -136,6 +183,19 @@ public partial class App : Application
             if (restored == 0)
             {
                 services.ShowManager();
+            }
+
+            // 检查更新回归：--update-demo 弹假的新版本，--update-demo --fail 弹假的失败态
+            if (HasFlag(args, "--update-demo"))
+            {
+                try
+                {
+                    ShowUpdateDemo(services, HasFlag(args, "--fail"));
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("[update] 弹窗失败：" + ex);
+                }
             }
 
             // --create-tool-demo <weather|worldclock|desktopclock>：打开一个工具型看板（进看板列表）。

@@ -24,6 +24,7 @@
     <ProjectReference Include="..\..\src\StickyTodo.Core\StickyTodo.Core.csproj" />
     <ProjectReference Include="..\..\src\StickyTodo.Infrastructure\StickyTodo.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\StickyTodo.Weather\StickyTodo.Weather.csproj" />
+    <ProjectReference Include="..\..\src\StickyTodo.Updates\StickyTodo.Updates.csproj" />
   </ItemGroup>
 
 </Project>

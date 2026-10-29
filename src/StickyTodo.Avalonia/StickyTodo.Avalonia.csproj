@@ -4,6 +4,7 @@
     <OutputType>WinExe</OutputType>
     <!-- 关键：Avalonia UI + net6.0 是官方包仍保留、且运行时还能装到 Windows 7 SP1 的组合 -->
     <TargetFramework>net6.0</TargetFramework>
+    <Version>1.5.6</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
@@ -27,6 +28,7 @@
     <ProjectReference Include="..\StickyTodo.Core\StickyTodo.Core.csproj" />
     <ProjectReference Include="..\StickyTodo.Infrastructure\StickyTodo.Infrastructure.csproj" />
     <ProjectReference Include="..\StickyTodo.Weather\StickyTodo.Weather.csproj" />
+    <ProjectReference Include="..\StickyTodo.Updates\StickyTodo.Updates.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,10 +1,13 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using StickyTodo.App.Services;
 using StickyTodo.App.ViewModels;
 using StickyTodo.Core.Entities;
 using StickyTodo.Core.Localization;
+using StickyTodo.Updates;
 
 namespace StickyTodo.App.Views;
 
@@ -16,13 +19,16 @@ public partial class ManagerWindow : Window
 {
     private readonly ManagerViewModel _viewModel;
     private readonly WindowManager _windows;
+    private readonly GitHubUpdateChecker _updates;
     private bool _allowClose;
+    private bool _checkingUpdate;
 
-    public ManagerWindow(ManagerViewModel viewModel, WindowManager windows)
+    public ManagerWindow(ManagerViewModel viewModel, WindowManager windows, GitHubUpdateChecker updates)
     {
         InitializeComponent();
         _viewModel = viewModel;
         _windows = windows;
+        _updates = updates;
         DataContext = viewModel;
 
         Loaded += async (_, _) =>
@@ -277,6 +283,39 @@ public partial class ManagerWindow : Window
 
     private void OpenSettings_Click(object sender, RoutedEventArgs e) =>
         (System.Windows.Application.Current as App)?.ShowSettings();
+
+    /// <summary>
+    /// 检查更新：问 GitHub 仓库的最新 release，把结果丢给 <see cref="UpdateDialog"/>。
+    /// 检查期间按钮变灰并显示「正在检查」，避免连点。
+    /// </summary>
+    private async void CheckUpdates_Click(object sender, RoutedEventArgs e)
+    {
+        if (_checkingUpdate || sender is not Button button)
+        {
+            return;
+        }
+
+        _checkingUpdate = true;
+        button.IsEnabled = false;
+        button.SetBinding(
+            ContentControl.ContentProperty,
+            new Binding { Converter = (IValueConverter)FindResource("Loc"), ConverterParameter = "update.checking" });
+
+        try
+        {
+            var result = await _updates.CheckAsync();
+            UpdateDialog.ShowResult(this, result, _updates.Repository);
+        }
+        finally
+        {
+            // 恢复成走翻译器的绑定，切语言时这条文案还能跟着变
+            button.SetBinding(
+                ContentControl.ContentProperty,
+                new Binding { Converter = (IValueConverter)FindResource("Loc"), ConverterParameter = "update.check" });
+            button.IsEnabled = true;
+            _checkingUpdate = false;
+        }
+    }
 
     // ---------------- 看板操作 ----------------
 

@@ -213,6 +213,16 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        // 检查更新回归：真实请求 GitHub（--fake 用假版本、--fail 用假失败，便于离线截图）
+        if (e.Args.Contains("--update-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunUpdateDemo(
+                ReadOptionValue(e.Args, "--shot"),
+                e.Args.Contains("--fake", StringComparer.OrdinalIgnoreCase),
+                e.Args.Contains("--fail", StringComparer.OrdinalIgnoreCase));
+            return;
+        }
+
         // 拖到标签回归：应用内自动完成「拖到标签」全链路并断言
         if (e.Args.Contains("--tag-drag-demo", StringComparer.OrdinalIgnoreCase))
         {
@@ -492,6 +502,8 @@ public partial class App : System.Windows.Application
                 services.AddSingleton<AutoStartService>();
                 services.AddSingleton<Weather.WeatherService>();
             services.AddSingleton<Weather.WeatherCache>();
+                // 检查更新：仓库地址来自 git remote（见 UpdateRepository.StickyTodo）
+                services.AddSingleton(new StickyTodo.Updates.GitHubUpdateChecker());
                 services.AddSingleton<ViewModels.WorldClockViewModel>();
                 services.AddSingleton<ViewModels.DesktopClockViewModel>();
                 services.AddSingleton<Core.Abstractions.ITokenStatsProvider>(sp =>
@@ -976,6 +988,94 @@ public partial class App : System.Windows.Application
         catch (Exception ex)
         {
             Log.Fatal(ex, "[calendar] 异常");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
+    /// --update-demo：检查更新回归。默认真的去问 GitHub；
+    /// <c>--fake</c> 用一条假的新版本（离线可截图），<c>--fail</c> 用一条假的失败。
+    /// </summary>
+    private async void RunUpdateDemo(string? shotDirectory, bool fake, bool fail)
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+            _host = BuildHost();
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+            ApplyLanguageForCurrentRun();
+
+            var checker = _host.Services.GetRequiredService<StickyTodo.Updates.GitHubUpdateChecker>();
+            var current = StickyTodo.Updates.AppVersionInfo.Current;
+
+            StickyTodo.Updates.UpdateCheckResult result;
+            if (fake)
+            {
+                var notes = string.Join("\n",
+                    "### 新增",
+                    "- 检查更新：按仓库地址比对最新 Release，不再靠手动看版本号",
+                    "- 待办行内容垂直居中",
+                    "- 标签与完成/删除按钮共用右侧位置，鼠标悬停互换",
+                    string.Empty,
+                    "### 修复",
+                    "- 天气接口连不上时明确显示「暂无数据」，不拿别的城市顶替");
+                var release = new StickyTodo.Updates.UpdateRelease(
+                    "v9.9.9",
+                    new Version(9, 9, 9),
+                    "StickyTodo 9.9.9",
+                    notes,
+                    checker.Repository.ReleasesPageUrl + "/tag/v9.9.9",
+                    checker.Repository.ReleasesPageUrl,
+                    DateTimeOffset.UtcNow);
+                result = StickyTodo.Updates.UpdateCheckResult.Available(current, new Version(9, 9, 9), release);
+            }
+            else if (fail)
+            {
+                result = StickyTodo.Updates.UpdateCheckResult.Failed(
+                    current,
+                    StickyTodo.Updates.UpdateFailure.Network,
+                    "The SSL connection could not be established, see inner exception. (示例)");
+            }
+            else
+            {
+                result = await checker.CheckAsync();
+            }
+
+            Log.Information(
+                "[update] 仓库={Repo} 当前={Current} 状态={Status} 最新={Latest} 失败={Failure} 细节={Detail}",
+                checker.Repository.Slug,
+                StickyTodo.Updates.AppVersionInfo.Display(result.CurrentVersion),
+                result.Status,
+                StickyTodo.Updates.AppVersionInfo.Display(result.LatestVersion),
+                result.Failure,
+                result.Detail);
+
+            var dialog = new UpdateDialog(result, checker.Repository);
+            MainWindow = dialog;
+            dialog.Show();
+            await Task.Delay(700);
+
+            if (shotDirectory is not null)
+            {
+                Log.Information("[update] 截图 {Count} 张", SaveWindowShots(shotDirectory));
+            }
+
+            // 离线/限流都算"已知失败态"，只要界面把失败讲清楚就不算回归失败
+            var ok = result.Status != StickyTodo.Updates.UpdateCheckStatus.Failed
+                     || result.Failure is StickyTodo.Updates.UpdateFailure.Network
+                         or StickyTodo.Updates.UpdateFailure.RateLimited;
+
+            Log.Information("[update] 总结果={Result}", ok ? "通过" : "失败");
+            Log.CloseAndFlush();
+            Shutdown(ok ? 0 : 2);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[update] 异常");
             Log.CloseAndFlush();
             Shutdown(1);
         }

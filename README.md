@@ -116,18 +116,18 @@ TODO / Done 视图切换：
 WPF 版受 .NET 8 限制无法支持 Win7 和 32 位系统。为此仓库里另有一个 **Avalonia 11.3.22 + .NET 6** 的完整移植版，可发布到 **Windows 7 SP1（x64 / x86）**：
 
 ```powershell
-.\tools\publish-avalonia-win7.ps1 -Version 1.5.5
+.\tools\publish-avalonia-win7.ps1 -Version 1.5.6
 ```
 
 产物（self-contained 单文件，目标机无需装 .NET）：
 
 ```
 publish-avalonia/
-  StickyTodo-Avalonia-1.5.5-win-x64-portable.zip   # ~38 MB
-  StickyTodo-Avalonia-1.5.5-win-x86-portable.zip   # ~35 MB
+  StickyTodo-Avalonia-1.5.6-win-x64-portable.zip   # ~38 MB
+  StickyTodo-Avalonia-1.5.6-win-x86-portable.zip   # ~35 MB
 ```
 
-功能与 WPF 版对齐：待办看板、便签、日历（农历/节气/黄历）、Token 用量（含**复制摘要**）、番茄钟、提醒、托盘、全局快捷键、皮肤与透明度、四语言热切换、会话恢复、便携模式，以及 **天气看板**（Open-Meteo 免费接口，唯一联网功能；城市可增删、支持**模糊搜索**全国省市区县、可设**默认城市**；区县查不到会自动按所属地级市查，查不到就明确提示暂无数据，绝不拿别的城市顶上）、**世界时钟**（全球十大城市）、**桌面时钟挂件**（阳历/农历+节气节日/时间，下面是**今日天气**和**今日日程**——点天气行直接打开天气看板、点日程行打开日历，没建过看板会自动建，可嵌入桌面）。
+功能与 WPF 版对齐：待办看板、便签、日历（农历/节气/黄历）、Token 用量（含**复制摘要**）、番茄钟、提醒、托盘、全局快捷键、皮肤与透明度、四语言热切换、会话恢复、便携模式、**检查更新**（按仓库地址问 GitHub latest release），以及 **天气看板**（Open-Meteo 免费接口；城市可增删、支持**模糊搜索**全国省市区县、可设**默认城市**；区县查不到会自动按所属地级市查，查不到就明确提示暂无数据，绝不拿别的城市顶上）、**世界时钟**（全球十大城市）、**桌面时钟挂件**（阳历/农历+节气节日/时间，下面是**今日天气**和**今日日程**——点天气行直接打开天气看板、点日程行打开日历，没建过看板会自动建，可嵌入桌面）。
 
 > **Win7 上的已知限制**：Win7 只能用 `RedirectionSurface` 合成，**不支持窗口透明**，所以便签会以直角、不透明外观显示（Win8+ 保持圆角与半透明）。
 
@@ -139,7 +139,7 @@ publish-avalonia/
 
 ```powershell
 dotnet build -c Debug                       # 编译
-dotnet test                                 # 单元测试（245 个）
+dotnet test                                 # 单元测试（342 个）
 ```
 
 ```powershell
@@ -162,6 +162,7 @@ $exe = ".\src\StickyTodo.App\bin\Debug\net8.0-windows\StickyTodo.exe"
 & $exe --interaction-demo                   # 拖拽排序 / 拖到标签 / 清空标签 / 点空白退出编辑，退出码 0 = 通过
 & $exe --tag-drag-demo                      # 拖到标签全链路（打标签 → 清空标签），退出码 0 = 通过
 & $exe --hover-demo --shot D:\shots         # 截「悬停显示 ✓ ✕」与「已完成悬停显示 ↺」
+& $exe --update-demo --shot D:\shots        # 真的去问 GitHub 仓库最新 release 并截结果弹窗（--fake 假版本 / --fail 假失败）
 & $exe --chip-count-demo                    # 标签计数回归：加/删标签后胶囊计数是否跟着变
 & $exe --session-demo                       # 会话恢复第 1 阶段：开 3 个看板并写入会话
 & $exe --session-demo --phase2              # 会话恢复第 2 阶段：模拟重启，验证 3 个窗口与位置都回来
@@ -219,7 +220,7 @@ StickyTodo.sln
 │   ├─ Controls/                   TrendChart（自绘趋势图）
 │   ├─ Services/                   WindowManager / TrayService / SkinService / LocalizationService / Motion / ScreenHelper
 │   └─ Converters/                 含多语言转换器（Loc / LocFormat / LocYear / LocMonth）
-└─ tests/StickyTodo.Tests          xUnit（245 个）
+└─ tests/StickyTodo.Tests          xUnit（342 个）
 ```
 
 图标生成器在 `tools/IconGen`（WPF 矢量绘制 → 多尺寸 ICO）：
@@ -381,9 +382,10 @@ setting(key PRIMARY KEY, value)
 ## 5. 完全本地化（可验证，不是口号）
 
 - Token 用量看板读的是**本机 opencode 的 SQLite 数据库**，是本地文件读取，同样不联网、不发送任何数据。
-- 没有账号体系、没有云同步、没有埋点、没有版本检查。
+- 没有账号体系、没有云同步、没有埋点。
+- 联网只有两处，而且都得你点一下才发生：**天气**（Open-Meteo 免费接口）和**检查更新**（GitHub releases API，只读公开信息）。两处都不带身份、不上报任何本机数据。
 - 宿主刻意用 `new HostBuilder()` 而不是 `Host.CreateDefaultBuilder()`：后者会去读 `appsettings.json` / 环境变量 / 命令行配置，这里配置来源全部关闭，行为只由代码决定。
-- 可执行的保证：`tests/StickyTodo.Tests/NoNetworkTests.cs` 断言 **Core 与 Infrastructure 程序集的引用列表里没有** `System.Net.Http` / `System.Net.Sockets` / `System.Net.Requests` / `System.Net.WebClient`。一旦有人往这两层加回网络依赖，测试立刻失败。
+- 可执行的保证：`tests/StickyTodo.Tests/NoNetworkTests.cs` 断言 **Core 与 Infrastructure 程序集的引用列表里没有** `System.Net.Http` / `System.Net.Sockets` / `System.Net.Requests` / `System.Net.WebClient`。一旦有人往这两层加回网络依赖，测试立刻失败。天气与检查更新各自单独成层（`StickyTodo.Weather` / `StickyTodo.Updates`），主工程只依赖它们的抽象结果。
 
 ---
 
@@ -477,6 +479,11 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 **M6（已完成）**
 - [x] **四语言界面**：简体中文 / English / 日本語 / 한국어，设置页即时切换，农历术语保留中文；单测守住译文完整性与占位符一致性
 - [x] **README 四语版本**：`README.md`（中）/ `.en.md` / `.ja.md` / `.ko.md`，顶部互相链接
+
+**M7（已完成）**
+- [x] **检查更新（按仓库地址）**：解析 GitHub 仓库地址 → 读 `releases/latest` → 把 tag 与当前版本比较；有新版本时弹窗展示版本对比、发布说明（Markdown 压成纯文本）和「打开下载页」，已是最新只报版本号。**只有用户点「检查更新」时才联网**，失败会分「没网 / 限流 / 还没发版 / 返回看不懂」讲清楚，绝不静默当成最新
+- [x] **待办行垂直居中**：标题与徽标装进同一个垂直居中的栈里，行内内容不再贴上沿、下面空半截
+- [x] **标签与行尾按钮共用同一个右侧槽位**：平时显示标签，鼠标移入本行时标签淡出、换成 ✓（完成）/ ↺（撤回）/ ✕（删除），列宽按两者较宽的一方固定，悬停不跳位
 
 **M4 外延**
 - [ ] ICS 订阅与导入导出

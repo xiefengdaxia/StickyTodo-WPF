@@ -112,7 +112,7 @@ TODO / Done 보기 전환:
 
 ```powershell
 dotnet build -c Debug                       # 빌드
-dotnet test                                 # 단위 테스트(245개)
+dotnet test                                 # 단위 테스트(342개)
 ```
 
 ```powershell
@@ -192,7 +192,7 @@ StickyTodo.sln
 │   ├─ Controls/                   TrendChart(직접 그린 추세 그래프)
 │   ├─ Services/                   WindowManager / TrayService / SkinService / LocalizationService / Motion / ScreenHelper
 │   └─ Converters/                 다국어 변환기 포함(Loc / LocFormat / LocYear / LocMonth)
-└─ tests/StickyTodo.Tests          xUnit(245개)
+└─ tests/StickyTodo.Tests          xUnit(342개)
 ```
 
 아이콘 생성기는 `tools/IconGen`(WPF 벡터 드로잉 → 다중 크기 ICO):

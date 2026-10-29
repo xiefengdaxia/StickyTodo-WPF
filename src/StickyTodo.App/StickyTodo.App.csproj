@@ -3,6 +3,9 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
+    <!-- 版本号：发布脚本会用 -p:Version 覆盖；这里写死是为了本地跑的构建也有正确版本，
+         否则「检查更新」拿不到 1.0.0 以外的信息 -->
+    <Version>1.5.6</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
@@ -33,6 +36,7 @@
     <ProjectReference Include="..\StickyTodo.Core\StickyTodo.Core.csproj" />
     <ProjectReference Include="..\StickyTodo.Infrastructure\StickyTodo.Infrastructure.csproj" />
     <ProjectReference Include="..\StickyTodo.Weather\StickyTodo.Weather.csproj" />
+    <ProjectReference Include="..\StickyTodo.Updates\StickyTodo.Updates.csproj" />
   </ItemGroup>
 
   <ItemGroup>

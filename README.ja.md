@@ -112,7 +112,7 @@ TODO / Done ビュー切り替え：
 
 ```powershell
 dotnet build -c Debug                       # ビルド
-dotnet test                                 # ユニットテスト（245 件）
+dotnet test                                 # ユニットテスト（342 件）
 ```
 
 ```powershell
@@ -192,7 +192,7 @@ StickyTodo.sln
 │   ├─ Controls/                   TrendChart（自前描画の推移グラフ）
 │   ├─ Services/                   WindowManager / TrayService / SkinService / LocalizationService / Motion / ScreenHelper
 │   └─ Converters/                 多言語用コンバーターを含む（Loc / LocFormat / LocYear / LocMonth）
-└─ tests/StickyTodo.Tests          xUnit（245 件）
+└─ tests/StickyTodo.Tests          xUnit（342 件）
 ```
 
 アイコン生成器は `tools/IconGen`（WPF ベクター描画 → マルチサイズ ICO）：

@@ -79,6 +79,9 @@
             <Border Classes="divider" Margin="0,0,0,10" />
             <Button Content="{loc:Loc common.settings}" Classes="ghost" HorizontalContentAlignment="Left"
                     Padding="12,8" Margin="0,0,0,6" Click="OpenSettings_Click" />
+            <Button Name="CheckUpdatesButton" Content="{loc:Loc update.check}" Classes="ghost"
+                    HorizontalContentAlignment="Left" Padding="12,8" Margin="0,0,0,6"
+                    Click="CheckUpdates_Click" />
             <Button Content="{loc:Loc common.exit}" Classes="ghost" HorizontalContentAlignment="Left"
                     Padding="12,8" Foreground="{DynamicResource Brush.Danger}" Click="Exit_Click" />
           </StackPanel>

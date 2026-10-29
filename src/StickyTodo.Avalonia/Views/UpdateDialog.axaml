@@ -1,0 +1,58 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:StickyTodo.Notes.Localization"
+        x:Class="StickyTodo.Notes.Views.UpdateDialog"
+        Title="{loc:Loc update.title}"
+        Width="470"
+        SizeToContent="Height"
+        MaxHeight="640"
+        CanResize="False"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        FontFamily="Microsoft YaHei UI, Segoe UI"
+        Topmost="True">
+
+  <Border Name="Shell" Classes="note" Margin="12" CornerRadius="12">
+    <StackPanel Margin="18,16,18,16">
+      <!-- 标题条：标题 + 关闭 -->
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Name="HeadingText" FontSize="14" FontWeight="SemiBold"
+                   Foreground="{DynamicResource Brush.Ink}" TextWrapping="Wrap"
+                   VerticalAlignment="Center" />
+        <Button Grid.Column="1" Classes="chrome" Content="✕" FontSize="10" Click="Close_Click" />
+      </Grid>
+
+      <TextBlock Name="VersionsText" Margin="0,10,0,0" FontSize="12.5"
+                 TextWrapping="Wrap" Foreground="{DynamicResource Brush.InkSoft}" />
+
+      <TextBlock Name="ReleaseMetaText" Margin="0,6,0,0" FontSize="11"
+                 TextWrapping="Wrap" Opacity="0.75"
+                 Foreground="{DynamicResource Brush.InkSoft}" IsVisible="False" />
+
+      <!-- 发布说明 / 失败细节 -->
+      <Border Name="NotesBox" Margin="0,12,0,0" Padding="10,8" CornerRadius="8"
+              Background="#1F000000" IsVisible="False">
+        <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+          <TextBlock Name="NotesText" FontSize="11.5" TextWrapping="Wrap"
+                     LineHeight="18" Foreground="{DynamicResource Brush.Ink}" />
+        </ScrollViewer>
+      </Border>
+
+      <TextBlock Name="SourceText" Margin="0,10,0,0" FontSize="10.5"
+                 TextWrapping="Wrap" Opacity="0.7"
+                 Foreground="{DynamicResource Brush.InkSoft}" />
+
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                  Margin="0,14,0,0" Spacing="8">
+        <Button Name="DownloadButton" Classes="primary"
+                Content="{loc:Loc update.openDownload}"
+                Click="Download_Click" IsVisible="False" />
+        <Button Classes="ghost" Content="{loc:Loc common.close}" Click="Close_Click" />
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</Window>

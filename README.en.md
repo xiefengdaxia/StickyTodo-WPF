@@ -1,4 +1,4 @@
-﻿# StickyTodo
+# StickyTodo
 
 [简体中文](README.md) | **English** | [日本語](README.ja.md) | [한국어](README.ko.md)
 
@@ -113,7 +113,7 @@ The script runs tests → single-file publish → adds the portable marker → z
 
 ```powershell
 dotnet build -c Debug                       # build
-dotnet test                                 # unit tests (245)
+dotnet test                                 # unit tests (342)
 ```
 
 ```powershell
@@ -193,7 +193,7 @@ StickyTodo.sln
 │   ├─ Controls/                   TrendChart (custom-drawn trend chart)
 │   ├─ Services/                   WindowManager / TrayService / SkinService / LocalizationService / Motion / ScreenHelper
 │   └─ Converters/                 includes localization converters (Loc / LocFormat / LocYear / LocMonth)
-└─ tests/StickyTodo.Tests          xUnit (245 tests)
+└─ tests/StickyTodo.Tests          xUnit (342 tests)
 ```
 
 The icon generator lives in `tools/IconGen` (WPF vector drawing -> multi-size ICO):

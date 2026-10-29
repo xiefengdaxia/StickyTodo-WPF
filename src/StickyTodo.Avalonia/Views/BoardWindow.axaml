@@ -28,9 +28,19 @@
     <!-- 行悬停时才显出操作按钮 -->
     <Style Selector="StackPanel.rowActions">
       <Setter Property="Opacity" Value="0" />
+      <!-- 不可见时不能命中，否则会点到看不见的 ✕ -->
+      <Setter Property="IsHitTestVisible" Value="False" />
     </Style>
     <Style Selector="ListBoxItem:pointerover StackPanel.rowActions">
       <Setter Property="Opacity" Value="1" />
+      <Setter Property="IsHitTestVisible" Value="True" />
+    </Style>
+    <!-- 标签：平时显示，鼠标移入行时淡出、把位置让给操作按钮 -->
+    <Style Selector="TextBlock.rowTag">
+      <Setter Property="Opacity" Value="0.85" />
+    </Style>
+    <Style Selector="ListBoxItem:pointerover TextBlock.rowTag">
+      <Setter Property="Opacity" Value="0" />
     </Style>
     <Style Selector="TextBox.rowTitle.done">
       <Setter Property="Opacity" Value="0.55" />
@@ -141,15 +151,22 @@
 
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:TodoRowViewModel">
-                <Grid ColumnDefinitions="Auto,*,Auto,64" RowDefinitions="Auto,Auto,Auto"
+                <Grid RowDefinitions="Auto,Auto"
+                      VerticalAlignment="Center"
                       Classes.dragging="{Binding IsDragging}">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" MinWidth="64" />
+                  </Grid.ColumnDefinitions>
 
                   <!-- 拖拽插入线 -->
                   <Border Grid.Row="0" Grid.ColumnSpan="4" Height="2" Background="{DynamicResource Brush.Accent}"
                           IsVisible="{Binding IsDragTarget}" />
 
                   <!-- 拖动把手 -->
-                  <Border Grid.Row="1" Grid.RowSpan="2" Grid.Column="0"
+                  <Border Grid.Row="1" Grid.Column="0"
                           Width="16"
                           VerticalAlignment="Center"
                           Background="Transparent"
@@ -167,32 +184,73 @@
                   </Border>
 
                   <!-- 标题：点行内任意位置都能编辑 -->
-                  <TextBox Grid.Row="1" Grid.Column="1"
-                           Classes="inline rowTitle"
-                           Classes.done="{Binding IsDone}"
-                           Text="{Binding Title, Mode=TwoWay}"
-                           HorizontalAlignment="Stretch"
-                           VerticalAlignment="Center"
-                           GotFocus="RowTitle_GotFocus"
-                           LostFocus="RowTitle_LostFocus"
-                           KeyDown="RowTitle_KeyDown"
-                           Tag="{Binding}" />
+                  <StackPanel Grid.Row="1" Grid.Column="1" VerticalAlignment="Center">
+                    <TextBox
+                             Classes="inline rowTitle"
+                             Classes.done="{Binding IsDone}"
+                             Text="{Binding Title, Mode=TwoWay}"
+                             HorizontalAlignment="Stretch"
+                             VerticalAlignment="Center"
+                             GotFocus="RowTitle_GotFocus"
+                             LostFocus="RowTitle_LostFocus"
+                             KeyDown="RowTitle_KeyDown"
+                             Tag="{Binding}" />
+                    <!-- 第二行：完成时间 / 倒数日 / 提醒 / 重复 -->
+                    <WrapPanel
+                               Margin="-5,1,0,0"
+                               Orientation="Horizontal"
+                               VerticalAlignment="Center"
+                               IsVisible="{Binding HasMeta}">
+                      <Border Margin="0,0,5,0" Padding="5,1" CornerRadius="6" Background="#332E7D32"
+                              IsVisible="{Binding HasDoneAt}">
+                        <TextBlock Text="{Binding DoneAtText}" FontSize="10" Foreground="{DynamicResource Brush.Success}" />
+                      </Border>
 
-                  <!-- 标签：固定在右侧 -->
-                  <TextBlock Grid.Row="1" Grid.Column="2"
+                      <Border Margin="0,0,5,0" Padding="5,1" CornerRadius="6" Background="#33C0392B"
+                              IsVisible="{Binding HasCountdown}">
+                        <TextBlock Text="{Binding CountdownText}" FontSize="10" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource Brush.Accent}">
+                          <TextBlock.Styles>
+                            <Style Selector="TextBlock">
+                              <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}" />
+                            </Style>
+                          </TextBlock.Styles>
+                        </TextBlock>
+                      </Border>
+
+                      <TextBlock Text="{Binding RemindText}" FontSize="10" Margin="0,0,5,0"
+                                 VerticalAlignment="Center" Opacity="0.8"
+                                 Foreground="{DynamicResource Brush.InkSoft}"
+                                 IsVisible="{Binding HasReminder}" />
+
+                      <Border Margin="0,0,5,0" Padding="5,1" CornerRadius="6" Background="#332E7D32"
+                              VerticalAlignment="Center" IsVisible="{Binding IsRecurring}">
+                        <StackPanel Orientation="Horizontal">
+                          <TextBlock Text="🔁 " FontSize="9" VerticalAlignment="Center" />
+                          <TextBlock Text="{Binding RecurrenceText}" FontSize="10"
+                                     VerticalAlignment="Center" Foreground="{DynamicResource Brush.Success}" />
+                        </StackPanel>
+                      </Border>
+                    </WrapPanel>
+                  </StackPanel>
+
+                  <!-- 标签：和操作按钮同一个位置（右对齐），鼠标悬停时让位给按钮 -->
+                  <TextBlock Grid.Row="1" Grid.Column="3"
+                             Classes="rowTag"
                              Text="{Binding TagText}"
                              FontSize="10"
-                             Margin="6,0,6,0"
+                             Margin="0,0,2,0"
                              MaxWidth="96"
+                             HorizontalAlignment="Right"
                              VerticalAlignment="Center"
                              TextTrimming="CharacterEllipsis"
                              ToolTip.Tip="{Binding TagText}"
                              Foreground="{DynamicResource Brush.Accent}"
-                             Opacity="0.85"
                              IsVisible="{Binding HasTags}" />
 
-                  <!-- 编辑错误提示 -->
-                  <TextBlock Grid.Row="1" Grid.Column="3"
+                  <!-- 编辑错误提示（放在标签左侧，不压住右侧那一格） -->
+                  <TextBlock Grid.Row="1" Grid.Column="2"
+                             HorizontalAlignment="Right"
                              Text="{Binding EditError}"
                              FontSize="10"
                              Margin="0,0,4,0"
@@ -201,46 +259,9 @@
                              Foreground="{DynamicResource Brush.Danger}"
                              IsVisible="{Binding EditError, Converter={StaticResource NullToCollapsed}}" />
 
-                  <!-- 第二行：完成时间 / 倒数日 / 提醒 / 重复 -->
-                  <WrapPanel Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2"
-                             Margin="-5,1,0,0"
-                             Orientation="Horizontal"
-                             VerticalAlignment="Center"
-                             IsVisible="{Binding HasMeta}">
-                    <Border Margin="0,0,5,0" Padding="5,1" CornerRadius="6" Background="#332E7D32"
-                            IsVisible="{Binding HasDoneAt}">
-                      <TextBlock Text="{Binding DoneAtText}" FontSize="10" Foreground="{DynamicResource Brush.Success}" />
-                    </Border>
-
-                    <Border Margin="0,0,5,0" Padding="5,1" CornerRadius="6" Background="#33C0392B"
-                            IsVisible="{Binding HasCountdown}">
-                      <TextBlock Text="{Binding CountdownText}" FontSize="10" VerticalAlignment="Center"
-                                 Foreground="{DynamicResource Brush.Accent}">
-                        <TextBlock.Styles>
-                          <Style Selector="TextBlock">
-                            <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}" />
-                          </Style>
-                        </TextBlock.Styles>
-                      </TextBlock>
-                    </Border>
-
-                    <TextBlock Text="{Binding RemindText}" FontSize="10" Margin="0,0,5,0"
-                               VerticalAlignment="Center" Opacity="0.8"
-                               Foreground="{DynamicResource Brush.InkSoft}"
-                               IsVisible="{Binding HasReminder}" />
-
-                    <Border Margin="0,0,5,0" Padding="5,1" CornerRadius="6" Background="#332E7D32"
-                            VerticalAlignment="Center" IsVisible="{Binding IsRecurring}">
-                      <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="🔁 " FontSize="9" VerticalAlignment="Center" />
-                        <TextBlock Text="{Binding RecurrenceText}" FontSize="10"
-                                   VerticalAlignment="Center" Foreground="{DynamicResource Brush.Success}" />
-                      </StackPanel>
-                    </Border>
-                  </WrapPanel>
 
                   <!-- 悬停操作区 -->
-                  <StackPanel Grid.Row="1" Grid.RowSpan="2" Grid.Column="3"
+                  <StackPanel Grid.Row="1" Grid.Column="3"
                               Classes="rowActions"
                               Orientation="Horizontal"
                               HorizontalAlignment="Right"

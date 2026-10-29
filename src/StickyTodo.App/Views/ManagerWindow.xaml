@@ -108,6 +108,11 @@
                         <Button Content="{Binding Converter={StaticResource Loc}, ConverterParameter=common.settings}" Style="{StaticResource Button.Ghost}"
                                 HorizontalContentAlignment="Left" Padding="12,8" Margin="0,0,0,6"
                                 Click="OpenSettings_Click" />
+                        <Button x:Name="CheckUpdatesButton"
+                                Content="{Binding Converter={StaticResource Loc}, ConverterParameter=update.check}"
+                                Style="{StaticResource Button.Ghost}"
+                                HorizontalContentAlignment="Left" Padding="12,8" Margin="0,0,0,6"
+                                Click="CheckUpdates_Click" />
                         <Button Content="{Binding Converter={StaticResource Loc}, ConverterParameter=common.exit}" Style="{StaticResource Button.Ghost}"
                                 HorizontalContentAlignment="Left" Padding="12,8"
                                 Foreground="#FFC0392B"
