@@ -206,6 +206,7 @@ public partial class App : Application
                 "weather" => Core.Entities.BoardKind.Weather,
                 "worldclock" => Core.Entities.BoardKind.WorldClock,
                 "desktopclock" => Core.Entities.BoardKind.DesktopClock,
+                "networkspeed" => Core.Entities.BoardKind.NetworkSpeed,
                 _ => (Core.Entities.BoardKind?)null,
             };
 
@@ -217,6 +218,7 @@ public partial class App : Application
                         {
                             Core.Entities.BoardKind.Weather => "天气",
                             Core.Entities.BoardKind.WorldClock => "世界时钟",
+                            Core.Entities.BoardKind.NetworkSpeed => "网速",
                             _ => "桌面时钟",
                         }, kind);
 

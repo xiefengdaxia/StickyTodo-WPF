@@ -1,0 +1,164 @@
+<Window x:Class="StickyTodo.App.Views.NetworkSpeedWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="网速看板"
+        Icon="/Assets/stickytodo.ico"
+        Width="440" Height="640"
+        MinWidth="360" MinHeight="480"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="CanResize"
+        WindowStartupLocation="CenterScreen"
+        ShowInTaskbar="False"
+        FontFamily="Microsoft YaHei UI"
+        UseLayoutRounding="True">
+
+    <Window.Resources>
+        <!-- 组标题 -->
+        <Style x:Key="GroupHeader" TargetType="Border">
+            <Setter Property="Padding" Value="10,4" />
+            <Setter Property="CornerRadius" Value="7" />
+            <Setter Property="Margin" Value="0,2,0,4" />
+        </Style>
+    </Window.Resources>
+
+    <Border x:Name="NoteRoot"
+            Margin="10"
+            CornerRadius="12"
+            Background="{DynamicResource Brush.Paper}"
+            BorderBrush="#59FFFFFF"
+            BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="18" ShadowDepth="3" Opacity="0.30" Color="#FF000000" Direction="270" />
+        </Border.Effect>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- 标题栏 -->
+            <Border Grid.Row="0"
+                    Background="{DynamicResource Brush.PaperDeep}"
+                    CornerRadius="11,11,0,0"
+                    Padding="12,8"
+                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="📶" FontSize="12" VerticalAlignment="Center" />
+                        <TextBlock Text="网速看板" Style="{StaticResource Text.Title}"
+                                   Margin="6,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Button Style="{StaticResource Button.Chrome}" Content="🎨" FontSize="11"
+                                ToolTip="皮肤与透明度" Click="Appearance_Click" />
+                        <Button Style="{StaticResource Button.Chrome}" Content="✕" FontSize="11"
+                                ToolTip="关闭" Click="Close_Click" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- 全机合计（与挂件同源） -->
+            <Border Grid.Row="1" Padding="14,8,14,4">
+                <Grid>
+                    <TextBlock Text="{Binding TotalText}" FontSize="13" FontWeight="SemiBold"
+                               Foreground="{DynamicResource Brush.Accent}" VerticalAlignment="Center" />
+                    <TextBlock Text="按连接估算 · 每秒刷新" FontSize="10" Opacity="0.6"
+                               HorizontalAlignment="Right" VerticalAlignment="Center"
+                               Foreground="{DynamicResource Brush.InkSoft}" />
+                </Grid>
+            </Border>
+
+            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="10,4,10,10">
+                <StackPanel>
+                    <!-- 下载组 -->
+                    <Border Style="{StaticResource GroupHeader}" Background="#262E7D32">
+                        <TextBlock Text="↓ 实时下载" FontSize="12" FontWeight="SemiBold"
+                                   Foreground="#FF2E7D32" />
+                    </Border>
+                    <ItemsControl ItemsSource="{Binding DownloadRows}" Margin="0,0,0,8">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="2,2" Padding="10,6" CornerRadius="7"
+                                        Background="{DynamicResource Brush.Surface}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="12.5"
+                                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                                   Foreground="{DynamicResource Brush.Ink}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsSelf}" Value="True">
+                                                            <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}" />
+                                                            <Setter Property="FontWeight" Value="SemiBold" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <TextBlock Grid.Column="1" Text="{Binding Sent}" FontSize="10.5"
+                                                   Opacity="0.55" Margin="0,0,10,0" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource Brush.InkSoft}"
+                                                   ToolTip="该进程的上传（共用连接池，按连接估算）" />
+                                        <TextBlock Grid.Column="2" Text="{Binding Received}" FontSize="14" FontWeight="SemiBold"
+                                                   VerticalAlignment="Center" Foreground="#FF2E7D32" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- 上传组 -->
+                    <Border Style="{StaticResource GroupHeader}" Background="#26B27F0A">
+                        <TextBlock Text="↑ 实时上传" FontSize="12" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource Brush.Accent}" />
+                    </Border>
+                    <ItemsControl ItemsSource="{Binding UploadRows}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="2,2" Padding="10,6" CornerRadius="7"
+                                        Background="{DynamicResource Brush.Surface}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="12.5"
+                                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                                   Foreground="{DynamicResource Brush.Ink}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsSelf}" Value="True">
+                                                            <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}" />
+                                                            <Setter Property="FontWeight" Value="SemiBold" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <TextBlock Grid.Column="1" Text="{Binding Received}" FontSize="10.5"
+                                                   Opacity="0.55" Margin="0,0,10,0" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource Brush.InkSoft}"
+                                                   ToolTip="该进程的下载（共用连接池，按连接估算）" />
+                                        <TextBlock Grid.Column="2" Text="{Binding Sent}" FontSize="14" FontWeight="SemiBold"
+                                                   VerticalAlignment="Center" Foreground="{DynamicResource Brush.Accent}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</Window>

@@ -98,6 +98,7 @@ public sealed class WindowManager
                 new DesktopClockViewModel(_weatherService, _settings, _todoService, this, _tokenProvider, _weatherCache),
                 board,
                 this),
+            BoardKind.NetworkSpeed => new NetworkSpeedBoardWindow(new NetworkSpeedViewModel(), board, this),
             _ => new BoardWindow(new BoardViewModel(_todoService, board, _settings, _skinService), this),
         };
 

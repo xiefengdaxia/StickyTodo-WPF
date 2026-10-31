@@ -1,0 +1,116 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:StickyTodo.Notes.Localization"
+        xmlns:vm="using:StickyTodo.Notes.ViewModels"
+        x:Class="StickyTodo.Notes.Views.NetworkSpeedBoardWindow"
+        Title="网速看板"
+        Width="440" Height="640"
+        MinWidth="360" MinHeight="480"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent"
+        CanResize="True"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterScreen"
+        FontFamily="Microsoft YaHei UI, Segoe UI"
+        UseLayoutRounding="True">
+
+  <Window.Styles>
+    <Style Selector="TextBlock.rowName.self">
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+  </Window.Styles>
+
+  <Border Name="NoteRoot" Classes="note">
+    <Grid RowDefinitions="Auto,Auto,*">
+
+      <!-- 标题栏 -->
+      <Border Name="TitleBar" Classes="header" CornerRadius="11,11,0,0" Padding="12,8"
+              PointerPressed="TitleBar_PointerPressed">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="📶" FontSize="12" VerticalAlignment="Center" />
+            <TextBlock Text="网速看板" Classes="title" Margin="6,0,0,0" VerticalAlignment="Center" />
+          </StackPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+            <Button Classes="chrome" Content="🎨" FontSize="11" ToolTip.Tip="{loc:Loc chrome.appearance}"
+                    Click="Appearance_Click" />
+            <Button Classes="chrome" Content="✕" FontSize="11" ToolTip.Tip="{loc:Loc chrome.close}" Click="Close_Click" />
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <!-- 全机合计（与挂件同源） -->
+      <Border Grid.Row="1" Padding="14,8,14,4">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Text="{Binding TotalText}" FontSize="13" FontWeight="SemiBold"
+                     Foreground="{DynamicResource Brush.Accent}" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="1" Text="按连接估算 · 每秒刷新" FontSize="10" Opacity="0.6"
+                     HorizontalAlignment="Right" VerticalAlignment="Center"
+                     Foreground="{DynamicResource Brush.InkSoft}" />
+        </Grid>
+      </Border>
+
+      <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="0">
+        <StackPanel Margin="10,4,10,10">
+
+          <!-- 下载组 -->
+          <Border Padding="10,4" CornerRadius="7" Margin="0,2,0,4" Background="#262E7D32">
+            <TextBlock Text="↓ 实时下载" FontSize="12" FontWeight="SemiBold"
+                       Foreground="{DynamicResource Brush.Success}" />
+          </Border>
+          <ItemsControl ItemsSource="{Binding DownloadRows}" Margin="0,0,0,8">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Margin="2,2" Padding="10,6" CornerRadius="7"
+                        Background="{DynamicResource Brush.Surface}">
+                  <Grid ColumnDefinitions="*,Auto,Auto">
+                    <TextBlock Classes="rowName" Text="{Binding Name}" FontSize="12.5"
+                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource Brush.Ink}"
+                               Classes.self="{Binding IsSelf}" />
+                    <TextBlock Grid.Column="1" Text="{Binding Sent}" FontSize="10.5"
+                               Opacity="0.55" Margin="0,0,10,0" VerticalAlignment="Center"
+                               Foreground="{DynamicResource Brush.InkSoft}"
+                               ToolTip.Tip="该进程的上传（共用连接池，按连接估算）" />
+                    <TextBlock Grid.Column="2" Text="{Binding Received}" FontSize="14" FontWeight="SemiBold"
+                               VerticalAlignment="Center" Foreground="{DynamicResource Brush.Success}" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <!-- 上传组 -->
+          <Border Padding="10,4" CornerRadius="7" Margin="0,2,0,4" Background="#26B27F0A">
+            <TextBlock Text="↑ 实时上传" FontSize="12" FontWeight="SemiBold"
+                       Foreground="{DynamicResource Brush.Accent}" />
+          </Border>
+          <ItemsControl ItemsSource="{Binding UploadRows}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Margin="2,2" Padding="10,6" CornerRadius="7"
+                        Background="{DynamicResource Brush.Surface}">
+                  <Grid ColumnDefinitions="*,Auto,Auto">
+                    <TextBlock Classes="rowName" Text="{Binding Name}" FontSize="12.5"
+                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource Brush.Ink}"
+                               Classes.self="{Binding IsSelf}" />
+                    <TextBlock Grid.Column="1" Text="{Binding Received}" FontSize="10.5"
+                               Opacity="0.55" Margin="0,0,10,0" VerticalAlignment="Center"
+                               Foreground="{DynamicResource Brush.InkSoft}"
+                               ToolTip.Tip="该进程的下载（共用连接池，按连接估算）" />
+                    <TextBlock Grid.Column="2" Text="{Binding Sent}" FontSize="14" FontWeight="SemiBold"
+                               VerticalAlignment="Center" Foreground="{DynamicResource Brush.Accent}" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+        </StackPanel>
+      </ScrollViewer>
+    </Grid>
+  </Border>
+</Window>

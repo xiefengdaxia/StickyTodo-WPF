@@ -57,12 +57,12 @@
         <TextBlock Grid.Column="0" Text="{Binding TimeText}" FontSize="38" FontWeight="Light" Tag="clock"
                    ToolTip.Tip="点击打开世界时钟"
                    Foreground="#FFF6EFE4" Margin="0,4,0,0" />
-        <!-- 网速：实时采样所有网卡，单位自动换档（KB/s → MB/s） -->
+        <!-- 网速：实时采样所有网卡，单位自动换档；点一下打开网速看板 -->
         <TextBlock Grid.Column="2" Text="{Binding NetworkSpeedText}" FontSize="11"
                    VerticalAlignment="Bottom" Margin="0,0,2,9"
-                   Foreground="#FF9E9284"
+                   Foreground="#FF9E9284" Tag="network" Cursor="Hand"
                    IsVisible="{Binding HasNetworkSpeed}"
-                   ToolTip.Tip="当前网速（所有网卡合计）：↓ 下载 / ↑ 上传" />
+                   ToolTip.Tip="当前网速（所有网卡合计）· 点击打开网速看板" />
       </Grid>
 
       <Border Height="1" Background="#26FFFFFF" Margin="0,10,0,8" />

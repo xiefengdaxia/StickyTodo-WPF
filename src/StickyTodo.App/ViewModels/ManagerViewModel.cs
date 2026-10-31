@@ -31,6 +31,7 @@ public sealed class BoardRowViewModel : ObservableObject
         BoardKind.Weather => "manager.kindWeather",
         BoardKind.WorldClock => "manager.kindWorldClock",
         BoardKind.DesktopClock => "manager.kindDesktopClock",
+        BoardKind.NetworkSpeed => "manager.kindNetworkSpeed",
         _ => "manager.kindTodo",
     });
 
@@ -43,6 +44,7 @@ public sealed class BoardRowViewModel : ObservableObject
         BoardKind.Weather => "🌤",
         BoardKind.WorldClock => "🌍",
         BoardKind.DesktopClock => "🕔",
+        BoardKind.NetworkSpeed => "📶",
         _ => "✓",
     };
 

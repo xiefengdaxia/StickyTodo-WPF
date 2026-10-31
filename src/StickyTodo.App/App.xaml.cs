@@ -365,6 +365,7 @@ public partial class App : System.Windows.Application
                 "weather" => BoardKind.Weather,
                 "worldclock" => BoardKind.WorldClock,
                 "desktopclock" => BoardKind.DesktopClock,
+                "networkspeed" => BoardKind.NetworkSpeed,
                 _ => (BoardKind?)null,
             };
 
@@ -377,6 +378,7 @@ public partial class App : System.Windows.Application
                         {
                             BoardKind.Weather => "天气",
                             BoardKind.WorldClock => "世界时钟",
+                            BoardKind.NetworkSpeed => "网速",
                             _ => "桌面时钟",
                         }, kind);
 
@@ -1785,6 +1787,7 @@ public partial class App : System.Windows.Application
             await CheckAreaAsync("todo", () => service.EnsureDefaultBoard(), "待办");
             await CheckAreaAsync("token", () => service.GetBoards().FirstOrDefault(b => b.Kind == BoardKind.Token), "token");
             await CheckAreaAsync("clock", () => service.GetBoards().FirstOrDefault(b => b.Kind == BoardKind.WorldClock), "世界时钟");
+            await CheckAreaAsync("network", () => service.GetBoards().FirstOrDefault(b => b.Kind == BoardKind.NetworkSpeed), "网速");
 
             // 天气缓存：缓存里有的城市，打开看板要直接用（用一个本来查不到的名字验证，不依赖网络）
             var weatherCache = _host.Services.GetRequiredService<WeatherCache>();

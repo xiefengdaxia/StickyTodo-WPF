@@ -273,6 +273,9 @@ public partial class DesktopClockWindow : Window
             case "token":
                 _viewModel.ToggleTokenBoard();
                 break;
+            case "network":
+                _viewModel.ToggleNetworkSpeedBoard();
+                break;
         }
     }
 

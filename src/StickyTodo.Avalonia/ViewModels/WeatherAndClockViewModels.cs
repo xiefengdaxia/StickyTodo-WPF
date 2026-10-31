@@ -650,6 +650,9 @@ public sealed partial class DesktopClockViewModel : ObservableObject
     /// <summary>点时间区域：打开世界时钟；已经开着就关掉。</summary>
     public void ToggleWorldClockBoard() => ToggleBoard(BoardKind.WorldClock, "世界时钟");
 
+    /// <summary>点网速区域：打开网速看板；已经开着就关掉。</summary>
+    public void ToggleNetworkSpeedBoard() => ToggleBoard(BoardKind.NetworkSpeed, "网速");
+
     /// <summary>点日程行：打开日历看板并跳回今天；已经开着就关掉。</summary>
     public void ToggleCalendarBoard() => ToggleBoard(BoardKind.Calendar, "日历");
 
