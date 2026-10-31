@@ -91,11 +91,13 @@ public sealed class WindowManager
             BoardKind.Token => new TokenBoardWindow(
                 new TokenBoardViewModel(_tokenProvider, _todoService, board, _settings, _skinService), this),
             BoardKind.Weather => new WeatherBoardWindow(
-                new WeatherViewModel(_weatherService, _settings, _weatherCache)),
+                new WeatherViewModel(_weatherService, _settings, _weatherCache), board, this),
             BoardKind.WorldClock => new WorldClockBoardWindow(
-                new WorldClockViewModel()),
+                new WorldClockViewModel(), board, this),
             BoardKind.DesktopClock => new DesktopClockBoardWindow(
-                new DesktopClockViewModel(_weatherService, _settings, _todoService, this, _tokenProvider, _weatherCache)),
+                new DesktopClockViewModel(_weatherService, _settings, _todoService, this, _tokenProvider, _weatherCache),
+                board,
+                this),
             _ => new BoardWindow(new BoardViewModel(_todoService, board, _settings, _skinService), this),
         };
 

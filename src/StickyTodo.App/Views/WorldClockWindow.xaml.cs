@@ -1,6 +1,8 @@
 using System.Windows;
 using System.Windows.Input;
+using StickyTodo.App.Services;
 using StickyTodo.App.ViewModels;
+using StickyTodo.Core.Entities;
 
 namespace StickyTodo.App.Views;
 
@@ -8,15 +10,30 @@ namespace StickyTodo.App.Views;
 public partial class WorldClockWindow : Window
 {
     private readonly WorldClockViewModel _viewModel;
+    private readonly WindowGeometryMemory _geometry;
 
-    public WorldClockWindow(WorldClockViewModel viewModel)
+    public WorldClockWindow(WorldClockViewModel viewModel, Board board, WindowManager windows)
     {
         _viewModel = viewModel;
+        _geometry = WindowGeometryMemory.Attach(this, board, windows, restoreSize: true);
         InitializeComponent();
         DataContext = viewModel;
 
-        // 小屏 / 高缩放下收进工作区，避免标题栏跑到屏幕外
-        Loaded += (_, _) => Services.ScreenHelper.FitIntoWorkArea(this);
+        // 位置在窗口可见之前就摆好（SourceInitialized 时句柄已建、还没画出来），
+        // 放到 Loaded 里会先闪一下默认位置
+        SourceInitialized += (_, _) =>
+        {
+            if (!_geometry.Restore())
+            {
+                Services.ScreenHelper.FitIntoWorkArea(this);
+            }
+
+            _geometry.Arm();
+        };
+
+        Loaded += (_, _) => _viewModel.Start();
+
+        Closed += (_, _) => _viewModel.Stop();
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

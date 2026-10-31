@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using StickyTodo.App.Services;
 using StickyTodo.App.ViewModels;
+using StickyTodo.Core.Entities;
 
 
 namespace StickyTodo.App.Views;
@@ -11,22 +12,37 @@ namespace StickyTodo.App.Views;
 public partial class DesktopClockWindow : Window
 {
     private readonly DesktopClockViewModel _viewModel;
+    private readonly WindowGeometryMemory _geometry;
 
-    public DesktopClockWindow(DesktopClockViewModel viewModel)
+    public DesktopClockWindow(DesktopClockViewModel viewModel, Board board, WindowManager windows)
     {
         _viewModel = viewModel;
+        _geometry = WindowGeometryMemory.Attach(this, board, windows, restoreSize: false, trackSize: false);
         InitializeComponent();
         DataContext = viewModel;
 
         // 点天气/日历要把看板贴到这个窗口旁边，所以得知道自己是谁
         viewModel.AttachWindow(this);
 
-        // ActualWidth 要等布局完成才有值，所以首帧渲染后再挪位 + 嵌入桌面层
-        ContentRendered += (_, _) =>
+        // 位置要在窗口"可见之前"就摆好：SourceInitialized 时句柄已建好但还没画出来，
+        // 放到 ContentRendered 里会先闪一下默认位置（右下角）再跳过去。
+        SourceInitialized += (_, _) =>
         {
-            MoveToBottomRight();
-            EmbedIntoDesktop();
+            if (_geometry.Restore())
+            {
+                // 上次的位置在库里有记录：摆回去，别再自动贴右下角
+                _userMoved = true;
+            }
+            else
+            {
+                MoveToBottomRight();
+            }
+
+            _geometry.Arm();
         };
+
+        // 嵌入桌面层要等布局完成（知道真实高度）再挂
+        ContentRendered += (_, _) => EmbedIntoDesktop();
         Loaded += (_, _) => viewModel.Start();
 
         // SizeToContent 会随内容（天气轮播文案）改变高度：每次变了都重新贴右下角，
@@ -60,6 +76,12 @@ public partial class DesktopClockWindow : Window
     private void MoveToBottomRight()
     {
         if (_userMoved)
+        {
+            return;
+        }
+
+        // SourceInitialized 时还没布局：等 SizeChanged 再贴，否则会先贴到屏幕外
+        if (ActualWidth < 1 || ActualHeight < 1)
         {
             return;
         }

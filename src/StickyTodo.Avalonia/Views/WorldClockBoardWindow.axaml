@@ -33,20 +33,31 @@
         </Grid>
       </Border>
 
-      <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="10,8,10,10">
-        <ItemsControl ItemsSource="{Binding Clocks}">
+      <!-- Padding 不能放在 ScrollViewer 上：Avalonia 不算进滚动范围，
+           滚到底时最后一行会被裁掉一半。挪到内容上。 -->
+      <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="0">
+        <ItemsControl ItemsSource="{Binding Clocks}" Margin="10,8,10,10">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:WorldClockRow">
-              <Border Margin="2,3" Padding="14,9" CornerRadius="9" Background="{DynamicResource Brush.Surface}">
-                <Grid ColumnDefinitions="*,Auto,Auto">
-                  <StackPanel Grid.Column="0" VerticalAlignment="Center">
+              <Border Margin="2,3" Padding="12,9" CornerRadius="9" Background="{DynamicResource Brush.Surface}">
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                  <!-- 时区偏移徽标：夏令时期间会变（伦敦夏天 UTC+1） -->
+                  <Border Grid.Column="0" Width="84" Margin="0,0,10,0" Padding="6,3"
+                          CornerRadius="6" VerticalAlignment="Center"
+                          Background="{DynamicResource Brush.PaperDeep}"
+                          BorderBrush="{DynamicResource Brush.Line}" BorderThickness="1">
+                    <TextBlock Text="{Binding OffsetText}" FontSize="10" HorizontalAlignment="Center"
+                               Foreground="{DynamicResource Brush.Accent}" />
+                  </Border>
+
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center">
                     <TextBlock Text="{Binding CityName}" FontSize="14" FontWeight="SemiBold"
                                Foreground="{DynamicResource Brush.Ink}" />
                     <TextBlock Text="{Binding CountryName}" Classes="caption" />
                   </StackPanel>
-                  <TextBlock Grid.Column="1" Text="{Binding DateText}" Classes="caption"
+                  <TextBlock Grid.Column="2" Text="{Binding DateText}" Classes="caption"
                              VerticalAlignment="Center" Margin="0,0,14,0" />
-                  <TextBlock Grid.Column="2" Text="{Binding TimeText}" FontSize="22" FontWeight="Light"
+                  <TextBlock Grid.Column="3" Text="{Binding TimeText}" FontSize="22" FontWeight="Light"
                              Foreground="{DynamicResource Brush.Ink}" VerticalAlignment="Center" />
                 </Grid>
               </Border>

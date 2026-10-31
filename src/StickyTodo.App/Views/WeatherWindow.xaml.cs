@@ -1,7 +1,9 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using StickyTodo.App.Services;
 using StickyTodo.App.ViewModels;
+using StickyTodo.Core.Entities;
 using StickyTodo.Weather;
 
 namespace StickyTodo.App.Views;
@@ -10,10 +12,12 @@ namespace StickyTodo.App.Views;
 public partial class WeatherWindow : Window
 {
     private readonly WeatherViewModel _viewModel;
+    private readonly WindowGeometryMemory _geometry;
 
-    public WeatherWindow(WeatherViewModel viewModel)
+    public WeatherWindow(WeatherViewModel viewModel, Board board, WindowManager windows)
     {
         _viewModel = viewModel;
+        _geometry = WindowGeometryMemory.Attach(this, board, windows, restoreSize: true);
         InitializeComponent();
         DataContext = viewModel;
 
@@ -23,12 +27,20 @@ public partial class WeatherWindow : Window
             viewModel.SelectDefaultCity();
         }
 
-        Loaded += async (_, _) =>
+        // 位置在窗口可见之前就摆好（SourceInitialized 时句柄已建、还没画出来），
+        // 放到 Loaded 里会先闪一下默认位置
+        SourceInitialized += (_, _) =>
         {
-            // 小屏 / 高缩放下把窗口收进工作区，否则标题栏被顶到屏幕外（看着像"拖不动"）
-            Services.ScreenHelper.FitIntoWorkArea(this);
-            await viewModel.LoadAsync();
+            // 有记录就摆回上次的位置；没记录才居中，并保证不超出工作区
+            if (!_geometry.Restore())
+            {
+                Services.ScreenHelper.FitIntoWorkArea(this);
+            }
+
+            _geometry.Arm();
         };
+
+        Loaded += async (_, _) => await viewModel.LoadAsync();
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

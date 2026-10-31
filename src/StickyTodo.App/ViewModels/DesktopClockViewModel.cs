@@ -76,9 +76,15 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         _ = RefreshTokensAsync();
         _timer.Start();
         _ = LoadWeatherAsync();
+        _ = RefreshNetworkSpeedAsync();
     }
 
-    public void Stop() => _timer.Stop();
+    public void Stop()
+    {
+        _timer.Stop();
+        _speedMonitor?.Dispose();
+        _speedMonitor = null;
+    }
 
     // ---------- 每秒刷新的时间文本 ----------
 
@@ -87,6 +93,10 @@ public sealed partial class DesktopClockViewModel : ObservableObject
     public string WeekdayText => DateTime.Now.ToString("dddd", new System.Globalization.CultureInfo("zh-CN"));
 
     public string TimeText => DateTime.Now.ToString("HH:mm:ss");
+
+    /// <summary>时间行右侧的网速：↓ 下载 / ↑ 上传，单位自动换档。</summary>
+    [ObservableProperty]
+    private string _networkSpeedText = string.Empty;
 
     /// <summary>农历 + 干支 + 生肖；今天有节日/节气就追加在末尾（每天只算一次）。</summary>
     public string LunarText => _lunarText;
@@ -124,6 +134,41 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         {
             // 账本读不到就当作今天没有数据，别让挂件报错
             TokenSummary = string.Empty;
+        }
+    }
+
+    // ---------- 网速（时间行右侧） ----------
+
+    private Core.Net.NetworkSpeedMonitor? _speedMonitor;
+
+    /// <summary>起一个后台循环：每秒采样一次网速，直到 Stop。计数器不可用就留空。</summary>
+    private async Task RefreshNetworkSpeedAsync()
+    {
+        try
+        {
+            var monitor = new Core.Net.NetworkSpeedMonitor();
+            _speedMonitor = monitor;
+
+            if (!monitor.IsAvailable)
+            {
+                return;
+            }
+
+            // 和时钟同一个 UI 线程上下文，赋值走绑定刷新
+            await Task.Yield();
+
+            while (_speedMonitor == monitor)
+            {
+                var (received, sent) = monitor.ReadBytesPerSecond();
+                NetworkSpeedText = $"↓{Core.Net.NetworkSpeedMonitor.Format(received)} ↑{Core.Net.NetworkSpeedMonitor.Format(sent)}";
+
+                await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(true);
+            }
+        }
+        catch (Exception)
+        {
+            // 网速显示失败就隐藏，别影响时钟本身
+            NetworkSpeedText = string.Empty;
         }
     }
 

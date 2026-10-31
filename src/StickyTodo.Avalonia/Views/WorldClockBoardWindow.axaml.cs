@@ -1,5 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using StickyTodo.Core.Entities;
+using StickyTodo.Notes.Services;
 using StickyTodo.Notes.ViewModels;
 
 namespace StickyTodo.Notes.Views;
@@ -7,14 +9,30 @@ namespace StickyTodo.Notes.Views;
 /// <summary>世界时钟看板窗口。不绑定看板数据，走无看板的简化基类。</summary>
 public partial class WorldClockBoardWindow : Window
 {
-    public WorldClockBoardWindow(WorldClockViewModel viewModel)
+    private readonly WorldClockViewModel _viewModel;
+    private readonly WindowGeometryMemory _geometry;
+
+    public WorldClockBoardWindow(WorldClockViewModel viewModel, Board board, WindowManager windows)
     {
+        _viewModel = viewModel;
+        _geometry = WindowGeometryMemory.Attach(this, board, windows, restoreSize: true);
         InitializeComponent();
         DataContext = viewModel;
 
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
-        Opened += (_, _) => Services.ScreenHelper.FitIntoWorkArea(this);
+        Opened += (_, _) =>
+        {
+            if (!_geometry.Restore())
+            {
+                Services.ScreenHelper.FitIntoWorkArea(this);
+            }
+
+            _geometry.Arm();
+            _viewModel.Start();
+        };
+
+        Closed += (_, _) => _viewModel.Stop();
     }
 
     private void TitleBar_PointerPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)

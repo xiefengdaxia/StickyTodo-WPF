@@ -54,17 +54,40 @@
                 <ItemsControl ItemsSource="{Binding Clocks}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Margin="2,3" Padding="14,9" CornerRadius="9"
+                            <Border Margin="2,3" Padding="12,9" CornerRadius="9"
                                     Background="{DynamicResource Brush.Surface}">
-                                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <!-- 时区偏移徽标：夏令时期间会变（伦敦夏天 UTC+1） -->
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <Border Grid.Column="0"
+                                            Width="84"
+                                            Margin="0,0,10,0"
+                                            Padding="6,3"
+                                            CornerRadius="6"
+                                            VerticalAlignment="Center"
+                                            Background="{DynamicResource Brush.PaperDeep}"
+                                            BorderBrush="{DynamicResource Brush.Line}"
+                                            BorderThickness="1">
+                                        <TextBlock Text="{Binding OffsetText}"
+                                                   FontSize="10"
+                                                   HorizontalAlignment="Center"
+                                                   Foreground="{DynamicResource Brush.Accent}" />
+                                    </Border>
+
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding CityName}" FontSize="14" FontWeight="SemiBold"
                                                    Foreground="{DynamicResource Brush.Ink}" />
                                         <TextBlock Text="{Binding CountryName}" Style="{StaticResource Text.Caption}" />
                                     </StackPanel>
-                                    <TextBlock Grid.Column="1" Text="{Binding DateText}" Style="{StaticResource Text.Caption}"
+                                    <TextBlock Grid.Column="2" Text="{Binding DateText}" Style="{StaticResource Text.Caption}"
                                                VerticalAlignment="Center" Margin="0,0,14,0" />
-                                    <TextBlock Grid.Column="2" Text="{Binding TimeText}" FontSize="22" FontWeight="Light"
+                                    <TextBlock Grid.Column="3" Text="{Binding TimeText}" FontSize="22" FontWeight="Light"
                                                Foreground="{DynamicResource Brush.Ink}" VerticalAlignment="Center" />
                                 </Grid>
                             </Border>

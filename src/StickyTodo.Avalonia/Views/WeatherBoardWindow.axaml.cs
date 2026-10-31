@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using StickyTodo.Core.Entities;
 using StickyTodo.Notes.Services;
 using StickyTodo.Notes.ViewModels;
 using StickyTodo.Weather;
@@ -10,10 +11,12 @@ namespace StickyTodo.Notes.Views;
 public partial class WeatherBoardWindow : Window
 {
     private readonly WeatherViewModel _viewModel;
+    private readonly WindowGeometryMemory _geometry;
 
-    public WeatherBoardWindow(WeatherViewModel viewModel)
+    public WeatherBoardWindow(WeatherViewModel viewModel, Board board, WindowManager windows)
     {
         _viewModel = viewModel;
+        _geometry = WindowGeometryMemory.Attach(this, board, windows, restoreSize: true);
         InitializeComponent();
         DataContext = viewModel;
 
@@ -22,8 +25,16 @@ public partial class WeatherBoardWindow : Window
 
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
-        // 小屏 / 高缩放下把窗口收进工作区，否则标题栏会被顶到屏幕外（看着像"拖不动"）
-        Opened += (_, _) => Services.ScreenHelper.FitIntoWorkArea(this);
+        // 有记录就摆回上次的位置；没记录才居中，并保证不超出工作区
+        Opened += (_, _) =>
+        {
+            if (!_geometry.Restore())
+            {
+                Services.ScreenHelper.FitIntoWorkArea(this);
+            }
+
+            _geometry.Arm();
+        };
 
         Opened += async (_, _) => await viewModel.LoadCoreAsync();
     }

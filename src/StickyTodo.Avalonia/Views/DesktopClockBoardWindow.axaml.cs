@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using StickyTodo.Core.Entities;
 using StickyTodo.Notes.Services;
 using StickyTodo.Notes.ViewModels;
 
@@ -11,20 +12,32 @@ namespace StickyTodo.Notes.Views;
 public partial class DesktopClockBoardWindow : Window
 {
     private readonly DesktopClockViewModel _viewModel;
+    private readonly WindowGeometryMemory _geometry;
 
-    public DesktopClockBoardWindow(DesktopClockViewModel viewModel)
+    public DesktopClockBoardWindow(DesktopClockViewModel viewModel, Board board, WindowManager windows)
     {
         _viewModel = viewModel;
+        _geometry = WindowGeometryMemory.Attach(this, board, windows, restoreSize: false, trackSize: false);
         InitializeComponent();
         DataContext = viewModel;
 
         // 点天气/日历要把看板贴到这个窗口旁边，所以得知道自己是谁
         viewModel.AttachWindow(this);
 
-        // 首次布局后挪到右下角并嵌入桌面层；启动时钟与天气轮播
+        // 首次布局后：有记录就摆回上次的位置，没记录才贴右下角；然后嵌入桌面层
         Opened += (_, _) =>
         {
-            MoveToBottomRight();
+            if (_geometry.Restore())
+            {
+                // 上次的位置在库里有记录：别再自动贴右下角
+                _userMoved = true;
+            }
+            else
+            {
+                MoveToBottomRight();
+            }
+
+            _geometry.Arm();
             EmbedIntoDesktop();
             viewModel.Start();
         };

@@ -88,10 +88,12 @@ public sealed class WindowManager
                 new TokenBoardViewModel(_tokenProvider, _todoService, board, _settings, _skinService), this),
             // 工具型看板：面板本身不带待办数据，但它是正式看板（进列表、可会话恢复、可重命名/删除）
             BoardKind.Weather => new WeatherWindow(
-                new WeatherViewModel(_weatherService, _settings, _weatherCache)),
-            BoardKind.WorldClock => new WorldClockWindow(new WorldClockViewModel()),
+                new WeatherViewModel(_weatherService, _settings, _weatherCache), board, this),
+            BoardKind.WorldClock => new WorldClockWindow(new WorldClockViewModel(), board, this),
             BoardKind.DesktopClock => new DesktopClockWindow(
-                new DesktopClockViewModel(_weatherService, _settings, _todoService, this, _tokenProvider, _weatherCache)),
+                new DesktopClockViewModel(_weatherService, _settings, _todoService, this, _tokenProvider, _weatherCache),
+                board,
+                this),
             _ => new BoardWindow(new BoardViewModel(_todoService, board, _settings, _skinService), this),
         };
 

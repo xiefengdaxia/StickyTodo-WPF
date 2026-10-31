@@ -1,30 +1,56 @@
 using System.Collections.ObjectModel;
-using CommunityToolkit.Mvvm.ComponentModel;
-using System.ComponentModel;
+using System.Globalization;
 using System.Windows.Threading;
-using StickyTodo.App.Services;
+using CommunityToolkit.Mvvm.ComponentModel;
+using StickyTodo.Core.WorldClock;
 
 namespace StickyTodo.App.ViewModels;
 
-/// <summary>世界时钟的一行。</summary>
-public sealed partial class WorldClockRow : ObservableObject
+/// <summary>世界时钟的一行：一个国家/地区 + 代表城市 + 实时时间。</summary>
+public sealed class WorldClockRow : ObservableObject
 {
-    private readonly TimeZoneInfo _zone;
+    public WorldClockRow(WorldClockCity city) => City = city;
+
+    public WorldClockCity City { get; }
+
+    public string CityName => City.City;
+
+    public string CountryName => City.Country;
+
+    /// <summary>实时偏移标签，夏令时期间会变（伦敦夏天是 UTC+1）。</summary>
+    public string OffsetText { get; private set; } = string.Empty;
+
+    public string TimeText { get; private set; } = string.Empty;
+
+    public string DateText { get; private set; } = string.Empty;
+
+    public void Refresh(DateTime utcNow)
+    {
+        var local = WorldClockTime.LocalTimeAt(utcNow, City);
+
+        OffsetText = WorldClockTime.FormatOffsetLabel(WorldClockTime.OffsetAt(utcNow, City));
+        TimeText = local.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+        DateText = local.ToString("M月d日 ddd", new CultureInfo("zh-CN"));
+
+        OnPropertyChanged(nameof(OffsetText));
+        OnPropertyChanged(nameof(TimeText));
+        OnPropertyChanged(nameof(DateText));
+    }
+}
+
+/// <summary>
+/// 世界时钟看板：<see cref="WorldClockCatalog"/> 里的 32 个时区代表城市，
+/// 从 UTC−11 排到 UTC+14，一个定时器统一刷新。
+/// </summary>
+public sealed class WorldClockViewModel : ObservableObject
+{
     private readonly DispatcherTimer _timer;
 
-    public WorldClockRow(string cityName, string countryName, string timeZoneId)
+    public WorldClockViewModel()
     {
-        CityName = cityName;
-        CountryName = countryName;
-
-        try
+        foreach (var city in WorldClockCatalog.All)
         {
-            _zone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
-        }
-        catch (TimeZoneNotFoundException)
-        {
-            // Windows 与 IANA 时区名不一致时的兜底（用 UTC 偏移近似）
-            _zone = FallbackZone(timeZoneId);
+            Clocks.Add(new WorldClockRow(city));
         }
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
@@ -33,65 +59,25 @@ public sealed partial class WorldClockRow : ObservableObject
         Refresh();
     }
 
-    public string CityName { get; }
-
-    public string CountryName { get; }
-
-    public string TimeText { get; private set; } = string.Empty;
-
-    public string DateText { get; private set; } = string.Empty;
-
-    private void Refresh()
-    {
-        var now = TimeZoneInfo.ConvertTime(DateTime.Now, _zone);
-        TimeText = now.ToString("HH:mm:ss");
-        DateText = now.ToString("M月d日 ddd", new System.Globalization.CultureInfo("zh-CN"));
-        OnPropertyChanged(nameof(TimeText));
-        OnPropertyChanged(nameof(DateText));
-    }
-
-    /// <summary>Windows 时区 ID 兜底：按已知 IANA 名映射到 UTC 偏移。</summary>
-    private static TimeZoneInfo FallbackZone(string ianaId) => ianaId switch
-    {
-        "America/New_York" => TimeZoneInfo.CreateCustomTimeZone("est", TimeSpan.FromHours(-5), "EST", "EST"),
-        "America/Los_Angeles" => TimeZoneInfo.CreateCustomTimeZone("pst", TimeSpan.FromHours(-8), "PST", "PST"),
-        "Europe/London" => TimeZoneInfo.CreateCustomTimeZone("gmt", TimeSpan.FromHours(0), "GMT", "GMT"),
-        "Europe/Paris" => TimeZoneInfo.CreateCustomTimeZone("cet", TimeSpan.FromHours(1), "CET", "CET"),
-        "Europe/Moscow" => TimeZoneInfo.CreateCustomTimeZone("msk", TimeSpan.FromHours(3), "MSK", "MSK"),
-        "Asia/Tokyo" => TimeZoneInfo.CreateCustomTimeZone("jst", TimeSpan.FromHours(9), "JST", "JST"),
-        "Australia/Sydney" => TimeZoneInfo.CreateCustomTimeZone("aest", TimeSpan.FromHours(10), "AEST", "AEST"),
-        "Asia/Kolkata" => TimeZoneInfo.CreateCustomTimeZone("ist", TimeSpan.FromHours(5), "IST", "IST"),
-        "America/Sao_Paulo" => TimeZoneInfo.CreateCustomTimeZone("brt", TimeSpan.FromHours(-3), "BRT", "BRT"),
-        "Africa/Lagos" => TimeZoneInfo.CreateCustomTimeZone("wat", TimeSpan.FromHours(1), "WAT", "WAT"),
-        _ => TimeZoneInfo.Utc,
-    };
-}
-
-/// <summary>世界时钟看板。</summary>
-public sealed class WorldClockViewModel : ObservableObject
-{
-    /// <summary>全球十大国家代表城市（用户最常问的时区）。</summary>
-    public static readonly IReadOnlyList<(string City, string Country, string Iana)> DefaultCities =
-    [
-        ("北京", "中国", "China Standard Time"),
-        ("东京", "日本", "Tokyo Standard Time"),
-        ("首尔", "韩国", "Korea Standard Time"),
-        ("新加坡", "新加坡", "Singapore Standard Time"),
-        ("伦敦", "英国", "GMT Standard Time"),
-        ("巴黎", "法国", "Romance Standard Time"),
-        ("莫斯科", "俄罗斯", "Russian Standard Time"),
-        ("纽约", "美国", "Eastern Standard Time"),
-        ("洛杉矶", "美国", "Pacific Standard Time"),
-        ("悉尼", "澳大利亚", "AUS Eastern Standard Time"),
-    ];
-
     public ObservableCollection<WorldClockRow> Clocks { get; } = new();
 
-    public WorldClockViewModel()
+    /// <summary>立刻刷新一遍（切换看板/打开窗口时用）。</summary>
+    public void Refresh()
     {
-        foreach (var (city, country, zone) in DefaultCities)
+        var utc = DateTime.UtcNow;
+        foreach (var row in Clocks)
         {
-            Clocks.Add(new WorldClockRow(city, country, zone));
+            row.Refresh(utc);
         }
     }
+
+    /// <summary>窗口打开时启动秒针（单例 VM 会被多个窗口复用）。</summary>
+    public void Start()
+    {
+        Refresh();
+        _timer.Start();
+    }
+
+    /// <summary>窗口关闭时停表，避免后台一直跑。</summary>
+    public void Stop() => _timer.Stop();
 }

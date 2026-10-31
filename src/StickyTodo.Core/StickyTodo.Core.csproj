@@ -12,4 +12,9 @@
     <PackageReference Include="Ical.Net" Version="4.2.0" />
   </ItemGroup>
 
+  <!-- 网速监控用（Windows 性能计数器）；两个 TFM 都要引用，net6.0 的 Win7 版同样有 -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == 'net6.0'">
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" Version="8.0.1" />
+  </ItemGroup>
+
 </Project>

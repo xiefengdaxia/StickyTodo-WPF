@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Text;
 using Avalonia.Controls;
 using Avalonia.Threading;
@@ -8,6 +9,7 @@ using StickyTodo.Core.Abstractions;
 using StickyTodo.Core.Calendar;
 using StickyTodo.Core.Entities;
 using StickyTodo.Core.Services;
+using StickyTodo.Core.WorldClock;
 using StickyTodo.Notes.Services;
 using StickyTodo.Weather;
 
@@ -502,38 +504,51 @@ public sealed partial class WeatherViewModel : ObservableObject
     }
 }
 
-/// <summary>世界时钟的一行。</summary>
-public sealed partial class WorldClockRow : ObservableObject
+/// <summary>世界时钟的一行：一个国家/地区 + 代表城市 + 实时时间。</summary>
+public sealed class WorldClockRow : ObservableObject
 {
-    private readonly TimeZoneInfo _zone;
+    public WorldClockRow(WorldClockCity city) => City = city;
+
+    public WorldClockCity City { get; }
+
+    public string CityName => City.City;
+
+    public string CountryName => City.Country;
+
+    /// <summary>实时偏移标签，夏令时期间会变（伦敦夏天是 UTC+1）。</summary>
+    public string OffsetText { get; private set; } = string.Empty;
+
+    public string TimeText { get; private set; } = string.Empty;
+
+    public string DateText { get; private set; } = string.Empty;
+
+    public void Refresh(DateTime utcNow)
+    {
+        var local = WorldClockTime.LocalTimeAt(utcNow, City);
+
+        OffsetText = WorldClockTime.FormatOffsetLabel(WorldClockTime.OffsetAt(utcNow, City));
+        TimeText = local.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+        DateText = local.ToString("M月d日 ddd", new CultureInfo("zh-CN"));
+
+        OnPropertyChanged(nameof(OffsetText));
+        OnPropertyChanged(nameof(TimeText));
+        OnPropertyChanged(nameof(DateText));
+    }
+}
+
+/// <summary>
+/// 世界时钟看板：<see cref="WorldClockCatalog"/> 里的 32 个时区代表城市，
+/// 从 UTC−11 排到 UTC+14，一个定时器统一刷新。
+/// </summary>
+public sealed class WorldClockViewModel
+{
     private readonly DispatcherTimer _timer;
 
-    public WorldClockRow(string cityName, string countryName, string timeZoneId)
+    public WorldClockViewModel()
     {
-        CityName = cityName;
-        CountryName = countryName;
-
-        try
+        foreach (var city in WorldClockCatalog.All)
         {
-            _zone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
-        }
-        catch (Exception)
-        {
-            // IANA 名在 Windows 上找不到时的兜底（用固定 UTC 偏移近似，不含夏令时）
-            _zone = timeZoneId switch
-            {
-                "America/New_York" => TimeZoneInfo.CreateCustomTimeZone("est", new TimeSpan(-5, 0, 0), "EST", "EST"),
-                "America/Los_Angeles" => TimeZoneInfo.CreateCustomTimeZone("pst", new TimeSpan(-8, 0, 0), "PST", "PST"),
-                "Europe/London" => TimeZoneInfo.CreateCustomTimeZone("gmt", TimeSpan.Zero, "GMT", "GMT"),
-                "Europe/Paris" => TimeZoneInfo.CreateCustomTimeZone("cet", new TimeSpan(1, 0, 0), "CET", "CET"),
-                "Europe/Moscow" => TimeZoneInfo.CreateCustomTimeZone("msk", new TimeSpan(3, 0, 0), "MSK", "MSK"),
-                "Asia/Tokyo" => TimeZoneInfo.CreateCustomTimeZone("jst", new TimeSpan(9, 0, 0), "JST", "JST"),
-                "Australia/Sydney" => TimeZoneInfo.CreateCustomTimeZone("aest", new TimeSpan(10, 0, 0), "AEST", "AEST"),
-                "Asia/Kolkata" => TimeZoneInfo.CreateCustomTimeZone("ist", new TimeSpan(5, 30, 0), "IST", "IST"),
-                "America/Sao_Paulo" => TimeZoneInfo.CreateCustomTimeZone("brt", new TimeSpan(-3, 0, 0), "BRT", "BRT"),
-                "Africa/Lagos" => TimeZoneInfo.CreateCustomTimeZone("wat", new TimeSpan(1, 0, 0), "WAT", "WAT"),
-                _ => TimeZoneInfo.Utc,
-            };
+            Clocks.Add(new WorldClockRow(city));
         }
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
@@ -542,50 +557,27 @@ public sealed partial class WorldClockRow : ObservableObject
         Refresh();
     }
 
-    public string CityName { get; }
-
-    public string CountryName { get; }
-
-    public string TimeText { get; private set; } = string.Empty;
-
-    public string DateText { get; private set; } = string.Empty;
-
-    private void Refresh()
-    {
-        var now = TimeZoneInfo.ConvertTime(DateTime.Now, _zone);
-        TimeText = now.ToString("HH:mm:ss");
-        DateText = now.ToString("M月d日 ddd");
-        OnPropertyChanged(nameof(TimeText));
-        OnPropertyChanged(nameof(DateText));
-    }
-}
-
-/// <summary>世界时钟看板：全球十大国家代表城市。</summary>
-public sealed class WorldClockViewModel
-{
-    public static readonly IReadOnlyList<(string City, string Country, string WindowsZone)> DefaultCities =
-    [
-        ("北京", "中国", "China Standard Time"),
-        ("东京", "日本", "Tokyo Standard Time"),
-        ("首尔", "韩国", "Korea Standard Time"),
-        ("新加坡", "新加坡", "Singapore Standard Time"),
-        ("伦敦", "英国", "GMT Standard Time"),
-        ("巴黎", "法国", "Romance Standard Time"),
-        ("莫斯科", "俄罗斯", "Russian Standard Time"),
-        ("纽约", "美国", "Eastern Standard Time"),
-        ("洛杉矶", "美国", "Pacific Standard Time"),
-        ("悉尼", "澳大利亚", "AUS Eastern Standard Time"),
-    ];
-
     public ObservableCollection<WorldClockRow> Clocks { get; } = new();
 
-    public WorldClockViewModel()
+    /// <summary>立刻刷新一遍（切换看板/打开窗口时用）。</summary>
+    public void Refresh()
     {
-        foreach (var (city, country, zone) in DefaultCities)
+        var utc = DateTime.UtcNow;
+        foreach (var row in Clocks)
         {
-            Clocks.Add(new WorldClockRow(city, country, zone));
+            row.Refresh(utc);
         }
     }
+
+    /// <summary>窗口打开时启动秒针（看板切换时会被复用）。</summary>
+    public void Start()
+    {
+        Refresh();
+        _timer.Start();
+    }
+
+    /// <summary>窗口关闭时停表，避免后台一直跑。</summary>
+    public void Stop() => _timer.Stop();
 }
 
 /// <summary>
@@ -695,15 +687,30 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         _ = RefreshTokensAsync();
         _timer.Start();
         _ = LoadWeatherAsync();
+        _ = RefreshNetworkSpeedAsync();
     }
 
-    public void Stop() => _timer.Stop();
+    public void Stop()
+    {
+        _timer.Stop();
+        _speedMonitor?.Dispose();
+        _speedMonitor = null;
+    }
 
     public string SolarDateText => DateTime.Now.ToString("yyyy年M月d日");
 
     public string WeekdayText => DateTime.Now.ToString("dddd");
 
     public string TimeText => DateTime.Now.ToString("HH:mm:ss");
+
+    /// <summary>时间行右侧的网速：↓ 下载 / ↑ 上传，单位自动换档。</summary>
+    [ObservableProperty]
+    private string _networkSpeedText = string.Empty;
+
+    /// <summary>网速行是否可见（采样失败/计数器不可用时隐藏）。</summary>
+    public bool HasNetworkSpeed => !string.IsNullOrEmpty(NetworkSpeedText);
+
+    partial void OnNetworkSpeedTextChanged(string value) => OnPropertyChanged(nameof(HasNetworkSpeed));
 
     /// <summary>农历 + 干支 + 生肖；今天有节日/节气就追加在末尾（每天只算一次）。</summary>
     public string LunarText => _lunarText;
@@ -741,6 +748,38 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         {
             // 账本读不到就当作今天没有数据，别让挂件报错
             TokenSummary = string.Empty;
+        }
+    }
+
+    // ---------- 网速（时间行右侧） ----------
+
+    private Core.Net.NetworkSpeedMonitor? _speedMonitor;
+
+    /// <summary>起一个后台循环：每秒采样一次网速，直到 Stop。计数器不可用就留空。</summary>
+    private async Task RefreshNetworkSpeedAsync()
+    {
+        try
+        {
+            var monitor = new Core.Net.NetworkSpeedMonitor();
+            _speedMonitor = monitor;
+
+            if (!monitor.IsAvailable)
+            {
+                return;
+            }
+
+            while (_speedMonitor == monitor)
+            {
+                var (received, sent) = monitor.ReadBytesPerSecond();
+                NetworkSpeedText = $"↓{Core.Net.NetworkSpeedMonitor.Format(received)} ↑{Core.Net.NetworkSpeedMonitor.Format(sent)}";
+
+                await Task.Delay(TimeSpan.FromSeconds(1));
+            }
+        }
+        catch (Exception)
+        {
+            // 网速显示失败就隐藏，别影响时钟本身
+            NetworkSpeedText = string.Empty;
         }
     }
 
