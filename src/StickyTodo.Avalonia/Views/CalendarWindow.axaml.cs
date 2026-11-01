@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using StickyTodo.Core.Entities;
+using StickyTodo.Core.Localization;
 using StickyTodo.Notes.Services;
 using StickyTodo.Notes.ViewModels;
 
@@ -51,6 +52,20 @@ public partial class CalendarWindow : StickyWindowBase
     }
 
     private async void Today_Click(object? sender, RoutedEventArgs e) => await GoToTodayAsync();
+
+    /// <summary>侧栏「＋」：在选中日期新建待办（due_at = 选中日）。</summary>
+    private async void AddTodo_Click(object? sender, RoutedEventArgs e)
+    {
+        var title = await PromptWindow.PromptAsync(this,
+            Loc.T("cal.addTodoTitle"),
+            Loc.T("cal.addTodoLabel"));
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            return;
+        }
+
+        await _viewModel.AddTodoOnSelectedDateAsync(title);
+    }
 
     /// <summary>跳回今天（桌面时钟的"今日日程"点开时也走这里）。</summary>
     public async Task GoToTodayAsync()

@@ -179,8 +179,13 @@
               Margin="0,8,0,0" Padding="10,6" Background="#14FFFFFF">
         <Grid RowDefinitions="Auto,Auto,Auto,Auto">
 
-          <TextBlock Grid.Row="0" Text="{Binding SelectedDateText}" FontSize="14" FontWeight="SemiBold"
-                     Foreground="{DynamicResource Brush.Ink}" Margin="2,0,0,4" TextWrapping="Wrap" />
+          <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="2,0,0,4">
+            <TextBlock Text="{Binding SelectedDateText}" FontSize="14" FontWeight="SemiBold"
+                       Foreground="{DynamicResource Brush.Ink}" TextWrapping="Wrap" />
+            <Button Grid.Column="1" Classes="ghost" Padding="8,1" FontSize="14"
+                    ToolTip.Tip="{loc:Loc cal.addTodoTip}"
+                    Click="AddTodo_Click" Content="＋" />
+          </Grid>
 
           <Border Grid.Row="1" Margin="0,0,0,6" Padding="8,5" CornerRadius="6" Background="#10B27F0A"
                   IsVisible="{Binding ShowAlmanac}">

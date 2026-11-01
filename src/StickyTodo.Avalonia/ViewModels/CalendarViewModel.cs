@@ -272,6 +272,28 @@ public partial class CalendarViewModel : ObservableObject, IAppearanceHost, IRef
         UpdateSelectedDay();
     }
 
+    /// <summary>在选中日期新建待办（侧栏「＋」），落到默认待办看板，目标日期 = 选中日 08:00。</summary>
+    public async Task AddTodoOnSelectedDateAsync(string title)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            return;
+        }
+
+        try
+        {
+            ErrorText = null;
+
+            var due = new DateTimeOffset(SelectedDate.ToDateTime(new TimeOnly(8, 0)));
+            await Task.Run(() => _service.AddTodo(_service.EnsureDefaultBoard().Id, title.Trim(), due));
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorText = ex.Message;
+        }
+    }
+
     /// <summary>把某条待办改到新的日期（拖动到别的格子时用）。</summary>
     public async Task MoveEntryToDateAsync(CalendarEntryViewModel entry, DateOnly target)
     {

@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -93,6 +93,18 @@ public partial class CalendarWindow : Window, IStickyWindow
     }
 
     private async void Today_Click(object sender, RoutedEventArgs e) => await GoToTodayAsync();
+
+    /// <summary>侧栏「＋」：在选中日期新建待办（due_at = 选中日）。</summary>
+    private async void AddTodo_Click(object sender, RoutedEventArgs e)
+    {
+        var title = PromptWindow.Prompt(this, Loc.T("cal.addTodoTitle"), Loc.T("cal.addTodoLabel"));
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            return;
+        }
+
+        await _viewModel.AddTodoOnSelectedDateAsync(title);
+    }
 
     /// <summary>跳回今天（桌面时钟的"今日日程"点开时也走这里）。</summary>
     public async Task GoToTodayAsync()
