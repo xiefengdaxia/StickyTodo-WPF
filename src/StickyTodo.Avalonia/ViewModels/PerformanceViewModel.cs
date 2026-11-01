@@ -48,17 +48,38 @@ public sealed partial class PerformanceViewModel : ObservableObject
     private double _diskActiveValue;
 
     [ObservableProperty]
-    private string _diskIoText = "↓ 0 KB/s   ↑ 0 KB/s";
+    private string _diskIoText = "读 0 KB/s   写 0 KB/s";
 
     [ObservableProperty]
     private string _gpuText = string.Empty;
+
+    /// <summary>GPU 占用值（进度条用）。</summary>
+    [ObservableProperty]
+    private double _gpuValue;
+
+    /// <summary>GPU 引擎说明。</summary>
+    [ObservableProperty]
+    private string _gpuEngineName = "GPU";
 
     /// <summary>GPU 块是否显示（计数器取不到就隐藏整块）。</summary>
     [ObservableProperty]
     private bool _hasGpu = true;
 
+    /// <summary>全机下载速率（与网速看板同源）。</summary>
     [ObservableProperty]
-    private string _networkText = "↓ 0 KB/s   ↑ 0 KB/s";
+    private string _networkDownloadText = "0 KB/s";
+
+    /// <summary>全机上传速率。</summary>
+    [ObservableProperty]
+    private string _networkUploadText = "0 KB/s";
+
+    /// <summary>CPU 逻辑核心数（标题旁小字）。</summary>
+    [ObservableProperty]
+    private string _cpuCoresText = $"{Environment.ProcessorCount} 核";
+
+    /// <summary>剩余物理内存（内存卡右下角小字）。</summary>
+    [ObservableProperty]
+    private string _memoryFreeText = string.Empty;
 
     [ObservableProperty]
     private string _uptimeText = string.Empty;
@@ -127,11 +148,12 @@ public sealed partial class PerformanceViewModel : ObservableObject
 
         MemoryValue = sample.MemoryPercent;
         MemoryText = sample.MemoryText;
+        MemoryFreeText = $"剩余 {(sample.MemoryTotalBytes - sample.MemoryUsedBytes) / (1024.0 * 1024 * 1024):0.0} GB";
         MemoryLevel = sample.MemoryPercent >= 90 ? 2 : sample.MemoryPercent >= 75 ? 1 : 0;
 
         DiskActiveValue = sample.DiskActivePercent;
         DiskActiveText = $"{sample.DiskActivePercent:0.0}%";
-        DiskIoText = $"↓ {NetworkSpeedMonitor.Format(sample.DiskReadBytesPerSecond)}   ↑ {NetworkSpeedMonitor.Format(sample.DiskWriteBytesPerSecond)}";
+        DiskIoText = $"读 {NetworkSpeedMonitor.Format(sample.DiskReadBytesPerSecond)}   写 {NetworkSpeedMonitor.Format(sample.DiskWriteBytesPerSecond)}";
 
         HasGpu = sample.GpuPercent.HasValue;
         if (sample.GpuPercent.HasValue)
@@ -139,7 +161,8 @@ public sealed partial class PerformanceViewModel : ObservableObject
             GpuText = $"{sample.GpuPercent.Value:0.0}%";
         }
 
-        NetworkText = $"↓ {NetworkSpeedMonitor.Format(sample.NetworkReceivedBytesPerSecond)}   ↑ {NetworkSpeedMonitor.Format(sample.NetworkSentBytesPerSecond)}";
+        NetworkDownloadText = NetworkSpeedMonitor.Format(sample.NetworkReceivedBytesPerSecond);
+        NetworkUploadText = NetworkSpeedMonitor.Format(sample.NetworkSentBytesPerSecond);
 
         var uptime = sample.Uptime;
         UptimeText = uptime.TotalDays >= 1

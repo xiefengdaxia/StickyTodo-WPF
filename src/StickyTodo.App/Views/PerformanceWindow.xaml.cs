@@ -60,6 +60,7 @@ public partial class PerformanceWindow : Window
             UpdateBar(MemoryBar, _viewModel.MemoryValue);
             UpdateMemoryColor();
             UpdateBar(DiskBar, _viewModel.DiskActiveValue);
+            UpdateBar(GpuBar, _viewModel.GpuValue);
         }
     }
 

@@ -54,6 +54,7 @@ public partial class PerformanceBoardWindow : Window
             UpdateBar(MemoryBar, _viewModel.MemoryValue);
             UpdateMemoryColor();
             UpdateBar(DiskBar, _viewModel.DiskActiveValue);
+            UpdateBar(GpuBar, _viewModel.GpuValue);
         }
     }
 
@@ -62,10 +63,13 @@ public partial class PerformanceBoardWindow : Window
     {
         CpuChart.Children.Clear();
 
-        var width = CpuChart.Bounds.Width;
-        var height = CpuChart.Bounds.Height;
+        // 以窗口客户区宽推算画布宽：窗口 440 DIP - 窗体外边距 20 - 卡片 Margin/Padding/竖条 ≈ 55；
+        // 高度固定 50。避免依赖中间容器布局时序。
+        var width = ClientSize.Width - 70;
+        const double height = 50;
+
         var history = _viewModel.CpuHistory;
-        if (width < 10 || height < 5 || history.Count < 2)
+        if (width < 50 || history.Count < 2)
         {
             return;
         }

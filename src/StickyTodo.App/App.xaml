@@ -1087,12 +1087,23 @@
 
         <!-- ==================== 卡片 ==================== -->
 
+        <!-- 看板通用卡片：Surface 底 + Line 描边 + 圆角；
+             IsMouseOver 淡淡提亮，列表行/指标卡统一观感 -->
         <Style x:Key="Card" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />
             <Setter Property="BorderBrush" Value="{DynamicResource Brush.Line}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="10" />
             <Setter Property="Padding" Value="14" />
+        </Style>
+
+        <!-- 仪表卡片：性能/网速这类"指标卡"专用。左侧 3px 强调色竖条 + 更柔和的底 -->
+        <Style x:Key="MetricCard" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Brush.Line}" />
+            <Setter Property="BorderThickness" Value="1,1,1,1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="0" />
         </Style>
 
         <!-- 标签胶囊：选中态靠 Background 切换 -->

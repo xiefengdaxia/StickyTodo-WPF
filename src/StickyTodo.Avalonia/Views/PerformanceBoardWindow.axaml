@@ -4,7 +4,7 @@
         x:Class="StickyTodo.Notes.Views.PerformanceBoardWindow"
         Title="性能看板"
         Width="440" Height="475"
-        MinWidth="380" MinHeight="440"
+        MinWidth="380" MinHeight="420"
         SystemDecorations="None"
         TransparencyLevelHint="Transparent"
         Background="Transparent"
@@ -18,32 +18,43 @@
     <Style Selector="TextBlock.metricLabel">
       <Setter Property="FontSize" Value="11.5" />
       <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Opacity" Value="0.75" />
+      <Setter Property="Opacity" Value="0.8" />
       <Setter Property="Foreground" Value="{DynamicResource Brush.InkSoft}" />
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
     <Style Selector="TextBlock.metricValue">
-      <Setter Property="FontSize" Value="20" />
+      <Setter Property="FontSize" Value="24" />
       <Setter Property="FontWeight" Value="Light" />
       <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
       <Setter Property="HorizontalAlignment" Value="Right" />
     </Style>
     <Style Selector="Border.track">
       <Setter Property="CornerRadius" Value="5" />
-      <Setter Property="Background" Value="#22000000" />
+      <Setter Property="Background" Value="{DynamicResource Brush.Track}" />
+    </Style>
+    <Style Selector="Border.accentStrip">
+      <Setter Property="Width" Value="3" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="Background" Value="{DynamicResource Brush.Accent}" />
+    </Style>
+    <Style Selector="Border.chipIcon">
+      <Setter Property="Padding" Value="6,4" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="Background" Value="{DynamicResource Brush.AccentSoft}" />
     </Style>
   </Window.Styles>
 
   <Border Name="NoteRoot" Classes="note">
     <Grid RowDefinitions="Auto,*">
 
-      <!-- 标题栏 -->
       <Border Name="TitleBar" Classes="header" CornerRadius="11,11,0,0" Padding="12,8"
               PointerPressed="TitleBar_PointerPressed">
         <Grid ColumnDefinitions="*,Auto">
           <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-            <TextBlock Text="🖥️" FontSize="12" VerticalAlignment="Center" />
-            <TextBlock Text="性能看板" Classes="title" Margin="6,0,0,0" VerticalAlignment="Center" />
+            <Border Classes="chipIcon">
+              <TextBlock Text="🖥️" FontSize="11" />
+            </Border>
+            <TextBlock Text="性能看板" Classes="title" Margin="8,0,0,0" VerticalAlignment="Center" />
           </StackPanel>
           <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
             <TextBlock Text="{Binding UptimeText}" FontSize="10.5" Opacity="0.7"
@@ -57,73 +68,122 @@
       </Border>
 
       <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="0">
-        <StackPanel Margin="8,4,8,10">
+        <StackPanel Margin="8,6,8,10">
 
-          <!-- ============ CPU：折线 + 大数字 ============ -->
-          <Border Margin="2,4" Padding="12,9" CornerRadius="9" Background="{DynamicResource Brush.Surface}">
-            <StackPanel>
-              <Grid ColumnDefinitions="*,Auto">
-                <TextBlock Classes="metricLabel" Text="CPU" />
-                <TextBlock Grid.Column="1" Classes="metricValue" Text="{Binding CpuText}" />
-              </Grid>
-              <!-- 60 秒历史折线（代码后置画 Polyline） -->
-              <Border Height="56" Margin="0,6,0,0" CornerRadius="6" Background="#14000000">
-                <Canvas Name="CpuChart" Margin="6,4" />
-              </Border>
-            </StackPanel>
-          </Border>
-
-          <!-- ============ 内存：进度条 ============ -->
-          <Border Margin="2,4" Padding="12,9" CornerRadius="9" Background="{DynamicResource Brush.Surface}">
-            <StackPanel>
-              <Grid ColumnDefinitions="*,Auto">
-                <TextBlock Classes="metricLabel" Text="内存" />
-                <TextBlock Grid.Column="1" Text="{Binding MemoryText}" FontSize="12.5"
-                           VerticalAlignment="Center" Foreground="{DynamicResource Brush.Ink}" />
-              </Grid>
-              <Grid Height="10" Margin="0,8,0,0">
-                <Border Classes="track" />
-                <Border Name="MemoryBar" CornerRadius="5" HorizontalAlignment="Left"
-                        Background="{DynamicResource Brush.Accent}" />
-              </Grid>
-              <TextBlock Text="{Binding MemoryValue, StringFormat={}{0:0.0}% 使用}" FontSize="10.5"
-                         Opacity="0.65" Margin="0,5,0,0"
-                         Foreground="{DynamicResource Brush.InkSoft}" />
-            </StackPanel>
-          </Border>
-
-          <!-- ============ 磁盘：活动率 + IO ============ -->
-          <Border Margin="2,4" Padding="12,9" CornerRadius="9" Background="{DynamicResource Brush.Surface}">
-            <StackPanel>
-              <Grid ColumnDefinitions="*,Auto">
-                <TextBlock Classes="metricLabel" Text="磁盘" />
-                <TextBlock Grid.Column="1" Classes="metricValue" Text="{Binding DiskActiveText}" />
-              </Grid>
-              <Grid Height="8" Margin="0,8,0,0">
-                <Border Classes="track" />
-                <Border Name="DiskBar" CornerRadius="4" HorizontalAlignment="Left"
-                        Background="{DynamicResource Brush.Accent}" />
-              </Grid>
-              <TextBlock Text="{Binding DiskIoText}" FontSize="11" Margin="0,6,0,0"
-                         Foreground="{DynamicResource Brush.InkSoft}" />
-            </StackPanel>
-          </Border>
-
-          <!-- ============ GPU ============ -->
-          <Border Margin="2,4" Padding="12,9" CornerRadius="9" Background="{DynamicResource Brush.Surface}"
-                  IsVisible="{Binding HasGpu}">
-            <Grid ColumnDefinitions="*,Auto">
-              <TextBlock Classes="metricLabel" Text="GPU" />
-              <TextBlock Grid.Column="1" Classes="metricValue" Text="{Binding GpuText}" />
+          <!-- CPU -->
+          <Border Margin="2,4" Padding="0" CornerRadius="10" Background="{DynamicResource Brush.Surface}"
+                  BorderBrush="{DynamicResource Brush.Line}" BorderThickness="1">
+            <Grid ColumnDefinitions="Auto,*">
+              <Border Classes="accentStrip" />
+              <StackPanel Margin="14,9,12,9">
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Classes="metricLabel" Text="CPU" />
+                    <TextBlock Text="{Binding CpuCoresText}" FontSize="10" Opacity="0.55"
+                               Margin="6,0,0,0" VerticalAlignment="Center"
+                               Foreground="{DynamicResource Brush.InkSoft}" />
+                  </StackPanel>
+                  <TextBlock Grid.Column="1" Text="{Binding CpuText}" FontSize="24" FontWeight="Light"
+                             Foreground="{DynamicResource Brush.Ink}" />
+                </Grid>
+                <Border Height="58" Margin="0,8,0,0" CornerRadius="8" Background="#12000000" ClipToBounds="True">
+                  <Grid Name="CpuChart" Margin="6,4" ClipToBounds="True" />
+                </Border>
+              </StackPanel>
             </Grid>
           </Border>
 
-          <!-- ============ 网络 ============ -->
-          <Border Margin="2,4" Padding="12,9" CornerRadius="9" Background="{DynamicResource Brush.Surface}">
-            <Grid ColumnDefinitions="*,Auto">
-              <TextBlock Classes="metricLabel" Text="网络" />
-              <TextBlock Grid.Column="1" Text="{Binding NetworkText}" FontSize="13"
-                         VerticalAlignment="Center" Foreground="{DynamicResource Brush.Ink}" />
+          <!-- 内存 -->
+          <Border Margin="2,4" Padding="0" CornerRadius="10" Background="{DynamicResource Brush.Surface}"
+                  BorderBrush="{DynamicResource Brush.Line}" BorderThickness="1">
+            <Grid ColumnDefinitions="Auto,*">
+              <Border Classes="accentStrip" />
+              <StackPanel Margin="14,9,12,9">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Classes="metricLabel" Text="内存" />
+                  <TextBlock Grid.Column="1" Text="{Binding MemoryText}" FontSize="13"
+                             VerticalAlignment="Center" Foreground="{DynamicResource Brush.Ink}" />
+                </Grid>
+                <Grid Height="10" Margin="0,9,0,0">
+                  <Border Classes="track" />
+                  <Border Name="MemoryBar" CornerRadius="5" HorizontalAlignment="Left"
+                          Background="{DynamicResource Brush.Accent}" />
+                </Grid>
+                <Grid ColumnDefinitions="*,Auto" Margin="0,5,0,0">
+                  <TextBlock Text="{Binding MemoryValue, StringFormat={}{0:0.0}% 使用}" FontSize="10.5"
+                             Opacity="0.65" Foreground="{DynamicResource Brush.InkSoft}" />
+                  <TextBlock Grid.Column="1" Text="{Binding MemoryFreeText}" FontSize="10.5" Opacity="0.65"
+                             Foreground="{DynamicResource Brush.InkSoft}" />
+                </Grid>
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <!-- 磁盘 + GPU 两列 -->
+          <Grid ColumnDefinitions="*,8,*">
+            <Border Grid.Column="0" Margin="2,4" Padding="0" CornerRadius="10"
+                    Background="{DynamicResource Brush.Surface}" BorderBrush="{DynamicResource Brush.Line}"
+                    BorderThickness="1">
+              <Grid ColumnDefinitions="Auto,*">
+                <Border Classes="accentStrip" />
+                <StackPanel Margin="14,9,12,9">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Classes="metricLabel" Text="磁盘" />
+                    <TextBlock Grid.Column="1" Text="{Binding DiskActiveText}" FontSize="20" FontWeight="Light"
+                               Foreground="{DynamicResource Brush.Ink}" />
+                  </Grid>
+                  <Grid Height="8" Margin="0,8,0,0">
+                    <Border Classes="track" />
+                    <Border Name="DiskBar" CornerRadius="4" HorizontalAlignment="Left"
+                            Background="{DynamicResource Brush.Accent}" />
+                  </Grid>
+                  <TextBlock Text="{Binding DiskIoText}" FontSize="10.5" Margin="0,7,0,0"
+                             Foreground="{DynamicResource Brush.InkSoft}" />
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <Border Grid.Column="2" Margin="2,4" Padding="0" CornerRadius="10"
+                    Background="{DynamicResource Brush.Surface}" BorderBrush="{DynamicResource Brush.Line}"
+                    BorderThickness="1" IsVisible="{Binding HasGpu}">
+              <Grid ColumnDefinitions="Auto,*">
+                <Border Classes="accentStrip" />
+                <StackPanel Margin="14,9,12,9">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Classes="metricLabel" Text="GPU" />
+                    <TextBlock Grid.Column="1" Text="{Binding GpuText}" FontSize="20" FontWeight="Light"
+                               Foreground="{DynamicResource Brush.Ink}" />
+                  </Grid>
+                  <Grid Height="8" Margin="0,8,0,0">
+                    <Border Classes="track" />
+                    <Border Name="GpuBar" CornerRadius="4" HorizontalAlignment="Left"
+                            Background="{DynamicResource Brush.Accent}" />
+                  </Grid>
+                  <TextBlock Text="{Binding GpuEngineName}" FontSize="10.5" Margin="0,7,0,0"
+                             Opacity="0.65" Foreground="{DynamicResource Brush.InkSoft}" />
+                </StackPanel>
+              </Grid>
+            </Border>
+          </Grid>
+
+          <!-- 网络 -->
+          <Border Margin="2,4" Padding="0" CornerRadius="10" Background="{DynamicResource Brush.Surface}"
+                  BorderBrush="{DynamicResource Brush.Line}" BorderThickness="1">
+            <Grid ColumnDefinitions="Auto,*">
+              <Border Classes="accentStrip" />
+              <StackPanel Margin="14,9,12,9">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Classes="metricLabel" Text="网络" />
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="↓" FontSize="13" Foreground="{DynamicResource Brush.Success}" Margin="0,0,3,0" />
+                    <TextBlock Text="{Binding NetworkDownloadText}" FontSize="13"
+                               Foreground="{DynamicResource Brush.Ink}" Margin="0,0,10,0" />
+                    <TextBlock Text="↑" FontSize="13" Foreground="{DynamicResource Brush.Accent}" Margin="0,0,3,0" />
+                    <TextBlock Text="{Binding NetworkUploadText}" FontSize="13"
+                               Foreground="{DynamicResource Brush.Ink}" />
+                  </StackPanel>
+                </Grid>
+              </StackPanel>
             </Grid>
           </Border>
 

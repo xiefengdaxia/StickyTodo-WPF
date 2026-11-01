@@ -86,7 +86,7 @@ public sealed class HardwareMonitor : IDisposable
                     // 排除逻辑分区（实例名 "0 C:" 是物理盘，"0 C: D:" 也是；纯数字+盘符的才要）
                     _diskRead.Add(new PerformanceCounter(CategoryDisk, "Disk Read Bytes/sec", instance, readOnly: true));
                     _diskWrite.Add(new PerformanceCounter(CategoryDisk, "Disk Write Bytes/sec", instance, readOnly: true));
-                    _diskActive.Add(new PerformanceCounter(CategoryDisk, "% Disk Time", instance, readOnly: true));
+                    _diskActive.Add(new PerformanceCounter(CategoryDisk, "% Idle Time", instance, readOnly: true));
                 }
             }
 
@@ -150,10 +150,11 @@ public sealed class HardwareMonitor : IDisposable
             diskActive += counter.NextValue();
         }
 
-        // 磁盘活动时间是各盘并行的，直接求和可能超 100；按盘数取平均更接近"忙不忙"
-        if (_diskActive.Count > 1)
+        // "% Idle Time"：活动率 = 100 - 空闲率（SSD 上 %Disk Time 会虚高 100%，任务管理器同款算法）
+        // 多盘取平均空闲率再取补数
+        if (_diskActive.Count > 0)
         {
-            diskActive /= _diskActive.Count;
+            diskActive = 100 - (diskActive / _diskActive.Count);
         }
 
         double? gpu = null;

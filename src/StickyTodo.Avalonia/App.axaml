@@ -787,6 +787,15 @@
       <Setter Property="Padding" Value="14" />
     </Style>
 
+    <!-- 仪表卡片：指标卡专用（性能/网速），左侧强调色竖条由内容侧加 -->
+    <Style Selector="Border.metricCard">
+      <Setter Property="Background" Value="{DynamicResource Brush.Surface}" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Line}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Padding" Value="0" />
+    </Style>
+
     <!-- 便签纸外壳：圆角 + 阴影 -->
     <Style Selector="Border.note">
       <Setter Property="Margin" Value="10" />
