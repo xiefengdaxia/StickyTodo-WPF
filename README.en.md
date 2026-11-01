@@ -46,6 +46,19 @@ Token usage board and Pomodoro timer:
 |---|---|
 | ![Token](artifacts/token-board.png) | ![Pomodoro](artifacts/pomodoro.png) |
 
+
+Weather / world clock / desktop clock widget (tap date, time, weather, agenda, network speed on the widget to open the matching board):
+
+| Weather (forecast + city search) | World clock (32 zones + offset badge) | Desktop clock widget (live network speed) |
+|---|---|---|
+| ![Weather](artifacts/weather.png) | ![World clock](artifacts/worldclock.png) | ![Desktop clock](artifacts/desktop-clock.png) |
+
+Network speed board and performance board (tap the speed area on the widget to open the speed board):
+
+| Network speed (top 5 by process) | Performance (CPU chart / memory / disk / GPU / network) |
+|---|---|
+| ![Network speed](artifacts/network-board.png) | ![Performance](artifacts/performance-board.png) |
+
 The almanac panel (click any day to see auspicious/inauspicious activities) and lunar markings:
 
 ![Almanac](artifacts/calendar-lunar.png)

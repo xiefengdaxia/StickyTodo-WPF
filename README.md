@@ -46,6 +46,18 @@ Token 用量看板与番茄时钟：
 |---|---|
 | ![Token](artifacts/token-board.png) | ![番茄](artifacts/pomodoro.png) |
 
+天气 / 世界时钟 / 桌面时钟挂件（挂件上点日期、时间、天气、日程、网速都能打开对应看板）：
+
+| 天气看板（预报 + 城市搜索） | 世界时钟（32 时区 + 偏移徽标） | 桌面时钟挂件（含实时网速） |
+|---|---|---|
+| ![天气](artifacts/weather.png) | ![世界时钟](artifacts/worldclock.png) | ![桌面时钟](artifacts/desktop-clock.png) |
+
+网速看板与性能看板（点挂件上的网速区域直接打开网速看板）：
+
+| 网速看板（按进程 Top 5） | 性能看板（CPU 折线 / 内存 / 磁盘 / GPU / 网络） |
+|---|---|
+| ![网速看板](artifacts/network-board.png) | ![性能看板](artifacts/performance-board.png) |
+
 日历的黄历面板（点某一天就显示宜忌）与农历标记：
 
 ![黄历](artifacts/calendar-lunar.png)
@@ -116,18 +128,18 @@ TODO / Done 视图切换：
 WPF 版受 .NET 8 限制无法支持 Win7 和 32 位系统。为此仓库里另有一个 **Avalonia 11.3.22 + .NET 6** 的完整移植版，可发布到 **Windows 7 SP1（x64 / x86）**：
 
 ```powershell
-.\tools\publish-avalonia-win7.ps1 -Version 1.6.1
+.\tools\publish-avalonia-win7.ps1 -Version 1.6.7
 ```
 
 产物（self-contained 单文件，目标机无需装 .NET）：
 
 ```
 publish-avalonia/
-  StickyTodo-Avalonia-1.6.1-win-x64-portable.zip   # ~38 MB
-  StickyTodo-Avalonia-1.6.1-win-x86-portable.zip   # ~35 MB
+  StickyTodo-Avalonia-1.6.7-win-x64-portable.zip   # ~38 MB
+  StickyTodo-Avalonia-1.6.7-win-x86-portable.zip   # ~35 MB
 ```
 
-功能与 WPF 版对齐：待办看板、便签、日历（农历/节气/黄历）、Token 用量（含**复制摘要**）、番茄钟、提醒、托盘、全局快捷键、皮肤与透明度、四语言热切换、会话恢复、便携模式、**检查更新**（按仓库地址问 GitHub latest release），以及 **天气看板**（Open-Meteo 免费接口；城市可增删、支持**模糊搜索**全国省市区县、可设**默认城市**；区县查不到会自动按所属地级市查，查不到就明确提示暂无数据，绝不拿别的城市顶上）、**世界时钟**（32 个时区代表城市，从 UTC−11 排到 UTC+14，含 +3:30 / +4:30 / +5:30 / +5:45 等非整点偏移；行内带实时偏移徽标，有夏令时的城市夏天自动 +1，不依赖系统时区数据）、**桌面时钟挂件**（阳历/农历+节气节日/时间，右侧**实时网速**（单位自动换档，**点击打开网速看板**），下面是**今日天气**和**今日日程**——点天气行直接打开天气看板、点日程行打开日历，没建过看板会自动建，可嵌入桌面）。
+功能与 WPF 版对齐：待办看板、便签、日历（农历/节气/黄历）、Token 用量（含**复制摘要**）、番茄钟、提醒、托盘、全局快捷键、皮肤与透明度、四语言热切换、会话恢复、便携模式、**检查更新**（按仓库地址问 GitHub latest release），以及 **天气看板**（Open-Meteo 免费接口；城市可增删、支持**模糊搜索**全国省市区县、可设**默认城市**；区县查不到会自动按所属地级市查，查不到就明确提示暂无数据，绝不拿别的城市顶上）、**性能看板**（CPU 60 秒折线 / 内存进度条 / 磁盘 IO / GPU / 网络 / 开机时长，每秒刷新；75% 内存变橙 90% 变红）、**世界时钟**（32 个时区代表城市，从 UTC−11 排到 UTC+14，含 +3:30 / +4:30 / +5:30 / +5:45 等非整点偏移；行内带实时偏移徽标，有夏令时的城市夏天自动 +1，不依赖系统时区数据）、**桌面时钟挂件**（阳历/农历+节气节日/时间，右侧**实时网速**（单位自动换档，**点击打开网速看板**），下面是**今日天气**和**今日日程**——点天气行直接打开天气看板、点日程行打开日历，没建过看板会自动建，可嵌入桌面）。
 
 > **Win7 上的已知限制**：Win7 只能用 `RedirectionSurface` 合成，**不支持窗口透明**，所以便签会以直角、不透明外观显示（Win8+ 保持圆角与半透明）。
 
@@ -139,7 +151,7 @@ publish-avalonia/
 
 ```powershell
 dotnet build -c Debug                       # 编译
-dotnet test                                 # 单元测试（342 个）
+dotnet test                                 # 单元测试（402 个）
 ```
 
 ```powershell
@@ -220,7 +232,7 @@ StickyTodo.sln
 │   ├─ Controls/                   TrendChart（自绘趋势图）
 │   ├─ Services/                   WindowManager / TrayService / SkinService / LocalizationService / Motion / ScreenHelper
 │   └─ Converters/                 含多语言转换器（Loc / LocFormat / LocYear / LocMonth）
-└─ tests/StickyTodo.Tests          xUnit（342 个）
+└─ tests/StickyTodo.Tests          xUnit（402 个）
 ```
 
 图标生成器在 `tools/IconGen`（WPF 矢量绘制 → 多尺寸 ICO）：

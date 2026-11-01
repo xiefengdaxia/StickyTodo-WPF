@@ -46,6 +46,19 @@ Token 使用量ボードとポモドーロタイマー：
 |---|---|
 | ![Token](artifacts/token-board.png) | ![ポモドーロ](artifacts/pomodoro.png) |
 
+
+天気 / 世界時計 / デスクトップ時計（表示上の日付・時刻・天気・予定・速度をクリックすると対応ボードが開きます）：
+
+| 天気（予報 + 都市検索） | 世界時計（32 タイムゾーン + オフセット） | デスクトップ時計（リアルタイム速度） |
+|---|---|---|
+| ![天気](artifacts/weather.png) | ![世界時計](artifacts/worldclock.png) | ![デスクトップ時計](artifacts/desktop-clock.png) |
+
+ネットワーク速度ボードとパフォーマンスボード（速度部分をクリックで速度ボードを開く）：
+
+| 速度（プロセス別 Top 5） | パフォーマンス（CPU グラフ / メモリ / ディスク / GPU / ネットワーク） |
+|---|---|
+| ![速度](artifacts/network-board.png) | ![パフォーマンス](artifacts/performance-board.png) |
+
 カレンダーの吉凶パネル（日付をクリックすると表示）と旧暦の表示：
 
 ![吉凶](artifacts/calendar-lunar.png)

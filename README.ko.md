@@ -46,6 +46,19 @@ Token 사용량 보드와 뽀모도로 타이머:
 |---|---|
 | ![Token](artifacts/token-board.png) | ![뽀모도로](artifacts/pomodoro.png) |
 
+
+날씨 / 세계 시계 / 데스크톱 시계（날짜·시간·날씨·일정·속도를 클릭하면 해당 보드가 열립니다）：
+
+| 날씨 (예보 + 도시 검색) | 세계 시계 (32개 시간대 + 오프셋) | 데스크톱 시계 (실시간 속도) |
+|---|---|---|
+| ![날씨](artifacts/weather.png) | ![세계 시계](artifacts/worldclock.png) | ![데스크톱 시계](artifacts/desktop-clock.png) |
+
+네트워크 속도 보드와 성능 보드 (속도 영역 클릭 시 속도 보드 열림)：
+
+| 속도 (프로세스 Top 5) | 성능 (CPU 그래프 / 메모리 / 디스크 / GPU / 네트워크) |
+|---|---|
+| ![속도](artifacts/network-board.png) | ![성능](artifacts/performance-board.png) |
+
 캘린더의 길흉 패널(날짜를 클릭하면 표시)과 음력 표기:
 
 ![길흉](artifacts/calendar-lunar.png)
