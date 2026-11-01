@@ -3,7 +3,7 @@
         xmlns:loc="using:StickyTodo.Notes.Localization"
         x:Class="StickyTodo.Notes.Views.PerformanceBoardWindow"
         Title="性能看板"
-        Width="440" Height="560"
+        Width="440" Height="475"
         MinWidth="380" MinHeight="440"
         SystemDecorations="None"
         TransparencyLevelHint="Transparent"

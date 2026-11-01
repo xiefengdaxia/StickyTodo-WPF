@@ -85,11 +85,20 @@ internal sealed class WindowGeometryMemory
 
         var area = ScreenHelper.GetWorkArea(_window);
 
-        // 桌面时钟是 SizeToContent="Height"，Window.Height 是 NaN；
-        // 而且 SourceInitialized 时还没布局，ActualWidth/Height 都是 0。
-        // 所以依次退：实际布局尺寸 → 记录里的尺寸 → 声明尺寸 → 兜底常量。
-        var width = _restoreSize && state.Width >= MinRestoreWidth ? state.Width : _window.ActualWidth;
-        var height = _restoreSize && state.Height >= MinRestoreHeight ? state.Height : _window.ActualHeight;
+        // 工具窗口改过默认尺寸后，位置记忆里存的还是"改之前那一次保存的值"
+        //（例如性能看板的 700、网速看板的 640）。记录高/宽和当前声明尺寸一致，
+        // 说明用户从未手动拉过，直接用新的默认尺寸，别让老默认值一直跟着迁移。
+        var declaredWidth = IsFinite(_window.Width) ? _window.Width : 0;
+        var declaredHeight = IsFinite(_window.Height) ? _window.Height : 0;
+        var userResizedWidth = Math.Abs(state.Width - declaredWidth) > 0.5;
+        var userResizedHeight = Math.Abs(state.Height - declaredHeight) > 0.5;
+
+        var width = _restoreSize && state.Width >= MinRestoreWidth && userResizedWidth
+            ? state.Width
+            : (IsFinite(_window.ActualWidth) && _window.ActualWidth > 1 ? _window.ActualWidth : declaredWidth);
+        var height = _restoreSize && state.Height >= MinRestoreHeight && userResizedHeight
+            ? state.Height
+            : (IsFinite(_window.ActualHeight) && _window.ActualHeight > 1 ? _window.ActualHeight : declaredHeight);
 
         if (!IsFinite(width) || width < 1)
         {

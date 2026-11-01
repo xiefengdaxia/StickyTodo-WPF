@@ -79,9 +79,19 @@ internal sealed class WindowGeometryMemory
             return false;
         }
 
-        // 桌面时钟 SizeToContent="Height"，Height 是 NaN，用实际布局尺寸兜底
-        var width = _restoreSize && state.Width >= MinRestoreWidth ? state.Width : ClientWidth();
-        var height = _restoreSize && state.Height >= MinRestoreHeight ? state.Height : ClientHeight();
+        // 工具窗口改过默认尺寸后，位置记忆里存的还是旧默认值（如性能看板 700、网速看板 640）。
+        // 记录值和当前声明尺寸一致 = 用户从未手动拉过 → 用新默认尺寸，别让老默认一直跟着迁移。
+        var declaredWidth = IsFinite(_window.Width) ? _window.Width : 0;
+        var declaredHeight = IsFinite(_window.Height) ? _window.Height : 0;
+        var userResizedWidth = Math.Abs(state.Width - declaredWidth) > 0.5;
+        var userResizedHeight = Math.Abs(state.Height - declaredHeight) > 0.5;
+
+        var width = _restoreSize && state.Width >= MinRestoreWidth && userResizedWidth
+            ? state.Width
+            : ClientWidth();
+        var height = _restoreSize && state.Height >= MinRestoreHeight && userResizedHeight
+            ? state.Height
+            : ClientHeight();
 
         var area = ScreenHelper.GetWorkArea(_window);
 
