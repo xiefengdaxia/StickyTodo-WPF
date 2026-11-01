@@ -88,7 +88,6 @@
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="12.5"
                                                    VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
@@ -104,10 +103,6 @@
                                                 </Style>
                                             </TextBlock.Style>
                                         </TextBlock>
-                                        <TextBlock Grid.Column="1" Text="{Binding Sent}" FontSize="10.5"
-                                                   Opacity="0.55" Margin="0,0,10,0" VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource Brush.InkSoft}"
-                                                   ToolTip="该进程的上传（共用连接池，按连接估算）" />
                                         <TextBlock Grid.Column="2" Text="{Binding Received}" FontSize="14" FontWeight="SemiBold"
                                                    VerticalAlignment="Center" Foreground="#FF2E7D32" />
                                     </Grid>
@@ -130,7 +125,6 @@
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="12.5"
                                                    VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
@@ -146,10 +140,6 @@
                                                 </Style>
                                             </TextBlock.Style>
                                         </TextBlock>
-                                        <TextBlock Grid.Column="1" Text="{Binding Received}" FontSize="10.5"
-                                                   Opacity="0.55" Margin="0,0,10,0" VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource Brush.InkSoft}"
-                                                   ToolTip="该进程的下载（共用连接池，按连接估算）" />
                                         <TextBlock Grid.Column="2" Text="{Binding Sent}" FontSize="14" FontWeight="SemiBold"
                                                    VerticalAlignment="Center" Foreground="{DynamicResource Brush.Accent}" />
                                     </Grid>

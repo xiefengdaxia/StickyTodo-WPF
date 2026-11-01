@@ -65,16 +65,12 @@
               <DataTemplate>
                 <Border Margin="2,2" Padding="10,6" CornerRadius="7"
                         Background="{DynamicResource Brush.Surface}">
-                  <Grid ColumnDefinitions="*,Auto,Auto">
+                  <Grid ColumnDefinitions="*,Auto">
                     <TextBlock Classes="rowName" Text="{Binding Name}" FontSize="12.5"
                                VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                                Foreground="{DynamicResource Brush.Ink}"
                                Classes.self="{Binding IsSelf}" />
-                    <TextBlock Grid.Column="1" Text="{Binding Sent}" FontSize="10.5"
-                               Opacity="0.55" Margin="0,0,10,0" VerticalAlignment="Center"
-                               Foreground="{DynamicResource Brush.InkSoft}"
-                               ToolTip.Tip="该进程的上传（共用连接池，按连接估算）" />
-                    <TextBlock Grid.Column="2" Text="{Binding Received}" FontSize="14" FontWeight="SemiBold"
+                    <TextBlock Grid.Column="1" Text="{Binding Received}" FontSize="14" FontWeight="SemiBold"
                                VerticalAlignment="Center" Foreground="{DynamicResource Brush.Success}" />
                   </Grid>
                 </Border>
@@ -92,16 +88,12 @@
               <DataTemplate>
                 <Border Margin="2,2" Padding="10,6" CornerRadius="7"
                         Background="{DynamicResource Brush.Surface}">
-                  <Grid ColumnDefinitions="*,Auto,Auto">
+                  <Grid ColumnDefinitions="*,Auto">
                     <TextBlock Classes="rowName" Text="{Binding Name}" FontSize="12.5"
                                VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                                Foreground="{DynamicResource Brush.Ink}"
                                Classes.self="{Binding IsSelf}" />
-                    <TextBlock Grid.Column="1" Text="{Binding Received}" FontSize="10.5"
-                               Opacity="0.55" Margin="0,0,10,0" VerticalAlignment="Center"
-                               Foreground="{DynamicResource Brush.InkSoft}"
-                               ToolTip.Tip="该进程的下载（共用连接池，按连接估算）" />
-                    <TextBlock Grid.Column="2" Text="{Binding Sent}" FontSize="14" FontWeight="SemiBold"
+                    <TextBlock Grid.Column="1" Text="{Binding Sent}" FontSize="14" FontWeight="SemiBold"
                                VerticalAlignment="Center" Foreground="{DynamicResource Brush.Accent}" />
                   </Grid>
                 </Border>

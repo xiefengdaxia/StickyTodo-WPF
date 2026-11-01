@@ -33,6 +33,9 @@ public sealed class ProcessNetworkMonitor : IDisposable
     // TCP_STATE: 5 = ESTABLISHED
     private const int TcpStateEstablished = 5;
 
+    /// <summary>每组最多显示的进程数（榜单式，不是完整连接表）。</summary>
+    public const int TopCount = 5;
+
     private readonly NetworkSpeedMonitor _total = new();
     private (double Received, double Sent) _lastTotals;
     private bool _hasFreshTotals;
@@ -99,17 +102,20 @@ public sealed class ProcessNetworkMonitor : IDisposable
             upload[processId] = totalSent * count / totalConnections;
         }
 
-        // 下载组过滤掉 1 KB/s 以下（上传组不过滤：0.1 KB 精度下小流量也有意义）
+        // 下载组过滤掉 1 KB/s 以下（上传组不过滤：0.1 KB 精度下小流量也有意义），
+        // 各组只显示前 5 名——看板是"谁在大量收/发"的榜单，不是完整连接表
         var downloadList = download
             .Select(kv => ToSpeed(kv.Key, kv.Value, upload.TryGetValue(kv.Key, out var u) ? u : 0))
             .Where(s => s.Received >= 1024)
             .OrderByDescending(s => s.Received)
+            .Take(TopCount)
             .ToList();
 
         var uploadList = upload
             .Select(kv => ToSpeed(kv.Key, download.TryGetValue(kv.Key, out var d) ? d : 0, kv.Value))
             .Where(s => s.Sent > 0)
             .OrderByDescending(s => s.Sent)
+            .Take(TopCount)
             .ToList();
 
         return (downloadList, uploadList);
