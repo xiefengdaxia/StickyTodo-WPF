@@ -94,7 +94,8 @@ public partial class CalendarWindow : Window, IStickyWindow
 
     private async void Today_Click(object sender, RoutedEventArgs e) => await GoToTodayAsync();
 
-    /// <summary>侧栏「＋」：在选中日期新建待办（due_at = 选中日）。</summary>
+    /// <summary>侧栏「＋」：在选中日期新建待办。先问标题，再问时间点（可跳过）；
+    /// 设了时间点则同时设置提醒，到点弹提醒。</summary>
     private async void AddTodo_Click(object sender, RoutedEventArgs e)
     {
         var title = PromptWindow.Prompt(this, Loc.T("cal.addTodoTitle"), Loc.T("cal.addTodoLabel"));
@@ -103,7 +104,30 @@ public partial class CalendarWindow : Window, IStickyWindow
             return;
         }
 
-        await _viewModel.AddTodoOnSelectedDateAsync(title);
+        var timeText = PromptWindow.Prompt(this,
+            Loc.T("cal.addTimeTitle"),
+            Loc.T("cal.addTimeLabel"),
+            Loc.T("cal.addTimeDefault"),
+            text =>
+            {
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    return null;   // 留空 = 全天，不提醒
+                }
+
+                return TimeSpan.TryParseExact(text, ["hh\\:mm"], null, out _)
+                    ? null
+                    : Loc.T("cal.addTimeInvalid");
+            });
+
+        TimeSpan? timeOfDay = null;
+        if (!string.IsNullOrWhiteSpace(timeText) &&
+            TimeSpan.TryParseExact(timeText, ["hh\\:mm"], null, out var parsed))
+        {
+            timeOfDay = parsed;
+        }
+
+        await _viewModel.AddTodoOnSelectedDateAsync(title, timeOfDay);
     }
 
     /// <summary>跳回今天（桌面时钟的"今日日程"点开时也走这里）。</summary>

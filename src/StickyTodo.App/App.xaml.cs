@@ -367,6 +367,7 @@ public partial class App : System.Windows.Application
                 "desktopclock" => BoardKind.DesktopClock,
                 "networkspeed" => BoardKind.NetworkSpeed,
                 "performance" => BoardKind.Performance,
+                "calendar" => BoardKind.Calendar,
                 _ => (BoardKind?)null,
             };
 
@@ -381,6 +382,7 @@ public partial class App : System.Windows.Application
                             BoardKind.WorldClock => "世界时钟",
                             BoardKind.NetworkSpeed => "网速",
                             BoardKind.Performance => "性能",
+                            BoardKind.Calendar => "日历",
                             _ => "桌面时钟",
                         }, kind);
 

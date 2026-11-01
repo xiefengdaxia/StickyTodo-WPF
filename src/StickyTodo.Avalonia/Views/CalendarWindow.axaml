@@ -163,10 +163,17 @@
                              Foreground="{DynamicResource Brush.InkSoft}" Opacity="0.8" />
                   <StackPanel Orientation="Horizontal" Margin="0,2,0,0" IsVisible="{Binding HasEntries}">
                     <Ellipse Width="5" Height="5" VerticalAlignment="Center"
-                             Fill="{DynamicResource Brush.Accent}" />
-                    <TextBlock Text="{Binding Summary}" FontSize="11" Margin="4,0,0,0"
+                             Fill="{DynamicResource Brush.Accent}"
+                             IsVisible="{Binding !HasMultipleEntries}" />
+                    <!-- 多条：强调底胶囊「共 N 条提醒」；单条：纯文本标题 -->
+                    <Border CornerRadius="4" Padding="4,1" Background="{DynamicResource Brush.Accent}"
+                            IsVisible="{Binding HasMultipleEntries}">
+                      <TextBlock Text="{Binding CellHint}" FontSize="10" Foreground="White" />
+                    </Border>
+                    <TextBlock Text="{Binding CellHint}" FontSize="11" Margin="4,0,0,0"
                                VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
-                               Foreground="{DynamicResource Brush.Accent}" />
+                               Foreground="{DynamicResource Brush.Accent}"
+                               IsVisible="{Binding !HasMultipleEntries}" />
                   </StackPanel>
                 </StackPanel>
               </Border>

@@ -70,6 +70,20 @@ public partial class CalendarDayViewModel : ObservableObject
             ? Entries[0].Title
             : $"{Entries[0].Title} 等 {Entries.Count} 项";
 
+    /// <summary>
+    /// 格子底部那行：单条日程显示标题，多条显示「共 N 条提醒/日程」
+    /// （参考系统日历的样式，如红底胶囊「共有2条提醒」）。
+    /// </summary>
+    public string CellHint => Entries.Count switch
+    {
+        0 => string.Empty,
+        1 => Entries[0].Title,
+        _ => Loc.F("cal.cellCount", Entries.Count),
+    };
+
+    /// <summary>格子底部胶囊是否使用"多条"样式（多条 = 强调胶囊，单条 = 纯文本标题）。</summary>
+    public bool HasMultipleEntries => Entries.Count > 1;
+
     public void SetEntries(IEnumerable<CalendarEntryViewModel> entries)
     {
         Entries.Clear();
@@ -80,6 +94,8 @@ public partial class CalendarDayViewModel : ObservableObject
 
         OnPropertyChanged(nameof(HasEntries));
         OnPropertyChanged(nameof(Summary));
+        OnPropertyChanged(nameof(CellHint));
+        OnPropertyChanged(nameof(HasMultipleEntries));
     }
 }
 

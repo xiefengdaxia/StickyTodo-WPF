@@ -64,7 +64,18 @@ public partial class CalendarWindow : StickyWindowBase
             return;
         }
 
-        await _viewModel.AddTodoOnSelectedDateAsync(title);
+        var timeText = await PromptWindow.PromptAsync(this,
+            Loc.T("cal.addTimeTitle"),
+            Loc.T("cal.addTimeLabel"),
+            Loc.T("cal.addTimeDefault"));
+        TimeSpan? timeOfDay = null;
+        if (!string.IsNullOrWhiteSpace(timeText) &&
+            TimeSpan.TryParseExact(timeText, ["hh\\:mm"], null, out var parsed))
+        {
+            timeOfDay = parsed;
+        }
+
+        await _viewModel.AddTodoOnSelectedDateAsync(title, timeOfDay);
     }
 
     /// <summary>跳回今天（桌面时钟的"今日日程"点开时也走这里）。</summary>

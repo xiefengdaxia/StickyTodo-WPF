@@ -235,8 +235,19 @@
                                                 Margin="0,2,0,0"
                                                 Visibility="Collapsed">
                                         <Ellipse Width="5" Height="5" VerticalAlignment="Center"
-                                                 Fill="{DynamicResource Brush.Accent}" />
-                                        <TextBlock Text="{Binding Summary}"
+                                                 Fill="{DynamicResource Brush.Accent}"
+                                                 Visibility="{Binding HasMultipleEntries, Converter={StaticResource InverseBoolToVis}}" />
+                                        <!-- 多条：强调底胶囊「共 N 条提醒」；单条：纯文本标题 -->
+                                        <Border x:Name="CountChip"
+                                                CornerRadius="4"
+                                                Padding="4,1"
+                                                Background="{DynamicResource Brush.Accent}">
+                                            <TextBlock Text="{Binding CellHint}"
+                                                       FontSize="10"
+                                                       Foreground="White" />
+                                        </Border>
+                                        <TextBlock x:Name="SingleTitle"
+                                                   Text="{Binding CellHint}"
                                                    FontSize="11"
                                                    Margin="4,0,0,0"
                                                    VerticalAlignment="Center"
@@ -301,6 +312,13 @@
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding HasEntries}" Value="True">
                                     <Setter TargetName="EntryHint" Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding HasMultipleEntries}" Value="True">
+                                    <Setter TargetName="SingleTitle" Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding HasMultipleEntries}" Value="False">
+                                    <Setter TargetName="CountChip" Property="Visibility" Value="Collapsed" />
+                                    <Setter TargetName="EntryHint" Property="Opacity" Value="1" />
                                 </DataTrigger>
                             </DataTemplate.Triggers>
                         </DataTemplate>

@@ -271,10 +271,11 @@ public partial class CalendarViewModel : ObservableObject, IAppearanceHost
     }
 
     /// <summary>
-    /// 在选中日期上新建待办（侧栏「＋」按钮）。落到默认待办看板，目标日期 = 选中日 08:00，
-    /// 这样它会同时出现在日历格子与当日日程列表里。
+    /// 在选中日期上新建待办（侧栏「＋」按钮）。落到默认待办看板，
+    /// 目标日期 = 选中日 + 可选时间点（默认 08:00）；
+    /// 设了时间点时同时设置提醒，到点走本地提醒弹窗。
     /// </summary>
-    public async Task AddTodoOnSelectedDateAsync(string title)
+    public async Task AddTodoOnSelectedDateAsync(string title, TimeSpan? timeOfDay = null)
     {
         if (string.IsNullOrWhiteSpace(title))
         {
@@ -285,8 +286,18 @@ public partial class CalendarViewModel : ObservableObject, IAppearanceHost
         {
             ErrorText = null;
 
-            var due = new DateTimeOffset(SelectedDate.ToDateTime(new TimeOnly(8, 0)));
-            await Task.Run(() => _service.AddTodo(_service.EnsureDefaultBoard().Id, title.Trim(), due));
+            var time = timeOfDay ?? new TimeSpan(8, 0, 0);
+            var due = new DateTimeOffset(SelectedDate.ToDateTime(TimeOnly.FromTimeSpan(time)));
+            await Task.Run(() =>
+            {
+                var todo = _service.AddTodo(_service.EnsureDefaultBoard().Id, title.Trim(), due);
+                if (timeOfDay.HasValue)
+                {
+                    // 时间点到了要触发提醒：同时设置 remind_at
+                    _service.SetRemindAt(todo.Id, due);
+                }
+            });
+
             await LoadAsync();
         }
         catch (Exception ex)
