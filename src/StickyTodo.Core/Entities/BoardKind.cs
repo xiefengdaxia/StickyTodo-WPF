@@ -11,6 +11,7 @@ public enum BoardKind
     WorldClock = 5,
     DesktopClock = 6,
     NetworkSpeed = 7,
+    Performance = 8,
 }
 
 public static class BoardKinds
@@ -23,6 +24,7 @@ public static class BoardKinds
     public const string WorldClock = "worldclock";
     public const string DesktopClock = "desktopclock";
     public const string NetworkSpeed = "networkspeed";
+    public const string Performance = "performance";
 
     public static string ToStorage(BoardKind kind) => kind switch
     {
@@ -33,6 +35,7 @@ public static class BoardKinds
         BoardKind.WorldClock => WorldClock,
         BoardKind.DesktopClock => DesktopClock,
         BoardKind.NetworkSpeed => NetworkSpeed,
+        BoardKind.Performance => Performance,
         _ => Todo,
     };
 
@@ -45,6 +48,7 @@ public static class BoardKinds
         WorldClock => BoardKind.WorldClock,
         DesktopClock => BoardKind.DesktopClock,
         NetworkSpeed => BoardKind.NetworkSpeed,
+        Performance => BoardKind.Performance,
         _ => BoardKind.Todo,
     };
 
@@ -57,9 +61,10 @@ public static class BoardKinds
         BoardKind.WorldClock => "世界时钟",
         BoardKind.DesktopClock => "桌面时钟",
         BoardKind.NetworkSpeed => "网速",
+        BoardKind.Performance => "性能",
         _ => "待办看板",
     };
 
     /// <summary>是否是「工具型」看板：没有待办数据，只有一块面板。</summary>
-    public static bool IsToolBoard(BoardKind kind) => kind is BoardKind.Weather or BoardKind.WorldClock or BoardKind.DesktopClock or BoardKind.NetworkSpeed;
+    public static bool IsToolBoard(BoardKind kind) => kind is BoardKind.Weather or BoardKind.WorldClock or BoardKind.DesktopClock or BoardKind.NetworkSpeed or BoardKind.Performance;
 }

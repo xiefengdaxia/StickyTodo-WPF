@@ -99,6 +99,7 @@ public sealed class WindowManager
                 board,
                 this),
             BoardKind.NetworkSpeed => new NetworkSpeedBoardWindow(new NetworkSpeedViewModel(), board, this),
+            BoardKind.Performance => new PerformanceBoardWindow(new PerformanceViewModel(), board, this),
             _ => new BoardWindow(new BoardViewModel(_todoService, board, _settings, _skinService), this),
         };
 
