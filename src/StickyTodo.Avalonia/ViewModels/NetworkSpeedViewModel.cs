@@ -51,6 +51,7 @@ public sealed partial class NetworkSpeedViewModel : ObservableObject
     private readonly Dictionary<int, ProcessSpeedRow> _downloadRows = new();
     private readonly Dictionary<int, ProcessSpeedRow> _uploadRows = new();
     private readonly int _selfPid;
+    private bool _sampling;
 
     /// <summary>全机合计（与桌面时钟挂件同源）。</summary>
     [ObservableProperty]
@@ -100,9 +101,31 @@ public sealed partial class NetworkSpeedViewModel : ObservableObject
         var (totalReceived, totalSent) = _monitor.ReadTotal();
         TotalText = $"↓ {NetworkSpeedMonitor.Format(totalReceived)}   ↑ {NetworkSpeedMonitor.Format(totalSent)}";
 
-        var (download, upload) = _monitor.Read(reuseLastTotals: true);
-        FillGroup(DownloadRows, _downloadRows, download, sortKey: s => s.Received);
-        FillGroup(UploadRows, _uploadRows, upload, sortKey: s => s.Sent);
+        if (_sampling)
+        {
+            return;
+        }
+
+        // 连接表 + 进程名解析在首次要 800ms+，全在 UI 线程会让拖动卡；
+        // 挪到后台，算完把结果抛回 UI（_sampling 防上一轮没算完就重入）
+        _sampling = true;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var (download, upload) = _monitor.Read(reuseLastTotals: true);
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    _sampling = false;
+                    FillGroup(DownloadRows, _downloadRows, download, sortKey: s => s.Received);
+                    FillGroup(UploadRows, _uploadRows, upload, sortKey: s => s.Sent);
+                });
+            }
+            catch (Exception)
+            {
+                _sampling = false;
+            }
+        });
     }
 
     private void FillGroup(

@@ -37,6 +37,10 @@ public sealed class ProcessNetworkMonitor : IDisposable
     public const int TopCount = 5;
 
     private readonly NetworkSpeedMonitor _total = new();
+
+    /// <summary>进程名缓存：pid → "名字 (pid)"。进程名一辈子不变，读一次就够；
+    /// 不缓存的话每秒 60 次 Process.GetProcessById 要 1.3 秒（拖动卡顿的主因）。</summary>
+    private readonly Dictionary<int, string> _nameCache = new();
     private (double Received, double Sent) _lastTotals;
     private bool _hasFreshTotals;
 
@@ -127,18 +131,27 @@ public sealed class ProcessNetworkMonitor : IDisposable
         return new ProcessSpeed(processId, name, received, sent);
     }
 
-    private static string GetProcessName(int processId)
+    private string GetProcessName(int processId)
     {
+        if (_nameCache.TryGetValue(processId, out var cached))
+        {
+            return cached;
+        }
+
+        string name;
         try
         {
             using var process = Process.GetProcessById(processId);
             // 同名进程很多（svchost × N），带上 pid 才分得清是哪一个
-            return $"{process.ProcessName} ({processId})";
+            name = $"{process.ProcessName} ({processId})";
         }
         catch (Exception)
         {
-            return "系统";
+            name = "系统";
         }
+
+        _nameCache[processId] = name;
+        return name;
     }
 
     public void Dispose()

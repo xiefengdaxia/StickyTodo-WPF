@@ -60,6 +60,7 @@ public sealed partial class NetworkSpeedViewModel : ObservableObject
     private readonly Dictionary<int, ProcessSpeedRow> _downloadRows = new();
     private readonly Dictionary<int, ProcessSpeedRow> _uploadRows = new();
     private readonly int _selfPid;
+    private bool _sampling;
 
     /// <summary>全机合计（与桌面时钟挂件同源）。</summary>
     [ObservableProperty]
@@ -94,25 +95,42 @@ public sealed partial class NetworkSpeedViewModel : ObservableObject
     }
 
     /// <summary>当前机器上有没有可用的计数器（没有就整板显示提示）。</summary>
-    public bool IsAvailable => _monitor.IsAvailable;    private void Refresh()
+    public bool IsAvailable => _monitor.IsAvailable;
+
+    private void Refresh()
     {
         // 全机合计直接用本轮计数器原始值——它和桌面时钟挂件同一来源（Network Interface 计数器），
         // 两边显示的数字因此严格相等。
         // 不能拿列表行求和：行有 1 KB/s 过滤阈值 + 每行 0 位小数取整，
         // 几十行加起来会和全机值差出一大截（就是"对不上"的原因）。
-        // Read() 内部也会读一次计数器，为避免同秒读两次造成差分错位，
-        // 先拿合计再让它复用（ReadTotalWasCalled 标记由 Read 检查）。
         var (monitorTotalReceived, monitorTotalSent) = _monitor.ReadTotal();
         TotalText = $"↓ {NetworkSpeedMonitor.Format(monitorTotalReceived)}   ↑ {NetworkSpeedMonitor.Format(monitorTotalSent)}";
 
-        if (!_monitor.IsAvailable)
+        if (!_monitor.IsAvailable || _sampling)
         {
             return;
         }
 
-        var (download, upload) = _monitor.Read(reuseLastTotals: true);
-        FillGroup(DownloadRows, _downloadRows, download, sortKey: s => s.Received);
-        FillGroup(UploadRows, _uploadRows, upload, sortKey: s => s.Sent);
+        // 连接表 + 进程名解析在首次要 800ms+，全在 UI 线程会让拖动卡；
+        // 挪到后台，算完把结果抛回 UI（_sampling 防上一轮没算完就重入）
+        _sampling = true;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var (download, upload) = _monitor.Read(reuseLastTotals: true);
+                await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    _sampling = false;
+                    FillGroup(DownloadRows, _downloadRows, download, sortKey: s => s.Received);
+                    FillGroup(UploadRows, _uploadRows, upload, sortKey: s => s.Sent);
+                });
+            }
+            catch (Exception)
+            {
+                _sampling = false;
+            }
+        });
     }
 
     private void FillGroup(
