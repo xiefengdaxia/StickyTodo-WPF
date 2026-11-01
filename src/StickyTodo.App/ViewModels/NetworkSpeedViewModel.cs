@@ -94,54 +94,25 @@ public sealed partial class NetworkSpeedViewModel : ObservableObject
     }
 
     /// <summary>当前机器上有没有可用的计数器（没有就整板显示提示）。</summary>
-    public bool IsAvailable => _monitor.IsAvailable;
-
-    private void Refresh()
+    public bool IsAvailable => _monitor.IsAvailable;    private void Refresh()
     {
-        var (totalReceived, totalSent) = SumSpeeds();
-        TotalText = $"↓ {NetworkSpeedMonitor.Format(totalReceived)}   ↑ {NetworkSpeedMonitor.Format(totalSent)}";
+        // 全机合计直接用本轮计数器原始值——它和桌面时钟挂件同一来源（Network Interface 计数器），
+        // 两边显示的数字因此严格相等。
+        // 不能拿列表行求和：行有 1 KB/s 过滤阈值 + 每行 0 位小数取整，
+        // 几十行加起来会和全机值差出一大截（就是"对不上"的原因）。
+        // Read() 内部也会读一次计数器，为避免同秒读两次造成差分错位，
+        // 先拿合计再让它复用（ReadTotalWasCalled 标记由 Read 检查）。
+        var (monitorTotalReceived, monitorTotalSent) = _monitor.ReadTotal();
+        TotalText = $"↓ {NetworkSpeedMonitor.Format(monitorTotalReceived)}   ↑ {NetworkSpeedMonitor.Format(monitorTotalSent)}";
 
         if (!_monitor.IsAvailable)
         {
             return;
         }
 
-        var (download, upload) = _monitor.Read();
+        var (download, upload) = _monitor.Read(reuseLastTotals: true);
         FillGroup(DownloadRows, _downloadRows, download, sortKey: s => s.Received);
         FillGroup(UploadRows, _uploadRows, upload, sortKey: s => s.Sent);
-    }
-
-    private (double, double) SumSpeeds()
-    {
-        double received = 0, sent = 0;
-        foreach (var row in DownloadRows)
-        {
-            received += ParseSpeed(row.Received);
-        }
-
-        foreach (var row in UploadRows)
-        {
-            sent += ParseSpeed(row.Sent);
-        }
-
-        return (received, sent);
-    }
-
-    private static double ParseSpeed(string text)
-    {
-        // "12.5 MB/s" → 字节速率；仅用于合计展示，容错即可
-        var parts = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length < 2 || !double.TryParse(parts[0], out var value))
-        {
-            return 0;
-        }
-
-        return parts[1] switch
-        {
-            "GB/s" => value * 1024 * 1024 * 1024,
-            "MB/s" => value * 1024 * 1024,
-            _ => value * 1024,
-        };
     }
 
     private void FillGroup(

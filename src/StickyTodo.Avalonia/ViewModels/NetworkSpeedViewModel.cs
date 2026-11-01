@@ -95,21 +95,12 @@ public sealed partial class NetworkSpeedViewModel : ObservableObject
             return;
         }
 
-        var (download, upload) = _monitor.Read();
-
-        double totalReceived = 0, totalSent = 0;
-        foreach (var s in download)
-        {
-            totalReceived += s.Received;
-        }
-
-        foreach (var s in upload)
-        {
-            totalSent += s.Sent;
-        }
-
+        // 合计直接用计数器原始值（与挂件同源、严格相等）；
+        // 列表行是分摊+过滤+取整后的近似值，求和必然对不上，不能用
+        var (totalReceived, totalSent) = _monitor.ReadTotal();
         TotalText = $"↓ {NetworkSpeedMonitor.Format(totalReceived)}   ↑ {NetworkSpeedMonitor.Format(totalSent)}";
 
+        var (download, upload) = _monitor.Read(reuseLastTotals: true);
         FillGroup(DownloadRows, _downloadRows, download, sortKey: s => s.Received);
         FillGroup(UploadRows, _uploadRows, upload, sortKey: s => s.Sent);
     }

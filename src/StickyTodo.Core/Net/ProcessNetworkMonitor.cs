@@ -34,6 +34,8 @@ public sealed class ProcessNetworkMonitor : IDisposable
     private const int TcpStateEstablished = 5;
 
     private readonly NetworkSpeedMonitor _total = new();
+    private (double Received, double Sent) _lastTotals;
+    private bool _hasFreshTotals;
 
     /// <summary>全机计数器是否可用。</summary>
     public bool IsAvailable => _total.IsAvailable;
@@ -47,10 +49,39 @@ public sealed class ProcessNetworkMonitor : IDisposable
     /// <summary>
     /// 采样一次：返回本轮每秒速率，下载与上传两个列表均已按速率降序排好。
     /// </summary>
-    public (IReadOnlyList<ProcessSpeed> Download, IReadOnlyList<ProcessSpeed> Upload) Read()
+    public (IReadOnlyList<ProcessSpeed> Download, IReadOnlyList<ProcessSpeed> Upload) Read(bool reuseLastTotals = false)
     {
-        var (totalReceived, totalSent) = _total.ReadBytesPerSecond();
+        if (reuseLastTotals && _hasFreshTotals)
+        {
+            // 看板每秒先 ReadTotal() 再 Read()：同一秒内计数器不能读两次，
+            // 否则差分窗口只有几毫秒，速率会抖到 0
+            return BuildLists(_lastTotals.Received, _lastTotals.Sent);
+        }
 
+        var (totalReceived, totalSent) = _total.ReadBytesPerSecond();
+        _lastTotals = (totalReceived, totalSent);
+        _hasFreshTotals = true;
+
+        return BuildLists(totalReceived, totalSent);
+    }
+
+    /// <summary>
+    /// 全机合计速率（性能计数器原始值）。看板顶部的合计用这个，
+    /// 和桌面时钟挂件显示的是同一个数——列表行是分摊+过滤+取整后的近似值，
+    /// 拿行求和必然对不上。
+    /// </summary>
+    public (double Received, double Sent) ReadTotal()
+    {
+        var totals = _total.ReadBytesPerSecond();
+        _lastTotals = totals;
+        _hasFreshTotals = true;
+        return totals;
+    }
+
+    private (IReadOnlyList<ProcessSpeed> Download, IReadOnlyList<ProcessSpeed> Upload) BuildLists(
+        double totalReceived,
+        double totalSent)
+    {
         var ownerByPort = GetPortOwners();
         var connectionCounts = new Dictionary<int, int>();
         foreach (var owner in ownerByPort.Values)
