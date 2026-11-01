@@ -143,6 +143,12 @@ public partial class ManagerWindow : Window
     private async void CreateDesktopClock_Click(object? sender, RoutedEventArgs e) =>
         await CreateBoardAsync(BoardKind.DesktopClock, Loc.T("manager.newDesktopClock"), Loc.T("manager.newDesktopClockDefault"));
 
+    private async void CreateNetworkSpeed_Click(object? sender, RoutedEventArgs e) =>
+        await CreateBoardAsync(BoardKind.NetworkSpeed, Loc.T("manager.newNetworkSpeed"), Loc.T("manager.newNetworkSpeedDefault"));
+
+    private async void CreatePerformance_Click(object? sender, RoutedEventArgs e) =>
+        await CreateBoardAsync(BoardKind.Performance, Loc.T("manager.newPerformance"), Loc.T("manager.newPerformanceDefault"));
+
     private async Task CreateBoardAsync(BoardKind kind, string title, string initial)
     {
         var name = await PromptWindow.PromptAsync(this, title, Loc.T("manager.boardName"), initial);

@@ -340,6 +340,12 @@ public partial class ManagerWindow : Window
     private async void CreateDesktopClock_Click(object sender, RoutedEventArgs e) =>
         await CreateBoardAsync(BoardKind.DesktopClock);
 
+    private async void CreateNetworkSpeed_Click(object sender, RoutedEventArgs e) =>
+        await CreateBoardAsync(BoardKind.NetworkSpeed);
+
+    private async void CreatePerformance_Click(object sender, RoutedEventArgs e) =>
+        await CreateBoardAsync(BoardKind.Performance);
+
     private async Task CreateBoardAsync(BoardKind kind)
     {
         var (title, initial) = kind switch
@@ -350,6 +356,8 @@ public partial class ManagerWindow : Window
             BoardKind.Weather => (Loc.T("manager.newBoardTitle") + " · " + Loc.T("manager.kindWeather"), Loc.T("manager.newWeatherDefault")),
             BoardKind.WorldClock => (Loc.T("manager.newBoardTitle") + " · " + Loc.T("manager.kindWorldClock"), Loc.T("manager.newWorldClockDefault")),
             BoardKind.DesktopClock => (Loc.T("manager.newBoardTitle") + " · " + Loc.T("manager.kindDesktopClock"), Loc.T("manager.newDesktopClockDefault")),
+            BoardKind.NetworkSpeed => (Loc.T("manager.newBoardTitle") + " · " + Loc.T("manager.kindNetworkSpeed"), Loc.T("manager.newNetworkSpeedDefault")),
+            BoardKind.Performance => (Loc.T("manager.newBoardTitle") + " · " + Loc.T("manager.kindPerformance"), Loc.T("manager.newPerformanceDefault")),
             _ => (Loc.T("manager.newBoardTitle") + " · " + Loc.T("manager.kindTodo"), Loc.T("board.untitled")),
         };
 

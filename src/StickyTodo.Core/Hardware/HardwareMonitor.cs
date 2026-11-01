@@ -94,20 +94,22 @@ public sealed class HardwareMonitor : IDisposable
             Prime(_diskWrite);
             Prime(_diskActive);
 
-            // GPU：GPU Engine 分类下每个引擎一个实例，取负载最高的前几个求和
+            // GPU：GPU Engine 分类下每个引擎一个实例（几百个），全量收集会让每秒采样卡 500ms+；
+            // 均匀抽样最多 16 个实例（每秒约 20ms），GPU 忙时总有实例占用高，读数足够反映"忙不忙"
             if (PerformanceCounterCategory.Exists(CategoryGpu))
             {
                 var category = new PerformanceCounterCategory(CategoryGpu);
-                foreach (var instance in category.GetInstanceNames())
+                var instances = category.GetInstanceNames();
+                var stride = Math.Max(1, instances.Length / 16);
+
+                for (var i = 0; i < instances.Length; i += stride)
                 {
-                    // 实例形如 "pid_1234_luid_..._engtype_3D"；只取 3D/Copy/VideoDecode 等真实负载引擎
+                    var instance = instances[i];
                     if (!instance.Contains("engtype_", StringComparison.OrdinalIgnoreCase))
                     {
                         continue;
                     }
 
-                    // 各进程会重复报同一引擎，按实例全加会超 100%；
-                    // 简化处理：全部收集，Read 时对同引擎名取平均
                     _gpu.Add(new PerformanceCounter(CategoryGpu, "Utilization Percentage", instance, readOnly: true));
                 }
 
@@ -157,8 +159,8 @@ public sealed class HardwareMonitor : IDisposable
         double? gpu = null;
         if (_gpu.Count > 0)
         {
-            // 同一引擎被多个进程实例重复上报：取所有实例的中位数会偏低，
-            // 取"每引擎最大值求和"最接近任务管理器；这里简化为最大单引擎值
+            // 同一引擎被多个进程实例重复上报：全加会超 100%，全遍历又慢；
+            // 构造时已抽样 ≤16 个实例，这里取最大值（GPU 忙时总有实例占用高）
             double max = 0;
             foreach (var counter in _gpu)
             {

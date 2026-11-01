@@ -90,8 +90,14 @@
                                 HorizontalContentAlignment="Left" Padding="12,8" Margin="0,0,0,6"
                                 Click="CreateWorldClock_Click" />
                         <Button Content="{Binding Converter={StaticResource Loc}, ConverterParameter=manager.newDesktopClock}" Style="{StaticResource Button.Ghost}"
-                                HorizontalContentAlignment="Left" Padding="12,8" Margin="0,0,0,14"
+                                HorizontalContentAlignment="Left" Padding="12,8" Margin="0,0,0,6"
                                 Click="CreateDesktopClock_Click" />
+                        <Button Content="{Binding Converter={StaticResource Loc}, ConverterParameter=manager.newNetworkSpeed}" Style="{StaticResource Button.Ghost}"
+                                HorizontalContentAlignment="Left" Padding="12,8" Margin="0,0,0,6"
+                                Click="CreateNetworkSpeed_Click" />
+                        <Button Content="{Binding Converter={StaticResource Loc}, ConverterParameter=manager.newPerformance}" Style="{StaticResource Button.Ghost}"
+                                HorizontalContentAlignment="Left" Padding="12,8" Margin="0,0,0,14"
+                                Click="CreatePerformance_Click" />
 
                         <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=manager.selected}" Style="{StaticResource Text.Section}" Margin="2,0,0,7" />
                         <Button Content="{Binding Converter={StaticResource Loc}, ConverterParameter=common.rename}" Style="{StaticResource Button.Ghost}"

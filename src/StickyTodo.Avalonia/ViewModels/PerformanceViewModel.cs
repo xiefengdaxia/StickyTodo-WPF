@@ -66,19 +66,17 @@ public sealed partial class PerformanceViewModel : ObservableObject
     public PerformanceViewModel()
     {
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        _timer.Tick += (_, _) => Refresh();
+        _timer.Tick += async (_, _) => await RefreshAsync();
     }
 
     /// <summary>CPU 历史值（最新在末尾），窗口用它画折线。</summary>
     public IReadOnlyList<double> CpuHistory => _cpuHistory;
 
     /// <summary>计数器是否可用。</summary>
-    public bool IsAvailable => _monitor.IsAvailable;
-
-    /// <summary>窗口打开时开始采样。</summary>
+    public bool IsAvailable => _monitor.IsAvailable;    /// <summary>窗口打开时开始采样。</summary>
     public void Start()
     {
-        Refresh();
+        _ = RefreshAsync();
         _timer.Start();
     }
 
@@ -89,10 +87,37 @@ public sealed partial class PerformanceViewModel : ObservableObject
         _monitor.Dispose();
     }
 
-    private void Refresh()
-    {
-        var sample = _monitor.Read();
+    private bool _sampling;
 
+    /// <summary>
+    /// 采样放后台线程：性能计数器一次全量读取约 30-80ms（GPU/网卡计数器单次调用固有开销），
+    /// 在 UI 线程上跑会让拖动掉帧。后台算完把结果抛回 UI 线程。
+    /// </summary>
+    private async Task RefreshAsync()
+    {
+        if (_sampling)
+        {
+            return;
+        }
+
+        _sampling = true;
+        try
+        {
+            var sample = await Task.Run(() => _monitor.Read()).ConfigureAwait(true);
+            Apply(sample);
+        }
+        catch (Exception)
+        {
+            // 单轮失败静默跳过，下一秒再试
+        }
+        finally
+        {
+            _sampling = false;
+        }
+    }
+
+    private void Apply(HardwareSample sample)
+    {
         CpuText = $"{sample.CpuPercent:0.0}%";
         _cpuHistory.Add(sample.CpuPercent);
         while (_cpuHistory.Count > CpuHistoryLength)
