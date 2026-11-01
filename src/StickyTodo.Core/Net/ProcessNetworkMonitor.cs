@@ -99,16 +99,16 @@ public sealed class ProcessNetworkMonitor : IDisposable
             upload[processId] = totalSent * count / totalConnections;
         }
 
-        // 只保留有明显速率的进程，避免几十个 0 KB/s 的行淹没有效信息
+        // 下载组过滤掉 1 KB/s 以下（上传组不过滤：0.1 KB 精度下小流量也有意义）
         var downloadList = download
             .Select(kv => ToSpeed(kv.Key, kv.Value, upload.TryGetValue(kv.Key, out var u) ? u : 0))
-            .Where(s => s.Received > 1024)
+            .Where(s => s.Received >= 1024)
             .OrderByDescending(s => s.Received)
             .ToList();
 
         var uploadList = upload
             .Select(kv => ToSpeed(kv.Key, download.TryGetValue(kv.Key, out var d) ? d : 0, kv.Value))
-            .Where(s => s.Sent > 1024)
+            .Where(s => s.Sent > 0)
             .OrderByDescending(s => s.Sent)
             .ToList();
 

@@ -139,7 +139,7 @@ public sealed partial class NetworkSpeedViewModel : ObservableObject
             }
 
             row.Received = NetworkSpeedMonitor.Format(speed.Received);
-            row.Sent = NetworkSpeedMonitor.Format(speed.Sent);
+            row.Sent = NetworkSpeedMonitor.Format(speed.Sent, precise: true);
             row.Total = NetworkSpeedMonitor.Format(speed.Received + speed.Sent);
             rowsByKey[speed.ProcessId] = row;
         }

@@ -83,24 +83,37 @@ public sealed class NetworkSpeedMonitor : IDisposable
     }
 
     /// <summary>把字节速率格式化成人类可读文本，单位自动换档（KB/s / MB/s / GB/s）。</summary>
-    public static string Format(double bytesPerSecond)
+    public static string Format(double bytesPerSecond) => Format(bytesPerSecond, precise: false);
+
+    /// <summary>
+    /// 把字节速率格式化成人类可读文本，单位自动换档（KB/s / MB/s / GB/s）。
+    /// <paramref name="precise"/> 为 true 时 1 MB/s 以下保留 1 位小数
+    /// （上传速率通常很小，整数精度会全部显示成 0 KB/s）。
+    /// </summary>
+    public static string Format(double bytesPerSecond, bool precise)
     {
         if (bytesPerSecond < 0 || double.IsNaN(bytesPerSecond))
         {
-            return "0 KB/s";
+            return precise ? "0.0 KB/s" : "0 KB/s";
         }
 
         const double kb = 1024;
         const double mb = kb * 1024;
         const double gb = mb * 1024;
 
-        return bytesPerSecond switch
+        if (bytesPerSecond >= gb)
         {
-            // 1 MB/s 以下固定 KB/s（保留 0 位），往上逐级换档
-            >= gb => $"{bytesPerSecond / gb:0.0} GB/s",
-            >= mb => $"{bytesPerSecond / mb:0.0} MB/s",
-            _ => $"{Math.Max(0, bytesPerSecond / kb):0} KB/s",
-        };
+            return $"{bytesPerSecond / gb:0.0} GB/s";
+        }
+
+        if (bytesPerSecond >= mb)
+        {
+            return $"{bytesPerSecond / mb:0.0} MB/s";
+        }
+
+        return precise
+            ? $"{bytesPerSecond / kb:0.0} KB/s"
+            : $"{bytesPerSecond / kb:0} KB/s";
     }
 
     public void Dispose() => DisposeCounters();
