@@ -197,7 +197,9 @@
                                     AllowDrop="True"
                                     DragOver="Cell_DragOver"
                                     Drop="Cell_Drop"
-                                    Cursor="Hand">
+                                    ToolTipService.Placement="MousePoint"
+                                    Cursor="Hand"
+                                    ToolTip="{Binding Summary}">
                                 <Border.RenderTransform>
                                     <ScaleTransform ScaleX="1" ScaleY="1" />
                                 </Border.RenderTransform>

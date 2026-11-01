@@ -147,7 +147,8 @@
                       PointerPressed="Cell_PointerPressed"
                       DragDrop.AllowDrop="True"
                       DragDrop.DragOver="Cell_DragOver"
-                      DragDrop.Drop="Cell_Drop">
+                          DragDrop.Drop="Cell_Drop"
+                          ToolTip.Tip="{Binding Summary}">
                 <StackPanel Margin="4,2">
                   <Grid>
                     <TextBlock Text="{Binding DayText}" FontSize="13.5" HorizontalAlignment="Left"

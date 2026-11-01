@@ -365,11 +365,20 @@ public sealed partial class DesktopClockViewModel : ObservableObject
             return;
         }
 
-        // 只看默认城市（没有默认就用列表第一个）；区县查不到时会自动用所属市，
-        // 这里显示的是实际查到数据的城市名。
-        var day = _report.Days.FirstOrDefault(d => d.DayLabel == "今天") ?? _report.Days[0];
-        WeatherLine = $"{_report.CityName} {day.TempMax:0}°C {day.Text}";
-        WeatherDetail = BuildWeatherDetail(day);
+        // ?????????????????????? CPU???????????????
+        var day = _report.Days.FirstOrDefault(d => d.DayLabel == "??") ?? _report.Days[0];
+        var line = $"{_report.CityName} {day.TempMax:0}?C {day.Text}";
+        var detail = BuildWeatherDetail(day);
+
+        if (line != WeatherLine)
+        {
+            WeatherLine = line;
+        }
+
+        if (detail != WeatherDetail)
+        {
+            WeatherDetail = detail;
+        }
     }
 
     /// <summary>风况 + 降水（概率高才提）或湿度，一行放得下。</summary>

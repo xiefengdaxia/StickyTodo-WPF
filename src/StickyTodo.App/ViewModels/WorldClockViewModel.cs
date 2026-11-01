@@ -24,9 +24,21 @@ public sealed class WorldClockRow : ObservableObject
 
     public string DateText { get; private set; } = string.Empty;
 
+    /// <summary>这一秒的真实显示文本（秒针每秒只变一次，值没变就不发通知，省 96 次/秒的绑定刷新）。</summary>
+    private string _lastStamp = string.Empty;
+
     public void Refresh(DateTime utcNow)
     {
         var local = WorldClockTime.LocalTimeAt(utcNow, City);
+
+        // HH:mm:ss 一秒一变；DateText 大多数时候不变
+        var stamp = local.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture);
+        if (stamp == _lastStamp)
+        {
+            return;
+        }
+
+        _lastStamp = stamp;
 
         OffsetText = WorldClockTime.FormatOffsetLabel(WorldClockTime.OffsetAt(utcNow, City));
         TimeText = local.ToString("HH:mm:ss", CultureInfo.InvariantCulture);

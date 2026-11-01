@@ -522,9 +522,20 @@ public sealed class WorldClockRow : ObservableObject
 
     public string DateText { get; private set; } = string.Empty;
 
+    /// <summary>这一秒的真实显示文本（值没变就不发通知，32 行 × 3 属性的绑定刷新省下来）。</summary>
+    private string _lastStamp = string.Empty;
+
     public void Refresh(DateTime utcNow)
     {
         var local = WorldClockTime.LocalTimeAt(utcNow, City);
+
+        var stamp = local.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture);
+        if (stamp == _lastStamp)
+        {
+            return;
+        }
+
+        _lastStamp = stamp;
 
         OffsetText = WorldClockTime.FormatOffsetLabel(WorldClockTime.OffsetAt(utcNow, City));
         TimeText = local.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
@@ -933,11 +944,20 @@ public sealed partial class DesktopClockViewModel : ObservableObject
             return;
         }
 
-        // 只看默认城市（没有默认就用列表第一个）；区县查不到时会自动用所属市，
-        // 这里显示的是实际查到数据的城市名。
+        // ?????????????????????? CPU???????????????
         var day = _report.Days.FirstOrDefault(d => d.DayLabel == "今天") ?? _report.Days[0];
-        WeatherLine = $"{_report.CityName} {day.TempMax:0}°C {day.Text}";
-        WeatherDetail = BuildWeatherDetail(day);
+        var line = $"{_report.CityName} {day.TempMax:0}°C {day.Text}";
+        var detail = BuildWeatherDetail(day);
+
+        if (line != WeatherLine)
+        {
+            WeatherLine = line;
+        }
+
+        if (detail != WeatherDetail)
+        {
+            WeatherDetail = detail;
+        }
     }
 
     /// <summary>默认城市在列表里的下标（没设置 / 找不到就是 0）。</summary>
