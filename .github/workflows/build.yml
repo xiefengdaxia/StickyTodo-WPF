@@ -68,7 +68,8 @@ jobs:
           if ($LASTEXITCODE -eq 0) { exit 0 }
 
           # 失败时把「哪些用例挂了 + 报错信息」写进 job summary，
-          # 免得到时候只能看到一个 exit code 1 还得翻整份日志。
+          # 同时用 ::error:: 注解输出——注解可以通过 GitHub API 读到，
+          # 这样在本地也能定位失败原因，不用登录网页翻日志。
           $summary = @()
           $trx = "TestResults/results.trx"
           if (Test-Path $trx) {
@@ -78,9 +79,12 @@ jobs:
             foreach ($f in $failed) {
               $msg = $f.Output.ErrorInfo.Message
               $summary += "- ``$($f.testName)`` — $msg"
+              $oneLine = ($msg -split "`n")[0]
+              Write-Host "::error title=$($f.testName)::$oneLine"
             }
           } else {
             $summary += "测试运行器没有产出 trx 文件"
+            Write-Host "::error title=test::没有产出 trx 文件"
           }
 
           if ($summary.Count -gt 0) { $summary -join "`n" | Out-File $env:GITHUB_STEP_SUMMARY -Append }
