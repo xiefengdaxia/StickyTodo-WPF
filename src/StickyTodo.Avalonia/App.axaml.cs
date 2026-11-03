@@ -278,7 +278,100 @@ public partial class App : Application
             DragTrial.Run(dragTrial);
         }
 
+        // 待办列表增量更新 + 删除可撤销回归
+        if (HasFlag(args, "--row-undo-demo"))
+        {
+            _ = RunRowUndoDemoAsync(services);
+        }
+
         Log.Info($"StickyTodo 启动完成，数据目录 {AppPaths.DataDirectory}");
+    }
+
+    /// <summary>
+    /// --row-undo-demo：验证这一轮新加的两件事（Avalonia 版）：
+    ///   ① 待办列表「增量更新」——勾掉一条后，别的行对象还是原来那几个实例；
+    ///   ② 删除可撤销——删掉一条后提示条浮出，撤销能把标题 / 标签 / 位置都还原。
+    /// 顺带断言 XAML 里「已删除…撤销」那条真的会显示（不是只改了 ViewModel）。
+    /// 全部通过 exit=0，否则 exit=2。
+    /// </summary>
+    private static async Task RunRowUndoDemoAsync(AppServices services)
+    {
+        try
+        {
+            var board = services.Todos.EnsureDefaultBoard();
+
+            foreach (var existing in services.Todos.GetTodos(board.Id))
+            {
+                services.Todos.Delete(existing.Id);
+            }
+
+            services.Todos.AddTodo(board.Id, "第一条");
+            var second = services.Todos.AddTodo(board.Id, "第二条");
+            services.Todos.AddTodo(board.Id, "第三条");
+
+            var tag = services.Todos.CreateTag("重要");
+            services.Todos.SetTodoTags(second.Id, [tag.Id]);
+
+            var window = (BoardWindow)services.Windows.OpenBoard(board);
+
+            // 等窗口 Loaded 里的首次 LoadAsync 落地
+            await Task.Delay(900);
+
+            // ---- ① 增量更新：勾掉最后一条，其它行的对象实例必须原封不动 ----
+            var firstRef = window.RowsForTest[0];
+            var secondRef = window.RowsForTest[1];
+            var thirdRef = window.RowsForTest[2];
+
+            await window.CompleteRowByIndexForTestAsync(2);
+
+            var syncOk = window.RowsForTest.Count == 2
+                         && ReferenceEquals(window.RowsForTest[0], firstRef)
+                         && ReferenceEquals(window.RowsForTest[1], secondRef)
+                         && !ReferenceEquals(window.RowsForTest[0], thirdRef);
+            Log.Info($"[rowundo] ①增量更新：行数={window.RowsForTest.Count} 行对象原地复用={syncOk}");
+
+            // ---- ② 删除：提示条要真的浮出来 ----
+            await window.DeleteRowByIndexForTestAsync(1);
+
+            var undoBar = window.FindControl<Avalonia.Controls.StackPanel>("UndoBar");
+            var statusLine = window.FindControl<Avalonia.Controls.TextBlock>("StatusLine");
+            var undoText = window.FindControl<Avalonia.Controls.TextBlock>("UndoText");
+
+            var barOk = undoBar is { IsVisible: true }
+                        && statusLine is { IsVisible: false }
+                        && undoText?.Text.Contains("第二条", StringComparison.Ordinal) == true;
+            Log.Info($"[rowundo] ②删除：行数={window.RowsForTest.Count} 提示条浮出={barOk} 文案={undoText?.Text}");
+
+            // ---- ③ 撤销：标题 / 标签 / 行数都回来 ----
+            await window.UndoDeleteForTestAsync();
+
+            var restored = services.Todos.GetTodos(board.Id).FirstOrDefault(t => t.Title == "第二条");
+            IReadOnlyList<string> restoredTags = [];
+            if (restored is not null
+                && services.Todos.GetTodoTagMap(board.Id).TryGetValue(restored.Id, out var ids))
+            {
+                restoredTags = ids;
+            }
+
+            var undoOk = window.RowsForTest.Count == 2
+                         && undoBar is { IsVisible: false }
+                         && restored is not null
+                         && restoredTags.Contains(tag.Id);
+            Log.Info($"[rowundo] ③撤销：行数={window.RowsForTest.Count} 标签回来了={string.Join(",", restoredTags)} 断言={undoOk}");
+
+            var allOk = syncOk && barOk && undoOk;
+            Log.Info($"[rowundo] 总结果={(allOk ? "通过" : "失败")}");
+            Environment.ExitCode = allOk ? 0 : 2;
+        }
+        catch (Exception ex)
+        {
+            Log.Error("[rowundo] 失败：" + ex);
+            Environment.ExitCode = 1;
+        }
+        finally
+        {
+            services.ExitApplication();
+        }
     }
 
     /// <summary>本地提醒：到点弹右下角小窗 + 托盘通知。全部在本机完成。</summary>

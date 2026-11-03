@@ -1,5 +1,6 @@
-﻿using System.Collections.ObjectModel;
+﻿﻿using System.Collections.ObjectModel;
 using System.Threading.Tasks;
+using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StickyTodo.App.Services;
@@ -29,6 +30,9 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
         _isTopmost = settings.GetBoardTopmost(board.Id);
         _isLocked = settings.GetBoardLocked(board.Id);
         _windowOpacity = skin.WindowOpacity;
+
+        _undoTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
+        _undoTimer.Tick += (_, _) => ClearUndoDelete();
     }
 
     public Board Board { get; }
@@ -328,7 +332,13 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
             }
         }
 
-        RebuildRows();
+        SyncRows();
+
+        // 「已删除…」提示也是拼出来的文案
+        if (_recentlyDeleted is { } pending)
+        {
+            UndoDeleteText = Loc.F("row.deleted", pending.Title);
+        }
 
         OnPropertyChanged(nameof(DraftPlaceholder));
 
@@ -365,7 +375,7 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
         }
 
         RebuildChips();
-        RebuildRows();
+        SyncRows();
     }
 
     private void RebuildChips()
@@ -398,7 +408,15 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
     /// <summary>给回归用：已完成总数（全量，不做标签/视图过滤）。</summary>
     internal int CompletedCountForTest => _all.Count(t => t.IsDone);
 
-    private void RebuildRows()
+    /// <summary>
+    /// 把行列表同步成"当前筛选 + 排序"应有的样子。
+    ///
+    /// 以前这里是 <c>Rows.Clear()</c> + 整表重建：每勾一条、删一条都要新建 N 个行对象
+    /// 并把 ListBox 的容器全部重造，滚动位置、悬停态、正在编辑的行全被打断。
+    /// 现在按 id 复用已有行（原地 <see cref="TodoRowViewModel.Refresh"/>），
+    /// 只对真正增/删/换位的行动集合。
+    /// </summary>
+    private void SyncRows()
     {
         var chip = SelectedChip;
 
@@ -408,13 +426,59 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
             scoped.Where(t => TodoViewFilter.Matches(t.IsDone, ViewMode)),
             ViewMode,
             t => t.Sort,
-            t => t.DoneAt);
+            t => t.DoneAt).ToList();
 
-        Rows.Clear();
         var now = DateTimeOffset.Now;
+
+        // 已有行按 id 建索引；下面按目标顺序逐个复用，剩下的就是该删除的
+        var existing = new Dictionary<string, TodoRowViewModel>(Rows.Count, StringComparer.Ordinal);
+        foreach (var row in Rows)
+        {
+            existing[row.Id] = row;
+        }
+
+        var desired = new List<TodoRowViewModel>(visible.Count);
         foreach (var item in visible)
         {
-            Rows.Add(new TodoRowViewModel(item, TagTextOf(item.Id), now));
+            if (existing.Remove(item.Id, out var row))
+            {
+                row.Refresh(item, TagTextOf(item.Id), now);
+            }
+            else
+            {
+                row = new TodoRowViewModel(item, TagTextOf(item.Id), now);
+            }
+
+            desired.Add(row);
+        }
+
+        // 不再可见的行（被过滤掉 / 删除了）移出集合
+        if (existing.Count > 0)
+        {
+            foreach (var gone in existing.Values)
+            {
+                Rows.Remove(gone);
+            }
+        }
+
+        // 剩下的差集就是顺序变化：就地 Move，新行 Insert
+        for (var i = 0; i < desired.Count; i++)
+        {
+            var row = desired[i];
+            var index = Rows.IndexOf(row);
+            if (index == i)
+            {
+                continue;
+            }
+
+            if (index >= 0)
+            {
+                Rows.Move(index, i);
+            }
+            else
+            {
+                Rows.Insert(i, row);
+            }
         }
 
         var undone = scoped.Count(t => !t.IsDone);
@@ -454,7 +518,7 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
         OnPropertyChanged(nameof(EmptyHint));
         OnPropertyChanged(nameof(CanAdd));
         OnPropertyChanged(nameof(DraftPlaceholder));
-        RebuildRows();
+        SyncRows();
     }
 
     /// <summary>切换视图。在已完成视图新增时自动切回待办，避免「看不见新加的东西」。</summary>
@@ -480,7 +544,7 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
             item.IsSelected = ReferenceEquals(item, chip);
         }
 
-        RebuildRows();
+        SyncRows();
         await Task.CompletedTask;
     }
 
@@ -527,20 +591,8 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
         }
     }
 
-    /// <summary>✕ 删除（行悬停按钮用）。</summary>
-    public async Task DeleteRowAsync(TodoRowViewModel row)
-    {
-        try
-        {
-            ErrorText = null;
-            await Task.Run(() => _service.Delete(row.Id));
-            await LoadAsync();
-        }
-        catch (Exception ex)
-        {
-            ErrorText = ex.Message;
-        }
-    }
+    /// <summary>✕ 删除（行悬停按钮用）。删完底部给一条可撤销的提示。</summary>
+    public Task DeleteRowAsync(TodoRowViewModel row) => DeleteWithUndoAsync(row);
 
     /// <summary>给回归脚本读：指定行的标签（从数据库重新读，不经内存缓存）。</summary>
     public string TagTextOfRowFromDb(int index)
@@ -605,16 +657,135 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
             return;
         }
 
+        await DeleteWithUndoAsync(row);
+    }
+
+    // ---------------- 删除可撤销 ----------------
+
+    /// <summary>刚删掉的那条，够用来原样加回来。</summary>
+    private sealed record DeletedTodo(
+        string Title,
+        DateTimeOffset? DueAt,
+        DateTimeOffset? RemindAt,
+        string? Recurrence,
+        bool WasDone,
+        IReadOnlyList<string> TagIds,
+        string? NextId);
+
+    private DeletedTodo? _recentlyDeleted;
+
+    /// <summary>撤销窗口（8 秒）。过了就把它定型成真删除，不再显示提示条。</summary>
+    private readonly DispatcherTimer _undoTimer;
+
+    /// <summary>底部「已删除 … · 撤销」提示条是否可见。</summary>
+    [ObservableProperty]
+    private bool _hasUndoDelete;
+
+    /// <summary>提示条上的文案，如「已删除「买牛奶」」。</summary>
+    [ObservableProperty]
+    private string _undoDeleteText = string.Empty;
+
+    /// <summary>删除一条待办：数据库立刻删，但底部留 8 秒「撤销」——误点 ✕ 也能救回来。</summary>
+    private async Task DeleteWithUndoAsync(TodoRowViewModel row)
+    {
         try
         {
             ErrorText = null;
+
+            var snapshot = new DeletedTodo(
+                row.Item.Title,
+                row.Item.DueAt,
+                row.Item.RemindAt,
+                row.Item.Recurrence,
+                row.IsDone,
+                TagsOf(row.Id),
+                NextVisibleIdAfter(row));
+
             await Task.Run(() => _service.Delete(row.Id));
+            await LoadAsync();
+
+            _recentlyDeleted = snapshot;
+            UndoDeleteText = Loc.F("row.deleted", snapshot.Title);
+            HasUndoDelete = true;
+            _undoTimer.Stop();
+            _undoTimer.Start();
+        }
+        catch (Exception ex)
+        {
+            ErrorText = ex.Message;
+        }
+    }
+
+    /// <summary>撤销上一条删除：按原样加回来（标题 / 目标日期 / 提醒 / 重复 / 完成状态 / 标签 / 原位置）。</summary>
+    public async Task UndoDeleteAsync()
+    {
+        var snapshot = _recentlyDeleted;
+        ClearUndoDelete();
+
+        if (snapshot is null)
+        {
+            return;
+        }
+
+        try
+        {
+            ErrorText = null;
+            await Task.Run(() =>
+            {
+                var restored = _service.AddTodo(BoardId, snapshot.Title, snapshot.DueAt);
+
+                if (snapshot.TagIds.Count > 0)
+                {
+                    _service.SetTodoTags(restored.Id, snapshot.TagIds);
+                }
+
+                if (snapshot.RemindAt is { } remind)
+                {
+                    _service.SetRemindAt(restored.Id, remind);
+                }
+
+                if (!string.IsNullOrWhiteSpace(snapshot.Recurrence))
+                {
+                    _service.SetRecurrence(restored.Id, snapshot.Recurrence);
+                }
+
+                if (snapshot.WasDone)
+                {
+                    _service.SetDone(restored.Id, true);
+                }
+
+                // 回到它原来在列表里的位置（删的是最后一条就落回末尾）
+                if (snapshot.NextId is { } next)
+                {
+                    _service.MoveBefore(BoardId, restored.Id, next);
+                }
+            });
+
             await LoadAsync();
         }
         catch (Exception ex)
         {
             ErrorText = ex.Message;
         }
+    }
+
+    private void ClearUndoDelete()
+    {
+        _undoTimer.Stop();
+        _recentlyDeleted = null;
+        HasUndoDelete = false;
+        UndoDeleteText = string.Empty;
+    }
+
+    /// <summary>这条待办身上的标签 id（撤销时按原样挂回去）。</summary>
+    private IReadOnlyList<string> TagsOf(string todoId) =>
+        _tagMap.TryGetValue(todoId, out var ids) ? ids.ToList() : [];
+
+    /// <summary>它下面那一行（撤销时插回原位）；它本来就是最后一行就返回 null = 放末尾。</summary>
+    private string? NextVisibleIdAfter(TodoRowViewModel row)
+    {
+        var index = Rows.IndexOf(row);
+        return index >= 0 && index + 1 < Rows.Count ? Rows[index + 1].Id : null;
     }
 
     /// <summary>拖拽落点：把 movingId 放到 targetId 之前，null 表示末尾。</summary>

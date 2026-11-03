@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+﻿﻿using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -237,6 +237,10 @@ public partial class BoardWindow : Window, IStickyWindow
         }
     }
 
+    /// <summary>底部「撤销」：把刚删掉的那条按原样加回来。</summary>
+    private async void UndoDelete_Click(object sender, RoutedEventArgs e) =>
+        await _viewModel.UndoDeleteAsync();
+
     /// <summary>从一个按钮往上找到它所在的 ListBoxItem（行容器）。</summary>
     private FrameworkElement? FindRowContainer(DependencyObject start)
     {
@@ -294,6 +298,12 @@ public partial class BoardWindow : Window, IStickyWindow
         }
     }
 
+    /// <summary>给回归用：删除第 index 行并等它落库完成。</summary>
+    internal Task DeleteRowByIndexForTestAsync(int index) =>
+        index >= 0 && index < _viewModel.Rows.Count
+            ? _viewModel.DeleteRowAsync(_viewModel.Rows[index])
+            : Task.CompletedTask;
+
     /// <summary>给回归用：完成第 index 行。</summary>
     internal void CompleteRowByIndexForTest(int index)
     {
@@ -302,6 +312,24 @@ public partial class BoardWindow : Window, IStickyWindow
             _ = _viewModel.MarkDoneAsync(_viewModel.Rows[index]);
         }
     }
+
+    /// <summary>给回归用：完成第 index 行并等它落库完成（验证行对象是否原地复用）。</summary>
+    internal Task CompleteRowByIndexForTestAsync(int index) =>
+        index >= 0 && index < _viewModel.Rows.Count
+            ? _viewModel.MarkDoneAsync(_viewModel.Rows[index])
+            : Task.CompletedTask;
+
+    /// <summary>给回归用：当前列表的行对象（比较引用即可证明「没有整表重建」）。</summary>
+    internal IReadOnlyList<TodoRowViewModel> RowsForTest => _viewModel.Rows;
+
+    /// <summary>给回归用：底部「已删除… 撤销」提示条是否显示。</summary>
+    internal bool HasUndoDeleteForTest => _viewModel.HasUndoDelete;
+
+    /// <summary>给回归用：提示条上的文案。</summary>
+    internal string UndoDeleteTextForTest => _viewModel.UndoDeleteText;
+
+    /// <summary>给回归用：点一下「撤销」，等它把待办加回来。</summary>
+    internal Task UndoDeleteForTestAsync() => _viewModel.UndoDeleteAsync();
 
     // ---------------- 表格行内编辑 ----------------
 

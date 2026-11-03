@@ -320,6 +320,30 @@ private void ApplyLockInteraction()
         }
     }
 
+    /// <summary>底部「撤销」：把刚删掉的那条按原样加回来。</summary>
+    private async void UndoDelete_Click(object? sender, RoutedEventArgs e) =>
+        await _viewModel.UndoDeleteAsync();
+
+    // ---------------- 回归测试用入口 ----------------
+
+    /// <summary>给回归用：当前列表的行对象（比较引用即可证明「没有整表重建」）。</summary>
+    internal IReadOnlyList<TodoRowViewModel> RowsForTest => _viewModel.Rows;
+
+    /// <summary>给回归用：完成第 index 行并等它落库完成。</summary>
+    internal Task CompleteRowByIndexForTestAsync(int index) =>
+        index >= 0 && index < _viewModel.Rows.Count
+            ? _viewModel.MarkDoneAsync(_viewModel.Rows[index])
+            : Task.CompletedTask;
+
+    /// <summary>给回归用：删除第 index 行并等它落库完成。</summary>
+    internal Task DeleteRowByIndexForTestAsync(int index) =>
+        index >= 0 && index < _viewModel.Rows.Count
+            ? _viewModel.DeleteRowAsync(_viewModel.Rows[index])
+            : Task.CompletedTask;
+
+    /// <summary>给回归用：点一下「撤销」，等它把待办加回来。</summary>
+    internal Task UndoDeleteForTestAsync() => _viewModel.UndoDeleteAsync();
+
     private void RowTitle_GotFocus(object? sender, GotFocusEventArgs e)
     {
         if (sender is TextBox { Tag: TodoRowViewModel row })

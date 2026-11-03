@@ -335,7 +335,16 @@
                 Margin="0,4,0,0">
           <Grid ColumnDefinitions="*,Auto">
             <StackPanel Grid.Column="0" VerticalAlignment="Center">
-              <TextBlock Text="{Binding StatusText}" Classes="caption" TextTrimming="CharacterEllipsis" />
+              <!-- 平时显示计数；刚删过一条时让位给「已删除… · 撤销」 -->
+              <TextBlock Name="StatusLine" Text="{Binding StatusText}" Classes="caption" TextTrimming="CharacterEllipsis"
+                         IsVisible="{Binding !HasUndoDelete}" />
+              <StackPanel Name="UndoBar" Orientation="Horizontal" IsVisible="{Binding HasUndoDelete}">
+                <TextBlock Name="UndoText" Text="{Binding UndoDeleteText}" Classes="caption" TextTrimming="CharacterEllipsis"
+                           VerticalAlignment="Center" />
+                <Button Content="{loc:Loc row.undoDelete}"
+                        Classes="ghost" FontSize="11" Padding="6,1" Margin="6,0,0,0"
+                        Click="UndoDelete_Click" />
+              </StackPanel>
               <TextBlock Text="{Binding ErrorText}" FontSize="10"
                          Foreground="{DynamicResource Brush.Danger}"
                          TextTrimming="CharacterEllipsis"

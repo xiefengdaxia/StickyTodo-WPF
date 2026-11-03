@@ -206,6 +206,13 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        // 待办列表增量更新 + 删除可撤销回归
+        if (e.Args.Contains("--row-undo-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunRowUndoDemo(ReadOptionValue(e.Args, "--shot"));
+            return;
+        }
+
         // 悬停操作回归：让 ✓/✕/↺ 显示出来并截图
         if (e.Args.Contains("--hover-demo", StringComparer.OrdinalIgnoreCase))
         {
@@ -2297,6 +2304,103 @@ public partial class App : System.Windows.Application
     }
 
     /// <summary>
+    /// --row-undo-demo：验证两件事（都是这一轮新加的）：
+    ///   ① 待办列表「增量更新」——勾掉一条后，别的行对象还是原来那几个实例（不是整表重建）；
+    ///   ② 删除可撤销——删掉一条后能一键还原，标题 / 标签 / 原位置都对。
+    /// 全部通过 exit=0，否则 exit=2。
+    /// </summary>
+    private async void RunRowUndoDemo(string? shotDirectory)
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+            _host = BuildHost();
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+
+            ApplyLanguageForCurrentRun();
+            var service = _host.Services.GetRequiredService<TodoService>();
+            var board = service.EnsureDefaultBoard();
+
+            foreach (var existing in service.GetTodos(board.Id))
+            {
+                service.Delete(existing.Id);
+            }
+
+            service.AddTodo(board.Id, "第一条");
+            var second = service.AddTodo(board.Id, "第二条");
+            service.AddTodo(board.Id, "第三条");
+
+            var tag = service.CreateTag("重要");
+            service.SetTodoTags(second.Id, [tag.Id]);
+
+            var windows = _host.Services.GetRequiredService<WindowManager>();
+            var window = (BoardWindow)windows.OpenBoard(board);
+            MainWindow = window;
+
+            // 等窗口 Loaded 里的首次 LoadAsync 落地
+            await Task.Delay(900);
+
+            // ---- ① 增量更新：勾掉最后一条，其它行的对象实例必须原封不动 ----
+            var firstRef = window.RowsForTest[0];
+            var secondRef = window.RowsForTest[1];
+            var thirdRef = window.RowsForTest[2];
+
+            await window.CompleteRowByIndexForTestAsync(2);
+
+            var syncOk = window.RowCountForTest() == 2
+                         && ReferenceEquals(window.RowsForTest[0], firstRef)
+                         && ReferenceEquals(window.RowsForTest[1], secondRef)
+                         && !ReferenceEquals(window.RowsForTest[0], thirdRef);
+            Log.Information("[rowundo] ①增量更新：行数={Count} 行对象原地复用={Ok}",
+                window.RowCountForTest(), syncOk);
+
+            // ---- ② 删除可撤销：删掉带标签的「第二条」 ----
+            await window.DeleteRowByIndexForTestAsync(1);
+
+            var deleteOk = window.RowCountForTest() == 1
+                           && window.HasUndoDeleteForTest
+                           && window.UndoDeleteTextForTest.Contains("第二条", StringComparison.Ordinal);
+            Log.Information("[rowundo] ②删除：行数={Count} 提示={Text} 断言={Ok}",
+                window.RowCountForTest(), window.UndoDeleteTextForTest, deleteOk);
+
+            if (shotDirectory is not null)
+            {
+                SaveWindowShots(Path.Combine(shotDirectory, "undo"));
+            }
+
+            await window.UndoDeleteForTestAsync();
+
+            var restored = service.GetTodos(board.Id).FirstOrDefault(t => t.Title == "第二条");
+            IReadOnlyList<string> restoredTags = [];
+            if (restored is not null
+                && service.GetTodoTagMap(board.Id).TryGetValue(restored.Id, out var restoredIds))
+            {
+                restoredTags = restoredIds;
+            }
+
+            var undoOk = window.RowCountForTest() == 2
+                         && !window.HasUndoDeleteForTest
+                         && restored is not null
+                         && restoredTags.Contains(tag.Id);
+            Log.Information("[rowundo] ③撤销：行数={Count} 标签回来了={Tags} 断言={Ok}",
+                window.RowCountForTest(), string.Join(",", restoredTags), undoOk);
+
+            var allOk = syncOk && deleteOk && undoOk;
+            Log.Information("[rowundo] 总结果={Result}", allOk ? "通过" : "失败");
+            Shutdown(allOk ? 0 : 2);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[rowundo] 失败");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
     /// --hover-demo：分别截「待办视图悬停（✓ ✕）」和「已完成视图悬停（↺ ✕）」两张图。
     /// </summary>
     private void RunHoverDemo(string? shotDirectory)
@@ -3290,6 +3394,10 @@ public partial class App : System.Windows.Application
             {
                 continue;
             }
+
+            // 绑定的 Visibility 刚被改掉时，布局树还是旧的：先强制重排一次，
+            // 否则截出来的图会「该出现的提示条没出现」。
+            window.UpdateLayout();
 
             const double scale = 2d; // 2 倍渲染，方便查看细节
             var width = (int)Math.Ceiling(window.ActualWidth * scale);

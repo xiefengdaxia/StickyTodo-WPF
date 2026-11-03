@@ -79,6 +79,8 @@ public static class UiStrings
         ["row.undo"] = ["撤回为待办", "Move back to to-do", "未完了に戻す", "할 일로 되돌리기"],
         ["row.delete"] = ["删除这条待办", "Delete this to-do", "この項目を削除", "이 항목 삭제"],
         ["row.titleEmpty"] = ["内容不能为空", "Title cannot be empty", "内容を入力してください", "내용을 입력해야 합니다"],
+        ["row.deleted"] = ["已删除「{0}」", "Deleted “{0}”", "「{0}」を削除しました", "「{0}」 삭제됨"],
+        ["row.undoDelete"] = ["撤销", "Undo", "元に戻す", "실행 취소"],
         ["view.todo"] = ["待办", "To-do", "未完了", "할 일"],
         ["view.done"] = ["已完成", "Done", "完了", "완료"],
         ["view.todoTip"] = ["只看未完成", "Show unfinished only", "未完了のみ表示", "미완료만 보기"],
