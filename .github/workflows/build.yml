@@ -1,0 +1,110 @@
+name: build
+
+# 只做一件事：每次 push / PR 都确认「能编译、402 条单测全过、
+# 两个 UI 项目的 XAML 都能正常生成」。之前几次踩的坑（XAML 开头多了个 BOM、
+# 注释被写坏、临时脚本改坏缩进）都靠肉眼检查，接上 CI 就不会再漏。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: build + test (${{ matrix.name }})
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # WPF 版：net8.0-windows，主线功能都在这里
+          - name: wpf
+            project: src/StickyTodo.App/StickyTodo.App.csproj
+          # Avalonia 版：net6.0，留给 Windows 7 的那条线
+          - name: avalonia
+            project: src/StickyTodo.Avalonia/StickyTodo.Avalonia.csproj
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          # 8.0：WPF 版与测试；6.0：Avalonia 版的目标框架（Win7 路线）
+          dotnet-version: |
+            8.0.x
+            6.0.x
+
+      - name: Cache NuGet
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'global.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore StickyTodo.sln --nologo
+
+      - name: Build ${{ matrix.name }}
+        run: dotnet build ${{ matrix.project }} -c Release --nologo --no-restore
+
+      # 单元测试只跑一遍（挂在 wpf 这个矩阵项上），避免两个 job 重复跑 402 条
+      - name: Test
+        if: matrix.name == 'wpf'
+        run: dotnet test tests/StickyTodo.Tests/StickyTodo.Tests.csproj -c Release --nologo --no-build
+
+      # 无界面冒烟 + 回归：真启动一次应用、建库、跑断言。
+      # 带超时：演示入口如果卡住，不要拖到 job 默认的 6 小时。
+      - name: Headless checks
+        if: matrix.name == 'wpf'
+        shell: pwsh
+        run: |
+          function Invoke-Demo([string]$flag, [int]$timeoutSec = 120) {
+            $exe = "src/StickyTodo.App/bin/Release/net8.0-windows/StickyTodo.exe"
+            $env:STICKYTODO_DATA_DIR = Join-Path $env:RUNNER_TEMP ("demo-" + ($flag -replace '[^a-z]', ''))
+
+            Write-Host "==> $flag"
+            $p = Start-Process $exe -ArgumentList $flag -PassThru -NoNewWindow
+            if (-not $p.WaitForExit($timeoutSec * 1000)) {
+              $p.Kill()
+              throw "$flag 超时（${timeoutSec}s）"
+            }
+
+            Remove-Item Env:\STICKYTODO_DATA_DIR -ErrorAction SilentlyContinue
+            if ($p.ExitCode -ne 0) { throw "$flag 退出码 $($p.ExitCode)" }
+          }
+
+          Invoke-Demo '--selftest'
+          Invoke-Demo '--recurrence-demo'
+          Invoke-Demo '--portable-check'
+
+  # 需要真实桌面的那 20 多个 --xxx-demo（截图、拖拽、置顶窗口）
+  # 在无人值守 runner 上不稳定，仍在本地用 tools/ 里的脚本跑。
+  # 这里只挑不依赖截图的 --skin-check，确认 10 套皮肤的资源仍然加载得起来。
+  skin-check:
+    name: headless demo (--skin-check)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    needs: build-and-test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Build
+        run: dotnet build src/StickyTodo.App/StickyTodo.App.csproj -c Release --nologo
+      - name: Run --skin-check
+        shell: pwsh
+        run: |
+          $exe = "src/StickyTodo.App/bin/Release/net8.0-windows/StickyTodo.exe"
+          $env:STICKYTODO_DATA_DIR = Join-Path $env:RUNNER_TEMP "skin-check-data"
+          $p = Start-Process $exe -ArgumentList '--skin-check' -PassThru -NoNewWindow
+          if (-not $p.WaitForExit(120000)) { $p.Kill(); throw '--skin-check 超时' }
+          if ($p.ExitCode -ne 0) { throw "--skin-check 退出码 $($p.ExitCode)" }

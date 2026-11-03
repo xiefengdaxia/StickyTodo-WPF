@@ -226,7 +226,8 @@ StickyTodo.sln
 │   ├─ Token/OpenCodeTokenStatsProvider.cs
 │   └─ AppPaths.cs
 ├─ src/StickyTodo.App              WPF 表现层（net8.0-windows）
-│   ├─ App.xaml(.cs)               最小 Host + DI + Serilog + 单实例 + 自检/演示
+│   ├─ App.xaml(.cs)               最小 Host + DI + Serilog + 单实例
+│   ├─ App.Demos.cs                30 多个 --xxx-demo 回归/截图入口（不参与正常启动）
 │   ├─ Views/                      ManagerWindow / SettingsWindow / BoardWindow / MemoBoardWindow / CalendarWindow / TokenBoardWindow / PomodoroWindow / PromptWindow / ReminderPopup
 │   ├─ ViewModels/                 CommunityToolkit.Mvvm（四类看板 + 设置页 + 番茄钟）
 │   ├─ Controls/                   TrendChart（自绘趋势图）
@@ -242,6 +243,10 @@ dotnet run --project tools/IconGen -c Release -- src/StickyTodo.App/Assets/stick
 ```
 
 依赖方向：`App → Infrastructure → Core`。Core 不知道数据库、窗口和 DI 的存在。
+
+**持续集成**：`.github/workflows/build.yml` 在每次 push / PR 上编译两个 UI 项目并跑全部单测；
+`release.yml` 在打 `v*.*.*` tag 时调用 `tools/` 下两个打包脚本，产出三份便携版 ZIP 并创建 Release。
+需要真实桌面的截图类演示（悬停、拖拽、锁定）仍用 `tools/*.ps1` 在本地机器上跑。
 
 ---
 
@@ -498,6 +503,12 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 - [x] **性能看板**：CPU（60 秒折线 + 当前值）/ 内存（进度条，75% 变橙 90% 变红）/ 磁盘 IO（活动率 + 读写字节）/ GPU / 网络 / 开机时长，每秒刷新；从「我的看板」新建或打开。数据走性能计数器，纯本机
 - [x] **待办 ↔ 日历联动**：待办右键「目标日期」（今天/明天/本周末/自定义）设定后自动出现在日历对应格子与当日日程列表；日历里可直接勾选完成、拖到别的日期改期、✕ 删除；侧栏「＋」在选中日期新建待办：**标题与时间点在同一个弹框**（提醒复选框 + 时/分两个下拉框，跟随皮肤；可留空为全天），勾选提醒时自动挂上提醒、到点弹窗。日历格子底部：单条日程显示标题，多条显示「共有 N 条待办」胶囊。日历年月下拉框应用皮肤样式
 
+**M10（已完成）**
+- [x] **待办列表增量更新**：勾选 / 删除 / 改标签 / 切视图不再 `Rows.Clear()` 整表重建，按 id 复用行对象原地刷新，滚动位置、悬停态和正在编辑的行都不再被打断
+- [x] **删除待办可撤销**：行尾 ✕ 删除后底部浮出「已删除「…」· 撤销」提示条（8 秒），撤销按快照原样还原标题 / 目标日期 / 提醒 / 重复规则 / 完成状态 / 标签 / 列表原位置
+- [x] **演示入口移出启动文件**：30 多个 `--xxx-demo` 从 `App.xaml.cs` 搬到 `App.Demos.cs`，入口文件从 3647 行降到 551 行
+- [x] **接入 GitHub Actions**：push / PR 自动跑 build + 402 条单测 + 无界面演示；打 `v*.*.*` tag 自动打包三份便携版并发 Release
+
 **M8（已完成）**
 - [x] **桌面时钟网速监控**：时间右侧实时显示 `↓下载 ↑上传`（所有网卡合计，每秒刷新），单位自动换档 KB/s → MB/s → GB/s；读本机性能计数器，不联网。计数器被禁时整行自动隐藏
 - [x] **工具窗口位置记忆**：天气 / 世界时钟 / 桌面时钟重启后回到上次的位置（之前每次都回默认位置）；恢复时按当前工作区夹取，换显示器/改缩放不会跑到屏幕外
@@ -514,7 +525,7 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 - [ ] ICS 订阅与导入导出
 - [ ] Excel 导入导出（NPOI）
 - [ ] 更多语言（可选）
-- [ ] 便携模式打包（单文件 / Velopack）
+- [x] 便携模式打包（单文件 / Velopack）
 
 ---
 

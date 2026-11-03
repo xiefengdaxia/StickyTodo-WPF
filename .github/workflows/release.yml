@@ -1,0 +1,143 @@
+name: release
+
+# 打 tag（v1.2.3）就自动出三份产物并发 Release：
+#   StickyTodo-<ver>-win-x64-portable.zip           WPF 版单文件便携（Windows 10 1809+）
+#   StickyTodo-Avalonia-<ver>-win-x64-portable.zip  Avalonia 版（Win7 SP1+），64 位
+#   StickyTodo-Avalonia-<ver>-win-x86-portable.zip  Avalonia 版（Win7 SP1+），32 位
+#
+# 打包脚本本身已包含「单文件发布 → 冒烟测试（--portable-check / --selftest）→ 打 ZIP」，
+# 这里只负责按 tag 取版本号、跑脚本、把三个 ZIP 挂到 Release 上。
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（如 1.7.8），仅手动触发时使用'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # 先跑测试，挂了就别发版
+  verify:
+    name: verify (test + selftest)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            6.0.x
+      - name: Test
+        run: dotnet test tests/StickyTodo.Tests/StickyTodo.Tests.csproj -c Release --nologo
+      - name: Smoke (--selftest)
+        shell: pwsh
+        run: |
+          $exe = "src/StickyTodo.App/bin/Release/net8.0-windows/StickyTodo.exe"
+          $env:STICKYTODO_DATA_DIR = Join-Path $env:RUNNER_TEMP "rel-selftest"
+          $p = Start-Process $exe -ArgumentList '--selftest' -PassThru -NoNewWindow
+          if (-not $p.WaitForExit(120000)) { $p.Kill(); throw '--selftest 超时' }
+          if ($p.ExitCode -ne 0) { throw "--selftest 退出码 $($p.ExitCode)" }
+
+  build-wpf:
+    name: package (WPF / desktop)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    needs: verify
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Resolve version
+        id: v
+        shell: pwsh
+        run: |
+          $v = "${{ inputs.version }}"
+          if ([string]::IsNullOrWhiteSpace($v)) { $v = "${{ github.ref_name }}".TrimStart('v') }
+          if ($v -notmatch '^\d+\.\d+\.\d+$') { throw "版本号不合法：$v" }
+          "value=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "版本号 = $v"
+      - name: Publish WPF portable
+        shell: pwsh
+        run: ./tools/publish-portable.ps1 -Version ${{ steps.v.outputs.value }} -SkipTests -OutputDirectory publish
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wpf-portable
+          path: publish/*.zip
+          if-no-files-found: error
+
+  build-avalonia:
+    name: package (Avalonia / Win7 x64 + x86)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    needs: verify
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            6.0.x
+      - name: Resolve version
+        id: v
+        shell: pwsh
+        run: |
+          $v = "${{ inputs.version }}"
+          if ([string]::IsNullOrWhiteSpace($v)) { $v = "${{ github.ref_name }}".TrimStart('v') }
+          if ($v -notmatch '^\d+\.\d+\.\d+$') { throw "版本号不合法：$v" }
+          "value=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "版本号 = $v"
+      - name: Publish Avalonia portable
+        shell: pwsh
+        run: ./tools/publish-avalonia-win7.ps1 -Version ${{ steps.v.outputs.value }} -SkipTests -OutputDirectory publish-avalonia
+      - uses: actions/upload-artifact@v4
+        with:
+          name: avalonia-portable
+          path: publish-avalonia/*.zip
+          if-no-files-found: error
+
+  release:
+    name: create GitHub release
+    runs-on: windows-latest
+    timeout-minutes: 20
+    needs: [build-wpf, build-avalonia]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $v = "${{ inputs.version }}"
+          if ([string]::IsNullOrWhiteSpace($v)) { $v = "${{ github.ref_name }}".TrimStart('v') }
+
+          $files = @(Get-ChildItem dist -Recurse -Filter *.zip | ForEach-Object { $_.FullName })
+          if ($files.Count -eq 0) { throw '没有找到任何 ZIP 产物' }
+          $files | ForEach-Object { Write-Host ("  {0}" -f (Split-Path $_ -Leaf)) }
+
+          # 同名 release 已存在就补传资产，避免重复触发时 422
+          gh release view "v$v" *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload "v$v" @files --clobber
+          } else {
+            gh release create "v$v" @files `
+              --title "StickyTodo $v" `
+              --notes 'WPF 便携版（Windows 10 1809+）与 Avalonia 便携版（含 Windows 7 SP1，x64/x86）。解压即用，不需要安装 .NET 运行时。' `
+              --generate-notes
+          }
+          if ($LASTEXITCODE -ne 0) { throw '创建/更新 Release 失败' }
