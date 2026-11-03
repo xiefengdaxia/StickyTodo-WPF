@@ -72,6 +72,10 @@ public static class UiStrings
         // ================= 待办看板 =================
         ["board.untitled"] = ["新看板", "New board", "新しいボード", "새 보드"],
         ["board.draftPlaceholder"] = ["在这里写一条，回车即添加", "Type here, press Enter to add", "ここに入力し、Enter で追加", "여기에 입력하고 Enter로 추가"],
+        ["board.searchPlaceholder"] = ["搜索标题 / 标签 / 日期", "Search title, tag, date", "タイトル・タグ・日付を検索", "제목·태그·날짜 검색"],
+        ["board.searchCount"] = ["找到 {0} 项（{1}）", "{0} match(es) for “{1}”", "「{1}」が {0} 件", "「{1}」 {0}개"],
+        ["board.searchTip"] = ["看板内搜索", "Search this board", "ボード内検索", "보드 내 검색"],
+        ["board.searchClear"] = ["清除搜索", "Clear search", "検索をクリア", "검색 지우기"],
         ["board.addTag"] = ["＋标签", "+ Tag", "＋タグ", "＋태그"],
         ["board.addTagTip"] = ["新建标签", "Create a tag", "タグを作成", "태그 만들기"],
         ["board.dragHandleTip"] = ["拖动可调整顺序；拖到上方的标签上可改标签", "Drag to reorder; drop on a tag above to retag", "ドラッグで並べ替え／上のタグにドロップで付け替え", "드래그로 순서 변경, 위 태그에 놓으면 태그 변경"],
@@ -140,6 +144,8 @@ public static class UiStrings
         ["repeat.yearly"] = ["每年", "Every year", "毎年", "매년"],
         ["repeat.custom"] = ["自定义 RRULE…", "Custom RRULE…", "カスタム RRULE…", "사용자 RRULE…"],
         ["repeat.clear"] = ["不重复", "No repeat", "繰り返さない", "반복 안 함"],
+        ["repeat.invalidTitle"] = ["规则无效", "Invalid rule", "ルールが無効です", "규칙이 잘못되었습니다"],
+        ["repeat.invalidRule"] = ["这条规则看不懂：{0}", "Cannot parse this rule: {0}", "このルールを解釈できません：{0}", "이 규칙을 해석할 수 없습니다: {0}"],
 
         // ================= 日历 =================
         ["cal.weekMon"] = ["一", "Mon", "月", "월"],
@@ -365,6 +371,7 @@ public static class UiStrings
 
         // ================= 输入框 =================
         ["prompt.title"] = ["输入", "Input", "入力", "입력"],
+        ["confirm.title"] = ["请确认", "Please confirm", "確認してください", "확인해 주세요"],
         ["prompt.required"] = ["不能为空。", "This field is required.", "入力が必要です。", "필수 입력입니다."],
         ["cal.deleteTitle"] = ["确认删除", "Confirm delete", "削除の確認", "삭제 확인"],
         ["cal.deleteConfirm"] = ["删除「{0}」？如果它是重复待办，整条规则都会被删除。", "Delete \"{0}\"? If it repeats, the whole rule will be removed.", "「{0}」を削除しますか？繰り返し項目の場合、ルール全体が削除されます。", "\"{0}\"을(를) 삭제할까요? 반복 항목이면 규칙 전체가 삭제됩니다."],

@@ -226,9 +226,44 @@ public partial class BoardWindow : StickyWindowBase
 
     private void ToggleTopmost_Click(object? sender, RoutedEventArgs e) => _viewModel.ToggleTopmost();
 
-private void ToggleLock_Click(object? sender, RoutedEventArgs e) => _viewModel.ToggleLock();
+    private void ToggleLock_Click(object? sender, RoutedEventArgs e) => _viewModel.ToggleLock();
 
-private UnlockChipWindow? _unlockChip;
+    // ---------------- 看板内搜索 ----------------
+
+    /// <summary>标题栏的 🔍：展开/收起搜索框，展开时把光标放进去。</summary>
+    private void Search_Click(object? sender, RoutedEventArgs e)
+    {
+        _viewModel.ToggleSearch();
+
+        if (_viewModel.IsSearchOpen)
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(
+                () =>
+                {
+                    SearchBox.Focus();
+                    SearchBox.CaretIndex = SearchBox.Text?.Length ?? 0;
+                },
+                Avalonia.Threading.DispatcherPriority.Input);
+        }
+    }
+
+    private void SearchClear_Click(object? sender, RoutedEventArgs e)
+    {
+        _viewModel.ClearSearch();
+        SearchBox.Focus();
+    }
+
+    /// <summary>Esc 收起搜索框（顺带清空关键字）。</summary>
+    private void SearchBox_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape)
+        {
+            _viewModel.IsSearchOpen = false;
+            e.Handled = true;
+        }
+    }
+
+    private UnlockChipWindow? _unlockChip;
 
 /// <summary>
 /// 锁定 = 只供查看：窗口设成鼠标穿透（点下去的是下面那层），
@@ -328,6 +363,16 @@ private void ApplyLockInteraction()
 
     /// <summary>给回归用：当前列表的行对象（比较引用即可证明「没有整表重建」）。</summary>
     internal IReadOnlyList<TodoRowViewModel> RowsForTest => _viewModel.Rows;
+
+    /// <summary>给回归用：设置搜索关键字（同时展开搜索框）。</summary>
+    internal void SetSearchForTest(string text)
+    {
+        _viewModel.IsSearchOpen = true;
+        _viewModel.SearchText = text;
+    }
+
+    /// <summary>给回归用：清空搜索。</summary>
+    internal void ClearSearchForTest() => _viewModel.ClearSearch();
 
     /// <summary>给回归用：完成第 index 行并等它落库完成。</summary>
     internal Task CompleteRowByIndexForTestAsync(int index) =>

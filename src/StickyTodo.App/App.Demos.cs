@@ -12,6 +12,7 @@ using StickyTodo.App.Views;
 using StickyTodo.Core.Abstractions;
 using StickyTodo.Core.Entities;
 using StickyTodo.Core.Entitlements;
+using StickyTodo.Core.Localization;
 using StickyTodo.Core.Recurrence;
 using StickyTodo.Core.Services;
 using StickyTodo.Infrastructure;
@@ -1729,6 +1730,139 @@ public partial class App : System.Windows.Application
     }
 
     /// <summary>
+    /// --search-demo：验证「看板内搜索」—— 关键字过滤标题/标签/日期、
+    /// 与标签胶囊取交集、Esc 收起并清空，并顺带截一张图。
+    /// </summary>
+    private async void RunSearchDemo(string? shotDirectory)
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+            _host = BuildHost();
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+
+            ApplyLanguageForCurrentRun();
+            var service = _host.Services.GetRequiredService<TodoService>();
+            var board = service.EnsureDefaultBoard();
+
+            foreach (var existing in service.GetTodos(board.Id))
+            {
+                service.Delete(existing.Id);
+            }
+
+            service.AddTodo(board.Id, "买牛奶", DateTimeOffset.Now.Date.AddHours(9));
+            var tagged = service.AddTodo(board.Id, "写周报");
+            service.AddTodo(board.Id, "去健身房");
+            var tag = service.CreateTag("工作");
+            service.SetTodoTags(tagged.Id, [tag.Id]);
+
+            var windows = _host.Services.GetRequiredService<WindowManager>();
+            var window = (BoardWindow)windows.OpenBoard(board);
+            MainWindow = window;
+
+            await Task.Delay(900);
+
+            var allCount = window.RowCountForTest();
+
+            // ① 按标题搜
+            window.SetSearchForTest("牛奶");
+            var byTitle = window.RowCountForTest() == 1;
+
+            // ② 按标签名搜（标签叫「工作」）
+            window.SetSearchForTest("工作");
+            var byTag = window.RowCountForTest() == 1;
+
+            // ③ 搜不到时是 0 行
+            window.SetSearchForTest("不存在的关键字");
+            var noneOk = window.RowCountForTest() == 0;
+
+            // ④ 清空后恢复全部
+            window.ClearSearchForTest();
+            var restoreOk = window.RowCountForTest() == allCount;
+
+            Log.Information(
+                "[search] 全部={All} 按标题={ByTitle} 按标签={ByTag} 无结果={None} 清空恢复={Restore}",
+                allCount, byTitle, byTag, noneOk, restoreOk);
+
+            // 截图：展开搜索框并输入关键字
+            if (shotDirectory is not null)
+            {
+                window.SetSearchForTest("工作");
+                await Task.Delay(300);
+                SaveWindowShots(Path.Combine(shotDirectory, "search"));
+            }
+
+            var ok = byTitle && byTag && noneOk && restoreOk;
+            Log.Information("[search] 总结果={Result}", ok ? "通过" : "失败");
+            Shutdown(ok ? 0 : 2);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[search] 失败");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
+    /// --confirm-demo：截一张「换皮肤确认框」，确认它在浅色/暗色皮肤下都不再是系统白框。
+    /// 因为 ShowDialog 会阻塞，这里直接 Show() 出来截图。
+    /// </summary>
+    private void RunConfirmDemo(string? shotDirectory)
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+            _host = BuildHost();
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+
+            ApplyLanguageForCurrentRun();
+            var service = _host.Services.GetRequiredService<TodoService>();
+            var board = service.EnsureDefaultBoard();
+
+            var windows = _host.Services.GetRequiredService<WindowManager>();
+            var owner = (BoardWindow)windows.OpenBoard(board);
+            MainWindow = owner;
+
+            var dialog = ConfirmWindow.CreatePreview(
+                Loc.T("cal.deleteTitle"),
+                Loc.F("manager.deleteConfirm", board.Name),
+                Loc.T("common.delete"));
+
+            dialog.Owner = owner;
+            dialog.Show();
+
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(900) };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+
+                if (shotDirectory is not null)
+                {
+                    SaveWindowShots(Path.Combine(shotDirectory, "confirm"));
+                }
+
+                Log.Information("[confirm] 确认框已截图");
+                dialog.Close();
+                Shutdown(0);
+            };
+            timer.Start();
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[confirm] 失败");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
     /// --hover-demo：分别截「待办视图悬停（✓ ✕）」和「已完成视图悬停（↺ ✕）」两张图。
     /// </summary>
     private void RunHoverDemo(string? shotDirectory)
@@ -3092,6 +3226,20 @@ public partial class App : System.Windows.Application
         if (args.Contains("--row-undo-demo", StringComparer.OrdinalIgnoreCase))
         {
             RunRowUndoDemo(ReadOptionValue(args, "--shot"));
+            return true;
+        }
+
+        // 看板内搜索回归
+        if (args.Contains("--search-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunSearchDemo(ReadOptionValue(args, "--shot"));
+            return true;
+        }
+
+        // 换皮肤确认框截图
+        if (args.Contains("--confirm-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunConfirmDemo(ReadOptionValue(args, "--shot"));
             return true;
         }
 

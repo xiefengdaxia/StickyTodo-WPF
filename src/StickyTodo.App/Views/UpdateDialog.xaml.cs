@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Globalization;
 using System.Windows;
 using StickyTodo.Core.Localization;
@@ -124,7 +124,7 @@ public partial class UpdateDialog : Window
         }
         catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
         {
-            MessageBox.Show(this, ex.Message, "StickyTodo", MessageBoxButton.OK, MessageBoxImage.Warning);
+            ConfirmWindow.Notify(this, "StickyTodo", ex.Message);
         }
     }
 

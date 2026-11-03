@@ -322,6 +322,16 @@ public partial class BoardWindow : Window, IStickyWindow
     /// <summary>给回归用：当前列表的行对象（比较引用即可证明「没有整表重建」）。</summary>
     internal IReadOnlyList<TodoRowViewModel> RowsForTest => _viewModel.Rows;
 
+    /// <summary>给回归用：设置搜索关键字（同时展开搜索框）。</summary>
+    internal void SetSearchForTest(string text)
+    {
+        _viewModel.IsSearchOpen = true;
+        _viewModel.SearchText = text;
+    }
+
+    /// <summary>给回归用：清空搜索。</summary>
+    internal void ClearSearchForTest() => _viewModel.ClearSearch();
+
     /// <summary>给回归用：底部「已删除… 撤销」提示条是否显示。</summary>
     internal bool HasUndoDeleteForTest => _viewModel.HasUndoDelete;
 
@@ -555,11 +565,47 @@ public partial class BoardWindow : Window, IStickyWindow
 
     private void ToggleTopmost_Click(object sender, RoutedEventArgs e) => _viewModel.ToggleTopmost();
 
-private void ToggleLock_Click(object sender, RoutedEventArgs e)
-{
-    _viewModel.ToggleLock();
-    ApplyLockInteraction();
-}
+    private void ToggleLock_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.ToggleLock();
+        ApplyLockInteraction();
+    }
+
+    // ---------------- 看板内搜索 ----------------
+
+    /// <summary>标题栏的 🔍：展开/收起搜索框，展开时自动把光标放进去。</summary>
+    private void Search_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.ToggleSearch();
+
+        if (_viewModel.IsSearchOpen)
+        {
+            // 等布局把搜索框显示出来再抢焦点
+            Dispatcher.BeginInvoke(
+                System.Windows.Threading.DispatcherPriority.Input,
+                new Action(() =>
+                {
+                    SearchBox.Focus();
+                    SearchBox.CaretIndex = SearchBox.Text.Length;
+                }));
+        }
+    }
+
+    private void SearchClear_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.ClearSearch();
+        SearchBox.Focus();
+    }
+
+    /// <summary>Esc 收起搜索框（顺带清空关键字）。</summary>
+    private void SearchBox_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == System.Windows.Input.Key.Escape)
+        {
+            _viewModel.IsSearchOpen = false;
+            e.Handled = true;
+        }
+    }
 
     private UnlockChipWindow? _unlockChip;
 
@@ -1268,13 +1314,11 @@ private void ToggleLock_Click(object sender, RoutedEventArgs e)
         var remove = new MenuItem { Header = "删除标签" };
         remove.Click += async (_, _) =>
         {
-            var confirm = MessageBox.Show(
-                $"删除标签「{tag.Name}」？已挂该标签的待办不受影响。",
-                "确认删除",
-                MessageBoxButton.OKCancel,
-                MessageBoxImage.Warning);
-
-            if (confirm == MessageBoxResult.OK)
+            if (ConfirmWindow.Confirm(
+                    this,
+                    Loc.T("cal.deleteTitle"),
+                    $"删除标签「{tag.Name}」？已挂该标签的待办不受影响。",
+                    Loc.T("common.delete")))
             {
                 await _viewModel.DeleteTagAsync(tag);
             }
@@ -1493,7 +1537,7 @@ private void ToggleLock_Click(object sender, RoutedEventArgs e)
 
             if (!RecurrenceEngine.IsValid(text))
             {
-                MessageBox.Show($"这条规则看不懂：{text}", "规则无效", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ConfirmWindow.Notify(this, Loc.T("repeat.invalidTitle"), Loc.F("repeat.invalidRule", text));
                 return;
             }
 

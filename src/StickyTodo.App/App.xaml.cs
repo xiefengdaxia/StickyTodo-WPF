@@ -44,7 +44,7 @@ public partial class App : System.Windows.Application
         _mutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var isFirstInstance);
         if (!isFirstInstance)
         {
-            MessageBox.Show("StickyTodo 已经在运行。", "StickyTodo", MessageBoxButton.OK, MessageBoxImage.Information);
+            ConfirmWindow.Notify(null, "StickyTodo", "StickyTodo 已经在运行。");
             Shutdown();
             return;
         }
@@ -216,8 +216,8 @@ public partial class App : System.Windows.Application
         catch (Exception ex)
         {
             Log.Fatal(ex, "启动失败");
-            MessageBox.Show($"启动失败：{ex.Message}\n\n日志位置：{AppPaths.LogDirectory}",
-                "StickyTodo", MessageBoxButton.OK, MessageBoxImage.Error);
+            ConfirmWindow.Notify(null, "StickyTodo",
+                $"启动失败：{ex.Message}\n\n日志位置：{AppPaths.LogDirectory}");
             Shutdown(-1);
         }
     }
@@ -250,11 +250,10 @@ public partial class App : System.Windows.Application
             // 标记已处理，程序继续运行；弹窗也做兜底，避免二次异常
             try
             {
-                MessageBox.Show(
-                    $"操作失败：{args.Exception.Message}\n\n详细信息已写入日志：{AppPaths.LogDirectory}",
+                ConfirmWindow.Notify(
+                    null,
                     "StickyTodo",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                    $"操作失败：{args.Exception.Message}\n\n详细信息已写入日志：{AppPaths.LogDirectory}");
             }
             catch (Exception)
             {

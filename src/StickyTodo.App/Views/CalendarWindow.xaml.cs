@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -183,13 +183,13 @@ public partial class CalendarWindow : Window, IStickyWindow
             return;
         }
 
-        var confirm = MessageBox.Show(
-            Loc.F("cal.deleteConfirm", entry.Title),
+        var confirmed = ConfirmWindow.Confirm(
+            this,
             Loc.T("cal.deleteTitle"),
-            MessageBoxButton.OKCancel,
-            MessageBoxImage.Warning);
+            Loc.F("cal.deleteConfirm", entry.Title),
+            Loc.T("common.delete"));
 
-        if (confirm != MessageBoxResult.OK)
+        if (!confirmed)
         {
             return;
         }
@@ -205,7 +205,7 @@ public partial class CalendarWindow : Window, IStickyWindow
         }
         catch (Exception ex)
         {
-            MessageBox.Show(ex.Message, Loc.T("cal.deleteFailed"), MessageBoxButton.OK, MessageBoxImage.Warning);
+            ConfirmWindow.Notify(this, Loc.T("cal.deleteFailed"), ex.Message);
         }
     }
 

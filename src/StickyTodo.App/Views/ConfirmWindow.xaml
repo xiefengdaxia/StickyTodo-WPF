@@ -1,0 +1,62 @@
+<Window x:Class="StickyTodo.App.Views.ConfirmWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{Binding Converter={StaticResource Loc}, ConverterParameter=confirm.title}"
+        Icon="/Assets/stickytodo.ico"
+        Width="380"
+        SizeToContent="Height"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        FontFamily="Microsoft YaHei UI"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Display">
+    <Border Margin="12"
+            CornerRadius="12"
+            Background="{DynamicResource Brush.Paper}"
+            BorderBrush="#59FFFFFF"
+            BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="22" ShadowDepth="3" Opacity="0.34" Color="#FF000000" Direction="270" />
+        </Border.Effect>
+
+        <StackPanel Margin="18,16,18,16">
+            <Grid MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <TextBlock x:Name="HeadingText"
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource Brush.Ink}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,28,0"
+                           VerticalAlignment="Center" />
+                <Button HorizontalAlignment="Right"
+                        Style="{StaticResource Button.Chrome}"
+                        Content="✕"
+                        FontSize="10"
+                        Click="Cancel_Click" />
+            </Grid>
+
+            <TextBlock x:Name="BodyText"
+                       Margin="0,10,0,0"
+                       FontSize="12.5"
+                       Foreground="{DynamicResource Brush.InkSoft}"
+                       TextWrapping="Wrap" />
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
+                <Button x:Name="CancelButton"
+                        Content="{Binding Converter={StaticResource Loc}, ConverterParameter=common.cancel}"
+                        Style="{StaticResource Button.Ghost}"
+                        Click="Cancel_Click" />
+                <Button x:Name="OkButton"
+                        Content="{Binding Converter={StaticResource Loc}, ConverterParameter=common.ok}"
+                        Style="{StaticResource Button.Primary}"
+                        Margin="8,0,0,0"
+                        Click="Ok_Click"
+                        IsDefault="True" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

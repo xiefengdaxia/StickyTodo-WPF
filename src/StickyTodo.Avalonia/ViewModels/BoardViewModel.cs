@@ -62,6 +62,39 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost, IRefres
     [ObservableProperty]
     private bool _isDraftFocused;
 
+    /// <summary>
+    /// 看板内搜索关键字（标题 / 标签 / 日期文本都能命中）。
+    /// 空串表示不过滤；与标签胶囊是「与」的关系。
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSearch))]
+    [NotifyPropertyChangedFor(nameof(SearchPlaceholder))]
+    private string _searchText = string.Empty;
+
+    /// <summary>搜索框是否展开（点标题栏的 🔍 切换）。</summary>
+    [ObservableProperty]
+    private bool _isSearchOpen;
+
+    public bool HasSearch => !string.IsNullOrWhiteSpace(SearchText);
+
+    public string SearchPlaceholder => Loc.T("board.searchPlaceholder");
+
+    /// <summary>输入变化时重算可见行；关掉搜索框时清空关键字。</summary>
+    partial void OnSearchTextChanged(string value) => SyncRows();
+
+    partial void OnIsSearchOpenChanged(bool value)
+    {
+        if (!value && HasSearch)
+        {
+            SearchText = string.Empty;
+        }
+    }
+
+    /// <summary>给 XAML 的「清除」按钮用：只清关键字，保留搜索框。</summary>
+    public void ClearSearch() => SearchText = string.Empty;
+
+    public void ToggleSearch() => IsSearchOpen = !IsSearchOpen;
+
     /// <summary>当前视图：待办 / 已完成。</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsTodoView))]
@@ -491,18 +524,52 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost, IRefres
         DoneViewText = done > 0 ? Loc.F("view.doneCount", done) : Loc.T("view.done");
 
         var filterName = chip.IsAll ? string.Empty : chip.Name;
-        StatusText = string.IsNullOrEmpty(filterName)
-            ? Loc.F("board.itemCount", visible.Count)
-            : Loc.F("board.itemCountInTag", visible.Count, filterName);
+        StatusText = HasSearch
+            ? Loc.F("board.searchCount", visible.Count, SearchText.Trim())
+            : string.IsNullOrEmpty(filterName)
+                ? Loc.F("board.itemCount", visible.Count)
+                : Loc.F("board.itemCountInTag", visible.Count, filterName);
 
         return;
 
-        bool Matches(TodoItem item) => chip.TagId switch
+        // 标签胶囊 & 搜索关键字是「与」的关系：两个都满足才可见
+        bool Matches(TodoItem item)
         {
-            null => true,
-            TagChipViewModel.NoTagId => !_tagMap.TryGetValue(item.Id, out var ids) || ids.Count == 0,
-            _ => _tagMap.TryGetValue(item.Id, out var ids) && ids.Contains(chip.TagId),
-        };
+            var tagOk = chip.TagId switch
+            {
+                null => true,
+                TagChipViewModel.NoTagId => !_tagMap.TryGetValue(item.Id, out var ids) || ids.Count == 0,
+                _ => _tagMap.TryGetValue(item.Id, out var ids) && ids.Contains(chip.TagId),
+            };
+
+            return tagOk && MatchesSearch(item);
+        }
+    }
+
+    /// <summary>
+    /// 关键字匹配：标题 / 标签名 / 倒数日文案（「今天到期」「还剩 3 天」）都能搜到，
+    /// 这样输入「今天」也能找出今天到期的那些。
+    /// </summary>
+    private bool MatchesSearch(TodoItem item)
+    {
+        var keyword = SearchText.Trim();
+        if (keyword.Length == 0)
+        {
+            return true;
+        }
+
+        if (item.Title.Contains(keyword, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (TagTextOf(item.Id).Contains(keyword, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var due = DueDateText.Describe(item.DueAt, DateTimeOffset.Now);
+        return due.Length > 0 && due.Contains(keyword, StringComparison.OrdinalIgnoreCase);
     }
 
     private string TagTextOf(string todoId)

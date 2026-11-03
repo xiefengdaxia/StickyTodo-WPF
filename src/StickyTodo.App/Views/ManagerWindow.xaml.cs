@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -472,13 +472,13 @@ public partial class ManagerWindow : Window
 
     private async Task DeleteBoardAsync(Board board)
     {
-        var confirm = MessageBox.Show(
-            Loc.F("manager.deleteConfirm", board.Name),
+        var confirmed = ConfirmWindow.Confirm(
+            this,
             Loc.T("cal.deleteTitle"),
-            MessageBoxButton.OKCancel,
-            MessageBoxImage.Warning);
+            Loc.F("manager.deleteConfirm", board.Name),
+            Loc.T("common.delete"));
 
-        if (confirm != MessageBoxResult.OK)
+        if (!confirmed)
         {
             return;
         }
@@ -528,8 +528,8 @@ public partial class ManagerWindow : Window
         _windows.OpenBoard(board);
     }
 
-    private static void Warn(string message) =>
-        MessageBox.Show(message, "StickyTodo", MessageBoxButton.OK, MessageBoxImage.Information);
+    private void Warn(string message) =>
+        ConfirmWindow.Notify(this, "StickyTodo", message);
 
     // ---------------- 生命周期 ----------------
 
