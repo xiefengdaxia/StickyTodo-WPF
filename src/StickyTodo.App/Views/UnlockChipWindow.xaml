@@ -1,0 +1,36 @@
+<Window x:Class="StickyTodo.App.Views.UnlockChipWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="解锁"
+        Width="30" Height="30"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        Topmost="True"
+        WindowStartupLocation="Manual"
+        FontFamily="Microsoft YaHei UI"
+        UseLayoutRounding="True">
+    <!-- 锁定的看板是"鼠标穿透"的，只有这个小徽标还能点：点一下解锁 -->
+    <Border x:Name="Chip"
+            Width="26" Height="26"
+            CornerRadius="13"
+            Background="{DynamicResource Brush.Accent}"
+            BorderBrush="#66FFFFFF"
+            BorderThickness="1"
+            Cursor="Hand"
+            ToolTip="点击解锁（看板已锁定，鼠标穿透）"
+            MouseLeftButtonUp="Chip_Click"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="8" ShadowDepth="1" Opacity="0.35" Color="#FF000000" Direction="270" />
+        </Border.Effect>
+        <TextBlock Text="🔓"
+                   FontSize="12"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center" />
+    </Border>
+</Window>

@@ -68,7 +68,7 @@
             <Button Classes="chrome" ToolTip.Tip="{loc:Loc chrome.topmost}" Click="ToggleTopmost_Click">
               <TextBlock Text="📌" FontSize="11" Classes="pin" Classes.active="{Binding IsTopmost}" />
             </Button>
-            <Button Classes="chrome" ToolTip.Tip="{loc:Loc chrome.lock}" Click="ToggleLock_Click">
+            <Button Name="LockButton" Classes="chrome" ToolTip.Tip="{loc:Loc chrome.lock}" Click="ToggleLock_Click">
               <Panel>
                 <TextBlock FontSize="11" Text="🔓" IsVisible="{Binding !IsLocked}" />
                 <TextBlock FontSize="11" Text="🔒" IsVisible="{Binding IsLocked}" />

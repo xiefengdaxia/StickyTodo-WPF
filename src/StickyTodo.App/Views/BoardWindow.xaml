@@ -111,7 +111,7 @@
                             </TextBlock>
                         </Button>
 
-                        <Button Style="{StaticResource Button.Chrome}"
+                        <Button x:Name="LockButton" Style="{StaticResource Button.Chrome}"
                                 Click="ToggleLock_Click">
                             <TextBlock FontSize="11">
                                 <TextBlock.Style>

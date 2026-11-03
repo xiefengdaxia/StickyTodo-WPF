@@ -26,7 +26,28 @@ public partial class MemoBoardWindow : Window, IStickyWindow
 
     public MemoBoardWindow(MemoBoardViewModel viewModel, WindowManager windows)
     {
-        InitializeComponent();
+    InitializeComponent();
+
+        // 锁定状态变化（按钮 / 热键 / 托盘都走这里）：句柄就绪后应用穿透 + 解锁徽标
+        SourceInitialized += (_, _) => ApplyLockInteraction();
+        DataContextChanged += (_, _) =>
+        {
+            if (DataContext is INotifyPropertyChanged vm)
+            {
+                vm.PropertyChanged += (_, e) =>
+                {
+                    if (e.PropertyName == "IsLocked")
+                    {
+                        ApplyLockInteraction();
+                    }
+                };
+            }
+        };
+        Closed += (_, _) =>
+        {
+            ClickThrough.Reset(this);
+            _unlockChip?.Close();
+        };
         _viewModel = viewModel;
         _windows = windows;
         DataContext = viewModel;
@@ -111,7 +132,48 @@ public partial class MemoBoardWindow : Window, IStickyWindow
 
     private void ToggleTopmost_Click(object sender, RoutedEventArgs e) => _viewModel.ToggleTopmost();
 
-    private void ToggleLock_Click(object sender, RoutedEventArgs e) => _viewModel.ToggleLock();
+private void ToggleLock_Click(object sender, RoutedEventArgs e)
+{
+    _viewModel.ToggleLock();
+    ApplyLockInteraction();
+}
+
+private UnlockChipWindow? _unlockChip;
+
+/// <summary>
+/// 锁定 = 只供查看：窗口设成鼠标穿透（点下去的是下面那层窗口/桌面），
+/// 只在原「锁定」按钮位置浮一个解锁徽标，整个看板里只有它能点。
+/// </summary>
+private void ApplyLockInteraction()
+{
+    var locked = _viewModel.IsLocked;
+    ClickThrough.Apply(this, locked);
+
+    if (!locked)
+    {
+        _unlockChip?.Close();
+        _unlockChip = null;
+        return;
+    }
+
+    if (_unlockChip is { IsLoaded: true })
+    {
+        return;
+    }
+
+    _unlockChip = new UnlockChipWindow(this, LockButton, () =>
+    {
+        if (_viewModel.IsLocked)
+        {
+            _viewModel.ToggleLock();
+        }
+
+        ApplyLockInteraction();
+    });
+    _unlockChip.Closed += (_, _) => _unlockChip = null;
+    _unlockChip.Show();
+    _unlockChip.FollowAnchor();
+}
 
     private void Appearance_Click(object sender, RoutedEventArgs e)
     {
