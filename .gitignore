@@ -21,3 +21,6 @@ Thumbs.db
 # 打包产物（单文件便携版）
 publish/
 publish-avalonia/
+
+# Avalonia 自检输出（发布脚本的临时产物）
+avalonia-selftest.txt
