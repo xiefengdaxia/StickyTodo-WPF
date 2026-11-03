@@ -59,7 +59,31 @@ jobs:
       # 注意不要加 --no-build：这一步之前只 build 了 App 项目，测试程序集还没生成
       - name: Test
         if: matrix.name == 'wpf'
-        run: dotnet test tests/StickyTodo.Tests/StickyTodo.Tests.csproj -c Release --nologo
+        shell: pwsh
+        run: |
+          dotnet test tests/StickyTodo.Tests/StickyTodo.Tests.csproj -c Release --nologo `
+            --logger "trx;LogFileName=results.trx" --results-directory TestResults
+
+          if ($LASTEXITCODE -eq 0) { exit 0 }
+
+          # 失败时把「哪些用例挂了 + 报错信息」写进 job summary，
+          # 免得到时候只能看到一个 exit code 1 还得翻整份日志。
+          $summary = @()
+          $trx = "TestResults/results.trx"
+          if (Test-Path $trx) {
+            [xml]$doc = Get-Content $trx
+            $failed = @($doc.TestRun.Results.UnitTestResult | Where-Object { $_.outcome -eq 'Failed' })
+            $summary += "### 挂了 $($failed.Count) 个用例"
+            foreach ($f in $failed) {
+              $msg = $f.Output.ErrorInfo.Message
+              $summary += "- ``$($f.testName)`` — $msg"
+            }
+          } else {
+            $summary += "测试运行器没有产出 trx 文件"
+          }
+
+          if ($summary.Count -gt 0) { $summary -join "`n" | Out-File $env:GITHUB_STEP_SUMMARY -Append }
+          exit 1
 
       # 无界面冒烟 + 回归：真启动一次应用、建库、跑断言。
       # 带超时：演示入口如果卡住，不要拖到 job 默认的 6 小时。
