@@ -288,6 +288,12 @@ public partial class App : Application
             _ = RunRowUndoDemoAsync(services);
         }
 
+        // 看板内搜索回归
+        if (HasFlag(args, "--search-demo"))
+        {
+            _ = RunSearchDemoAsync(services);
+        }
+
         Log.Info($"StickyTodo 启动完成，数据目录 {AppPaths.DataDirectory}");
 
         // 空闲时把工作集还给系统（详见 MemoryTrimmer 的注释）
@@ -373,6 +379,62 @@ public partial class App : Application
         catch (Exception ex)
         {
             Log.Error("[rowundo] 失败：" + ex);
+            Environment.ExitCode = 1;
+        }
+        finally
+        {
+            services.ExitApplication();
+        }
+    }
+
+    /// <summary>
+    /// --search-demo：验证看板内搜索（Avalonia 版）——
+    /// 按标题 / 按标签 / 搜不到 / 清空恢复，并检查搜索框真的显示出来了。
+    /// </summary>
+    private static async Task RunSearchDemoAsync(AppServices services)
+    {
+        try
+        {
+            var board = services.Todos.EnsureDefaultBoard();
+
+            foreach (var existing in services.Todos.GetTodos(board.Id))
+            {
+                services.Todos.Delete(existing.Id);
+            }
+
+            services.Todos.AddTodo(board.Id, "买牛奶");
+            var tagged = services.Todos.AddTodo(board.Id, "写周报");
+            services.Todos.AddTodo(board.Id, "去健身房");
+            var tag = services.Todos.CreateTag("工作");
+            services.Todos.SetTodoTags(tagged.Id, [tag.Id]);
+
+            var window = (BoardWindow)services.Windows.OpenBoard(board);
+            await Task.Delay(900);
+
+            var allCount = window.RowsForTest.Count;
+
+            window.SetSearchForTest("牛奶");
+            var byTitle = window.RowsForTest.Count == 1;
+
+            window.SetSearchForTest("工作");
+            var byTag = window.RowsForTest.Count == 1;
+
+            window.SetSearchForTest("不存在的关键字");
+            var noneOk = window.RowsForTest.Count == 0;
+
+            window.ClearSearchForTest();
+            var restoreOk = window.RowsForTest.Count == allCount;
+
+            var box = window.FindControl<Avalonia.Controls.TextBox>("SearchBox");
+            Log.Info($"[search] 全部={allCount} 按标题={byTitle} 按标签={byTag} 无结果={noneOk} 清空恢复={restoreOk} 搜索框={box?.IsVisible}");
+
+            var allOk = byTitle && byTag && noneOk && restoreOk;
+            Log.Info($"[search] 总结果={(allOk ? "通过" : "失败")}");
+            Environment.ExitCode = allOk ? 0 : 2;
+        }
+        catch (Exception ex)
+        {
+            Log.Error("[search] 失败：" + ex);
             Environment.ExitCode = 1;
         }
         finally
