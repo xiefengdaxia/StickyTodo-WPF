@@ -156,6 +156,12 @@ public sealed record WeatherFetchOutcome
 /// </summary>
 public sealed class WeatherService
 {
+    /// <summary>
+    /// 全进程共用的 HttpClient。天气是定时轮询的，每次请求都 new 一个会不断新建
+    /// 连接池、重做 TLS 握手，久了既慢又攒 TIME_WAIT。
+    /// </summary>
+    private static readonly HttpClient SharedHttp = new() { Timeout = TimeSpan.FromSeconds(8) };
+
     /// <summary>内置城市坐标表：城市名 → (纬度, 经度)。WGS84，与 Open-Meteo 接口一致。</summary>
     public static readonly IReadOnlyDictionary<string, (double Lat, double Lon)> KnownCities =
         new Dictionary<string, (double Lat, double Lon)>(StringComparer.OrdinalIgnoreCase)
@@ -353,7 +359,9 @@ public sealed class WeatherService
 
         try
         {
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+            // 复用同一个 HttpClient：每次 new 一个都会新建连接池并重做 TLS 握手，
+            // 天气是定时轮询的，这个开销会一直重复。
+            var http = SharedHttp;
 
             double lat;
             double lon;

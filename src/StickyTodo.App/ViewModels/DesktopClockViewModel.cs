@@ -72,6 +72,7 @@ public sealed partial class DesktopClockViewModel : ObservableObject
     /// <summary>时钟开始走 + 首次算好农历/日程并加载天气、token。</summary>
     public void Start()
     {
+        RefreshClockTexts();
         RefreshDayTexts();
         _ = RefreshTokensAsync();
         _timer.Start();
@@ -88,11 +89,50 @@ public sealed partial class DesktopClockViewModel : ObservableObject
 
     // ---------- 每秒刷新的时间文本 ----------
 
-    public string SolarDateText => DateTime.Now.ToString("yyyy年M月d日");
+    /// <summary>中文日期格式反复用到，缓存一份（原来每秒钟 new 两次 CultureInfo）。</summary>
+    private static readonly System.Globalization.CultureInfo ZhCn =
+        System.Globalization.CultureInfo.GetCultureInfo("zh-CN");
 
-    public string WeekdayText => DateTime.Now.ToString("dddd", new System.Globalization.CultureInfo("zh-CN"));
+    // 三个文本都缓存上一次的值：只有真的变了才通知界面重绘
+    private string _solarDateText = string.Empty;
+    private string _weekdayText = string.Empty;
+    private string _timeText = string.Empty;
 
-    public string TimeText => DateTime.Now.ToString("HH:mm:ss");
+    public string SolarDateText => _solarDateText;
+
+    public string WeekdayText => _weekdayText;
+
+    public string TimeText => _timeText;
+
+    /// <summary>
+    /// 每秒只重算并比较三个短字符串；日期 / 星期没变就不发通知，
+    /// 省掉整个时钟窗口每秒 3 次无谓的布局与重绘。
+    /// </summary>
+    private void RefreshClockTexts()
+    {
+        var now = DateTime.Now;
+
+        var solar = now.ToString("yyyy年M月d日", ZhCn);
+        if (!string.Equals(solar, _solarDateText, StringComparison.Ordinal))
+        {
+            _solarDateText = solar;
+            OnPropertyChanged(nameof(SolarDateText));
+        }
+
+        var weekday = now.ToString("dddd", ZhCn);
+        if (!string.Equals(weekday, _weekdayText, StringComparison.Ordinal))
+        {
+            _weekdayText = weekday;
+            OnPropertyChanged(nameof(WeekdayText));
+        }
+
+        var time = now.ToString("HH:mm:ss", ZhCn);
+        if (!string.Equals(time, _timeText, StringComparison.Ordinal))
+        {
+            _timeText = time;
+            OnPropertyChanged(nameof(TimeText));
+        }
+    }
 
     /// <summary>时间行右侧的网速：↓ 下载 / ↑ 上传，单位自动换档。</summary>
     [ObservableProperty]
@@ -312,9 +352,7 @@ public sealed partial class DesktopClockViewModel : ObservableObject
 
     private async Task TickAsync()
     {
-        OnPropertyChanged(nameof(SolarDateText));
-        OnPropertyChanged(nameof(WeekdayText));
-        OnPropertyChanged(nameof(TimeText));
+        RefreshClockTexts();
 
         _rotation++;
 

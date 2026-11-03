@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Media;
@@ -1807,6 +1808,113 @@ public partial class App : System.Windows.Application
         }
     }
 
+    /// <summary>内存报告小工具：一行一个阶段。</summary>
+    private static void LogMemory(string stage)
+    {
+        using var proc = Process.GetCurrentProcess();
+        proc.Refresh();
+
+        Log.Information(
+            "[mem] {Stage,-14} 工作集={WS,7:N1} MB  私有={Private,7:N1} MB  托管={Managed,6:N1} MB  线程={Threads,3}",
+            stage,
+            proc.WorkingSet64 / 1024d / 1024d,
+            proc.PrivateMemorySize64 / 1024d / 1024d,
+            GC.GetTotalMemory(false) / 1024d / 1024d,
+            proc.Threads.Count);
+    }
+
+    /// <summary>
+    /// --mem-report：只打印内存构成，用来判断「涨在托管堆还是原生资源」。
+    /// 输出：工作集 / 私有字节 / 托管堆 / 线程 / 句柄 / 已加载程序集。
+    /// </summary>
+    private async void RunMemReport()
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+            _host = BuildHost();
+
+            LogMemory("宿主已建");
+
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+
+            ApplyLanguageForCurrentRun();
+            _host.Services.GetRequiredService<TodoService>().EnsureDefaultBoard();
+
+            LogMemory("数据库就绪");
+
+            // 和正常启动一样：打开管理面板
+            var manager = _host.Services.GetRequiredService<ManagerWindow>();
+            manager.Show();
+            MainWindow = manager;
+
+            await Task.Delay(2500);
+            LogMemory("管理面板已显示");
+
+            // 再开两个待办看板，看看每个看板窗口要多少（模拟「摊了三个便签」的常见用法）
+            var windows = _host.Services.GetRequiredService<WindowManager>();
+            var todoService = _host.Services.GetRequiredService<TodoService>();
+            var board = todoService.EnsureDefaultBoard();
+            windows.OpenBoard(board);
+
+            var second = todoService.CreateBoard("工作");
+            windows.OpenBoard(second);
+
+            await Task.Delay(2500);
+            LogMemory("三个窗口已打开");
+
+            // 空闲时先让 GC 收一次，看看「静下来」之后的真实占用
+            await Task.Run(() =>
+            {
+                GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+                GC.WaitForPendingFinalizers();
+                GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
+            });
+
+            await Task.Delay(1500);
+
+            LogMemory("静置后");
+            MemoryTrimmer.TrimNow();
+            await Task.Delay(800);
+            LogMemory("修剪工作集后");
+
+            var proc = Process.GetCurrentProcess();
+            proc.Refresh();
+
+            var managed = GC.GetTotalMemory(forceFullCollection: true);
+            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            LogMemory("GC 之后");
+
+            Log.Information(
+                "[mem] 工作集={WS:N1} MB 私有={Private:N1} MB 托管堆={Managed:N1} MB " +
+                "线程={Threads} 句柄={Handles} 程序集={Assemblies}",
+                proc.WorkingSet64 / 1024d / 1024d,
+                proc.PrivateMemorySize64 / 1024d / 1024d,
+                managed / 1024d / 1024d,
+                proc.Threads.Count,
+                proc.HandleCount,
+                assemblies.Length);
+
+            foreach (var group in assemblies
+                         .GroupBy(a => a.GetName().Name?.Split('.')[0] ?? "?")
+                         .OrderByDescending(g => g.Count()))
+            {
+                Log.Information("[mem] 程序集 {Group} x{Count}", group.Key, group.Count());
+            }
+
+            Shutdown(0);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[mem] 失败");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
     /// <summary>
     /// --confirm-demo：截一张「换皮肤确认框」，确认它在浅色/暗色皮肤下都不再是系统白框。
     /// 因为 ShowDialog 会阻塞，这里直接 Show() 出来截图。
@@ -3054,6 +3162,15 @@ public partial class App : System.Windows.Application
     /// </summary>
     private bool TryRunDemo(string[] args)
     {
+        // 诊断用：个别演示需要对比硬件/软件渲染，--soft-render 保持兼容（现在已是默认）
+        if (args.Contains("--soft-render", StringComparer.OrdinalIgnoreCase))
+        {
+            System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
+        }
+        else if (args.Contains("--hardware-render", StringComparer.OrdinalIgnoreCase))
+        {
+            System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.Default;
+        }
         // 无界面自检：StickyTodo.exe --selftest（CI / 冒烟测试用）
         if (args.Contains("--selftest", StringComparer.OrdinalIgnoreCase))
         {
@@ -3235,6 +3352,13 @@ public partial class App : System.Windows.Application
             RunSearchDemo(ReadOptionValue(args, "--shot"));
             return true;
         }
+        // 内存构成报告（只看数字，不开界面）
+        if (args.Contains("--mem-report", StringComparer.OrdinalIgnoreCase))
+        {
+            RunMemReport();
+            return true;
+        }
+
 
         // 换皮肤确认框截图
         if (args.Contains("--confirm-demo", StringComparer.OrdinalIgnoreCase))

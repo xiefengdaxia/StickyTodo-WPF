@@ -31,32 +31,51 @@ public sealed class ReminderPump : IDisposable
         _ = CheckAsync(); // 启动时也查一次，避免错过关机期间的提醒
     }
 
+    /// <summary>正在查询（防止上一轮还没结束、这一轮又进来，导致同一条提醒弹两次）。</summary>
+    private bool _checking;
+
     public async Task CheckAsync()
     {
-        IReadOnlyList<TodoItem> due;
-        try
+        if (_checking)
         {
-            due = await Task.Run(() => _service.GetDueReminders(DateTimeOffset.Now));
-        }
-        catch (Exception)
-        {
-            // 数据库临时不可用不该影响主流程，下一轮再试
             return;
         }
 
-        foreach (var item in due)
+        _checking = true;
+
+        try
         {
-            // 先标记再弹窗：即使弹窗过程出错也不会反复骚扰
+            IReadOnlyList<TodoItem> due;
             try
             {
-                _service.MarkReminded(item.Id, DateTimeOffset.Now);
+                due = await Task.Run(() => _service.GetDueReminders(DateTimeOffset.Now));
             }
             catch (Exception)
             {
-                continue;
+                // 数据库临时不可用不该影响主流程，下一轮再试
+                return;
             }
 
-            ReminderDue?.Invoke(this, item);
+            foreach (var item in due)
+            {
+                // 先标记再弹窗：即使弹窗过程出错也不会反复骚扰
+                try
+                {
+                    // 写库放到后台，别在 UI 线程上做一次磁盘往返
+                    var id = item.Id;
+                    await Task.Run(() => _service.MarkReminded(id, DateTimeOffset.Now));
+                }
+                catch (Exception)
+                {
+                    continue;
+                }
+
+                ReminderDue?.Invoke(this, item);
+            }
+        }
+        finally
+        {
+            _checking = false;
         }
     }
 

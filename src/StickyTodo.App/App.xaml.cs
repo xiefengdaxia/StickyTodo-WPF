@@ -1,6 +1,8 @@
 using System.IO;
 using System.Threading;
 using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -24,6 +26,7 @@ public partial class App : System.Windows.Application
 
     private Mutex? _mutex;
     private IHost? _host;
+    private MemoryTrimmer? _memoryTrimmer;
 
     /// <summary>
     /// 回归演示里替换掉真实的 HTTP 数据源（见 <c>--token-demo</c>）。
@@ -34,6 +37,13 @@ public partial class App : System.Windows.Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        // 渲染模式要在任何窗口出现之前定好（见 SoftwareRendering 的说明）。
+        // 默认软件渲染：这套 UI 全是半透明无边框窗口，硬件加速帮不上忙，反而多占一份 D3D 表面。
+        if (!e.Args.Contains("--hardware-render", StringComparer.OrdinalIgnoreCase))
+        {
+            RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
+        }
 
         // 所有命令行演示/回归入口都在 App.Demos.cs
         if (TryRunDemo(e.Args))
@@ -212,6 +222,9 @@ public partial class App : System.Windows.Application
             }
 
             Log.Information("StickyTodo 启动完成，数据目录 {Directory}", AppPaths.DataDirectory);
+
+            // 空闲时把工作集还给系统（详见 MemoryTrimmer 的注释）
+            _memoryTrimmer = MemoryTrimmer.Start();
         }
         catch (Exception ex)
         {
@@ -524,6 +537,7 @@ public partial class App : System.Windows.Application
             {
                 _host.Services.GetService<WindowManager>()?.CloseAll();
                 _host.Services.GetService<TrayService>()?.Dispose();
+                _memoryTrimmer?.Dispose();
                 await _host.StopAsync(TimeSpan.FromSeconds(3));
                 _host.Dispose();
             }

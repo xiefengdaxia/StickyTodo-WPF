@@ -19,6 +19,9 @@ public partial class App : Application
 
     private bool _shuttingDown;
 
+    /// <summary>空闲时回收工作集（见 MemoryTrimmer）。</summary>
+    private MemoryTrimmer? _memoryTrimmer;
+
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
     public override void OnFrameworkInitializationCompleted()
@@ -38,6 +41,7 @@ public partial class App : Application
 
             // 注意：这里也走同一套清理，避免"点 X 关到托盘后再从别处退出"留下幽灵图标
             Services?.CleanupOnExit();
+            _memoryTrimmer?.Dispose();
         };
 
         var args = Environment.GetCommandLineArgs();
@@ -285,6 +289,9 @@ public partial class App : Application
         }
 
         Log.Info($"StickyTodo 启动完成，数据目录 {AppPaths.DataDirectory}");
+
+        // 空闲时把工作集还给系统（详见 MemoryTrimmer 的注释）
+        _memoryTrimmer = MemoryTrimmer.Start();
     }
 
     /// <summary>
