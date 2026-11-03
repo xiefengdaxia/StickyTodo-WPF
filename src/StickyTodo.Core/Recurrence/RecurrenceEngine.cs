@@ -131,13 +131,15 @@ public static class RecurrenceEngine
             return [];
         }
 
+        var offset = start.Offset;
+
         var calendar = IcalCalendar.Load(BuildIcs(start, rrule));
         var occurrences = calendar.GetOccurrences(
-            new CalDateTime(ToFloating(from)),
-            new CalDateTime(ToFloating(to.AddMinutes(1))));
+            new CalDateTime(ToFloating(from, offset)),
+            new CalDateTime(ToFloating(to.AddMinutes(1), offset)));
 
         var result = occurrences
-            .Select(o => ToLocalDateTimeOffset(o.Period.StartTime.Value))
+            .Select(o => RestoreOffset(o.Period.StartTime.Value, offset))
             .OrderBy(d => d)
             .ToList();
 
@@ -322,21 +324,26 @@ public static class RecurrenceEngine
         builder.AppendLine("PRODID:-//StickyTodo//Recurrence//EN");
         builder.AppendLine("BEGIN:VEVENT");
         builder.AppendLine("UID:stickytodo@local");
-        builder.AppendLine($"DTSTART:{ToFloating(start):yyyyMMddTHHmmss}");
-        builder.AppendLine($"DTEND:{ToFloating(start.AddMinutes(1)):yyyyMMddTHHmmss}");
+        builder.AppendLine($"DTSTART:{ToFloating(start, start.Offset):yyyyMMddTHHmmss}");
+        builder.AppendLine($"DTEND:{ToFloating(start.AddMinutes(1), start.Offset):yyyyMMddTHHmmss}");
         builder.AppendLine($"RRULE:{rrule}");
         builder.AppendLine("END:VEVENT");
         builder.AppendLine("END:VCALENDAR");
         return builder.ToString();
     }
 
-    /// <summary>把本地时间转成 iCalendar 的「浮动时间」，避免带时区带来的偏移问题。</summary>
-    private static DateTime ToFloating(DateTimeOffset value) =>
-        DateTime.SpecifyKind(value.LocalDateTime, DateTimeKind.Unspecified);
+    /// <summary>
+    /// 把时间转成 iCalendar 的「浮动时间」：只用钟面时间，不带时区。
+    ///
+    /// 关键点：必须按 <paramref name="offset"/>（条目自己的时区）取钟面时间，
+    /// 而不是 <c>value.LocalDateTime</c>——后者会先换算到「运行这台机器的时区」，
+    /// 于是同一条「每周二 9:00 +08:00」的规则，在 UTC 机器上会算成 1:00 并整体偏移。
+    /// 待办里的时间是用户眼里的钟面时间，重复规则只是在这个钟面上往后排，与时区无关。
+    /// </summary>
+    private static DateTime ToFloating(DateTimeOffset value, TimeSpan offset) =>
+        DateTime.SpecifyKind(value.ToOffset(offset).DateTime, DateTimeKind.Unspecified);
 
-    private static DateTimeOffset ToLocalDateTimeOffset(DateTime value)
-    {
-        var floating = DateTime.SpecifyKind(value, DateTimeKind.Unspecified);
-        return new DateTimeOffset(floating, TimeZoneInfo.Local.GetUtcOffset(floating));
-    }
+    /// <summary>把 iCal 返回的浮动时间套回条目原本的偏移量。</summary>
+    private static DateTimeOffset RestoreOffset(DateTime value, TimeSpan offset) =>
+        new(DateTime.SpecifyKind(value, DateTimeKind.Unspecified), offset);
 }

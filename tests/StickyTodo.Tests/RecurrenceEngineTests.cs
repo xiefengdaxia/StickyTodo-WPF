@@ -216,6 +216,23 @@ public sealed class MonthGridTests
     }
 
     [Fact]
+    public void Occurrences_FollowItemOffset_NotMachineTimeZone()
+    {
+        // 回归：曾经用 LocalDateTime 取钟面时间，等于先换算到「运行这台机器的时区」，
+        // 于是同一条「每周二 9:00 +08:00」的规则在 UTC 机器上会整体偏 8 小时（CI 上就是这么挂的）。
+        // 现在改为按条目自己的偏移量取钟面时间，任何机器上结果都一样。
+        foreach (var offsetHours in new[] { 8, 0, -5, 5.5 })
+        {
+            var start = new DateTimeOffset(2026, 10, 20, 9, 0, 0, TimeSpan.FromHours(offsetHours));
+            var dates = RecurrenceEngine.Occurrences(start, "FREQ=WEEKLY;BYDAY=TU", start, start.AddDays(7));
+
+            Assert.Equal(2, dates.Count);
+            Assert.All(dates, d => Assert.Equal(offsetHours, d.Offset.TotalHours));
+            Assert.All(dates, d => Assert.Equal(new TimeSpan(9, 0, 0), d.TimeOfDay));
+        }
+    }
+
+    [Fact]
     public void Build_ConsecutiveDays_WithoutGaps()
     {
         var cells = MonthGrid.Build(2026, 10);
