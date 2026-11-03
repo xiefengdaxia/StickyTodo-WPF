@@ -137,6 +137,7 @@
                                            FontSize="13" FontWeight="SemiBold"
                                            Foreground="{DynamicResource Brush.Ink}" />
                                 <ComboBox x:Name="LanguageBox"
+                                          Style="{StaticResource ComboBox.Flat}"
                                           HorizontalAlignment="Right"
                                           Width="132"
                                           ItemsSource="{Binding Languages}"
