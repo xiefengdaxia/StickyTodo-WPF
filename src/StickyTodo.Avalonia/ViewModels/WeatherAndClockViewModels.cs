@@ -944,7 +944,7 @@ public sealed partial class DesktopClockViewModel : ObservableObject
             return;
         }
 
-        // ?????????????????????? CPU???????????????
+        // 轮播文案一分钟才变一次：每秒重算字符串是白耗 CPU，算完与现值比较，变了才发通知
         var day = _report.Days.FirstOrDefault(d => d.DayLabel == "今天") ?? _report.Days[0];
         var line = $"{_report.CityName} {day.TempMax:0}°C {day.Text}";
         var detail = BuildWeatherDetail(day);
