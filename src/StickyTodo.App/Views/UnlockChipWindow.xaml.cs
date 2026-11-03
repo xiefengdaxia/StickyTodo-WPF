@@ -34,21 +34,19 @@ Loaded += (_, _) =>
     Follow();
 };
 board.Activated += OnBoardActivated;
-
-        // 看板被拖动/缩放时跟着走
         board.LocationChanged += OnBoardGeometryChanged;
         board.SizeChanged += OnBoardGeometryChanged;
         board.Closed += OnBoardClosed;
     }
 
-private void OnBoardGeometryChanged(object? sender, EventArgs e) => Follow();
+    private void OnBoardGeometryChanged(object? sender, EventArgs e) => Follow();
 
-/// <summary>看板被激活（可能盖过徽标）时，把徽标重新摆到它上面。</summary>
-private void OnBoardActivated(object? sender, EventArgs e)
-{
-    ClickThrough.PlaceAbove(this, _board);
-    Follow();
-}
+    /// <summary>看板被激活（可能盖过徽标）时，把徽标重新摆到它上面。</summary>
+    private void OnBoardActivated(object? sender, EventArgs e)
+    {
+        ClickThrough.PlaceAbove(this, _board);
+        Follow();
+    }
 
     private void OnBoardClosed(object? sender, EventArgs e) => Close();
 
@@ -77,14 +75,14 @@ private void OnBoardActivated(object? sender, EventArgs e)
         TriggerUnlock();
     }
 
-    /// <summary>??????????????????????</summary>
+    /// <summary>解锁（点击徽标走这里；回归脚本也能直接调）。</summary>
     public void TriggerUnlock()
     {
         _unlock();
         Close();
     }
 
-    /// <summary>??????????????</summary>
+    /// <summary>回归断言用：徽标当前是否置顶（本版刻意不置顶）。</summary>
     public bool IsTopmostChip => Topmost;
 
     /// <summary>看板布局变化后手动重定位（首次显示时调用）。</summary>

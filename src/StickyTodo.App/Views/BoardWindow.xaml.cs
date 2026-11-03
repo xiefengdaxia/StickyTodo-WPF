@@ -543,46 +543,46 @@ private void ToggleLock_Click(object sender, RoutedEventArgs e)
     /// <summary>给回归用：等同于点一下解锁徽标。</summary>
     internal void UnlockViaChipForTest() => _unlockChip?.TriggerUnlock();
 
-    /// <summary>?????????????????????????????????</summary>
+    /// <summary>给回归用：切换置顶（验证「不置顶的看板，解锁徽标也跟着不置顶」）。</summary>
     internal void SwitchTopmostForTest() => _viewModel.ToggleTopmost();
 
-    /// <summary>????????????</summary>
+    /// <summary>给回归用：当前是否置顶。</summary>
     internal bool IsTopmostForTest => _viewModel.IsTopmost;
 
-/// <summary>
-/// 锁定 = 只供查看：窗口设成鼠标穿透（点下去的是下面那层窗口/桌面），
-/// 只在原「锁定」按钮位置浮一个解锁徽标，整个看板里只有它能点。
-/// </summary>
-private void ApplyLockInteraction()
-{
-    var locked = _viewModel.IsLocked;
-    ClickThrough.Apply(this, locked);
-
-    if (!locked)
+    /// <summary>
+    /// 锁定 = 只供查看：窗口设成鼠标穿透（点下去的是下面那层窗口/桌面），
+    /// 只在原「锁定」按钮位置浮一个解锁徽标，整个看板里只有它能点。
+    /// </summary>
+    private void ApplyLockInteraction()
     {
-        _unlockChip?.Close();
-        _unlockChip = null;
-        return;
-    }
+        var locked = _viewModel.IsLocked;
+        ClickThrough.Apply(this, locked);
 
-    if (_unlockChip is { IsLoaded: true })
-    {
-        return;
-    }
-
-    _unlockChip = new UnlockChipWindow(this, LockButton, () =>
-    {
-        if (_viewModel.IsLocked)
+        if (!locked)
         {
-            _viewModel.ToggleLock();
+            _unlockChip?.Close();
+            _unlockChip = null;
+            return;
         }
 
-        ApplyLockInteraction();
-    });
-    _unlockChip.Closed += (_, _) => _unlockChip = null;
-    _unlockChip.Show();
-    _unlockChip.FollowAnchor();
-}
+        if (_unlockChip is { IsLoaded: true })
+        {
+            return;
+        }
+
+        _unlockChip = new UnlockChipWindow(this, LockButton, () =>
+        {
+            if (_viewModel.IsLocked)
+            {
+                _viewModel.ToggleLock();
+            }
+
+            ApplyLockInteraction();
+        });
+        _unlockChip.Closed += (_, _) => _unlockChip = null;
+        _unlockChip.Show();
+        _unlockChip.FollowAnchor();
+    }
 
     // ---------------- 外观：皮肤 + 透明度 ----------------
 
