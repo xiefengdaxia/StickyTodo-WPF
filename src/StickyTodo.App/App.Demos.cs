@@ -1938,6 +1938,10 @@ public partial class App : System.Windows.Application
             var owner = (BoardWindow)windows.OpenBoard(board);
             MainWindow = owner;
 
+            // 浅色 + 暗色各截一张：系统 MessageBox 在暗色皮肤下最刺眼，这里确认已经跟着皮肤走
+            var skins = new[] { NoteSkins.ClassicYellow.Key, NoteSkins.Graphite.Key };
+            var index = 0;
+
             var dialog = ConfirmWindow.CreatePreview(
                 Loc.T("cal.deleteTitle"),
                 Loc.F("manager.deleteConfirm", board.Name),
@@ -1949,14 +1953,21 @@ public partial class App : System.Windows.Application
             var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(900) };
             timer.Tick += (_, _) =>
             {
-                timer.Stop();
-
                 if (shotDirectory is not null)
                 {
-                    SaveWindowShots(Path.Combine(shotDirectory, "confirm"));
+                    SaveWindowShots(Path.Combine(shotDirectory, "confirm-" + skins[index]));
                 }
 
-                Log.Information("[confirm] 确认框已截图");
+                Log.Information("[confirm] 皮肤 {Skin} 的确认框已截图", skins[index]);
+
+                index++;
+                if (index < skins.Length)
+                {
+                    _host!.Services.GetRequiredService<SkinService>().SetSkin(skins[index]);
+                    return;
+                }
+
+                timer.Stop();
                 dialog.Close();
                 Shutdown(0);
             };
