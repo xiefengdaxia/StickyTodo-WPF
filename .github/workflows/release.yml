@@ -45,7 +45,7 @@ jobs:
         run: |
           $exe = "src/StickyTodo.App/bin/Release/net8.0-windows/StickyTodo.exe"
           $env:STICKYTODO_DATA_DIR = Join-Path $env:RUNNER_TEMP "rel-selftest"
-          $p = Start-Process $exe -ArgumentList '--selftest' -PassThru -NoNewWindow
+          $p = Start-Process $exe -ArgumentList '--selftest' -PassThru
           if (-not $p.WaitForExit(120000)) { $p.Kill(); throw '--selftest 超时' }
           if ($p.ExitCode -ne 0) { throw "--selftest 退出码 $($p.ExitCode)" }
 

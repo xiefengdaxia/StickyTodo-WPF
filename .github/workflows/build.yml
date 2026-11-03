@@ -56,9 +56,10 @@ jobs:
         run: dotnet build ${{ matrix.project }} -c Release --nologo --no-restore
 
       # 单元测试只跑一遍（挂在 wpf 这个矩阵项上），避免两个 job 重复跑 402 条
+      # 注意不要加 --no-build：这一步之前只 build 了 App 项目，测试程序集还没生成
       - name: Test
         if: matrix.name == 'wpf'
-        run: dotnet test tests/StickyTodo.Tests/StickyTodo.Tests.csproj -c Release --nologo --no-build
+        run: dotnet test tests/StickyTodo.Tests/StickyTodo.Tests.csproj -c Release --nologo
 
       # 无界面冒烟 + 回归：真启动一次应用、建库、跑断言。
       # 带超时：演示入口如果卡住，不要拖到 job 默认的 6 小时。
@@ -71,7 +72,7 @@ jobs:
             $env:STICKYTODO_DATA_DIR = Join-Path $env:RUNNER_TEMP ("demo-" + ($flag -replace '[^a-z]', ''))
 
             Write-Host "==> $flag"
-            $p = Start-Process $exe -ArgumentList $flag -PassThru -NoNewWindow
+            $p = Start-Process $exe -ArgumentList $flag -PassThru
             if (-not $p.WaitForExit($timeoutSec * 1000)) {
               $p.Kill()
               throw "$flag 超时（${timeoutSec}s）"
@@ -105,6 +106,6 @@ jobs:
         run: |
           $exe = "src/StickyTodo.App/bin/Release/net8.0-windows/StickyTodo.exe"
           $env:STICKYTODO_DATA_DIR = Join-Path $env:RUNNER_TEMP "skin-check-data"
-          $p = Start-Process $exe -ArgumentList '--skin-check' -PassThru -NoNewWindow
+          $p = Start-Process $exe -ArgumentList '--skin-check' -PassThru
           if (-not $p.WaitForExit(120000)) { $p.Kill(); throw '--skin-check 超时' }
           if ($p.ExitCode -ne 0) { throw "--skin-check 退出码 $($p.ExitCode)" }
