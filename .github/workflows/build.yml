@@ -12,7 +12,8 @@ on:
 
 concurrency:
   group: build-${{ github.ref }}
-  cancel-in-progress: true
+  # 不取消进行中的构建：CI 跑一次要好几分钟，取消掉会丢失上一次失败的具体原因
+  cancel-in-progress: false
 
 jobs:
   build-and-test:
