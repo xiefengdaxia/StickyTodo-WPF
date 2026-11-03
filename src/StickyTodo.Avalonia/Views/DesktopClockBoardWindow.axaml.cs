@@ -120,6 +120,14 @@ public partial class DesktopClockBoardWindow : Window
 
     private void Root_PointerPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
     {
+        // 右键：弹出跟随皮肤的托盘同款菜单（和任务栏图标右键一致）
+        if (e.GetCurrentPoint(this).Properties.IsRightButtonPressed)
+        {
+            App.Services?.Tray.ShowMenuAtCursor(this);
+            e.Handled = true;
+            return;
+        }
+
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
         {
             return;

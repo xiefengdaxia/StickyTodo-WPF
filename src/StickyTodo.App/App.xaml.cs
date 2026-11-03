@@ -318,6 +318,18 @@ public partial class App : System.Windows.Application
 
             StartReminderPump(tray);
 
+            // 托盘菜单回归：--tray-menu-demo 启动 8 秒后弹一次菜单（保持打开直到点击别处），供外部截图
+            if (e.Args.Contains("--tray-menu-demo", StringComparer.OrdinalIgnoreCase))
+            {
+                var menuTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
+                menuTimer.Tick += (_, _) =>
+                {
+                    menuTimer.Stop();
+                    ShowTrayMenu();
+                };
+                menuTimer.Start();
+            }
+
             // 工具窗口演示参数：--weather-demo / --worldclock-demo / --desktopclock-demo
             if (e.Args.Contains("--weather-demo", StringComparer.OrdinalIgnoreCase))
             {
@@ -553,6 +565,21 @@ public partial class App : System.Windows.Application
         }
 
         menu.IsOpen = true;
+    }
+
+    /// <summary>
+    /// 托盘右键菜单（桌面时钟里点右键也会调这里，等于"在时钟上右键 = 托盘菜单"）。
+    /// </summary>
+    public void ShowTrayMenu()
+    {
+        try
+        {
+            _host?.Services.GetRequiredService<TrayService>().ShowMenuAtCursor();
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "弹出托盘菜单失败");
+        }
     }
 
     /// <summary>

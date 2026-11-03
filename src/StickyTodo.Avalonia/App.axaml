@@ -830,6 +830,28 @@
       <Setter Property="Padding" Value="12,8" />
     </Style>
 
+    <!-- ==================== 右键菜单（跟随皮肤） ==================== -->
+    <!-- 托盘/桌面时钟右键用的是 Avalonia 自绘菜单，这里统一配色；
+         注意任务栏图标的原生菜单由系统绘制，不受此处影响 -->
+    <Style Selector="ContextMenu">
+      <Setter Property="Background" Value="{DynamicResource Brush.PaperOpaque}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Line}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="4" />
+    </Style>
+
+    <Style Selector="ContextMenu MenuItem">
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
+      <Setter Property="FontSize" Value="12.5" />
+      <Setter Property="Padding" Value="10,6" />
+      <Setter Property="CornerRadius" Value="6" />
+    </Style>
+
+    <Style Selector="ContextMenu MenuItem:pointerover /template/ Border#PART_LayoutRoot">
+      <Setter Property="Background" Value="{DynamicResource Brush.AccentSoft}" />
+    </Style>
+
     <!-- ==================== 分隔线 ==================== -->
     <Style Selector="Border.divider">
       <Setter Property="Height" Value="1" />

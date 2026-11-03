@@ -229,6 +229,13 @@ public partial class DesktopClockWindow : Window
         }
     }
 
+    /// <summary>右键：在鼠标位置弹出托盘菜单（和任务栏图标右键同一个菜单、同一套皮肤）。</summary>
+    private void Root_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        (System.Windows.Application.Current as App)?.ShowTrayMenu();
+        e.Handled = true;
+    }
+
     private void Root_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         if (!_pressed)

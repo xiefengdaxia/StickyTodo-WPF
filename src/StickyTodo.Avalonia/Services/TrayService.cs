@@ -156,6 +156,93 @@ public sealed class TrayService : IDisposable
 
     private void ShowManager() => Dispatcher.UIThread.Post(() => _services.ShowManager());
 
+    /// <summary>
+    /// 弹出"皮肤版"右键菜单（桌面时钟右键会调这里）。
+    ///
+    /// 说明：任务栏图标本身的右键菜单走 Avalonia 的 <see cref="NativeMenu"/>，
+    /// 那是系统原生 Win32 菜单、由 Explorer 绘制，应用改不了配色；
+    /// 而窗口内的右键菜单是我们自己的 Avalonia 控件，可以完全跟随皮肤。
+    /// </summary>
+    public void ShowMenuAtCursor(Control anchor)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            try
+            {
+                var menu = BuildContextMenu();
+                menu.Placement = PlacementMode.Pointer;
+                menu.Open(anchor);
+            }
+            catch (Exception ex)
+            {
+                Services.Log.Warn("[tray] 弹出右键菜单失败：" + ex.Message);
+            }
+        });
+    }
+
+    /// <summary>构造跟随皮肤的 Avalonia 右键菜单（与托盘原生菜单同结构）。</summary>
+    private ContextMenu BuildContextMenu()
+    {
+        var menu = new ContextMenu();
+        var items = menu.Items;
+
+        items.Add(MenuItem(Loc.T("tray.manager"), () => _services.ShowManager()));
+        items.Add(MenuItem(Loc.T("common.settings"), () => _services.ShowSettings()));
+        items.Add(MenuItem(Loc.T("tray.pomodoro"), () => _services.ShowPomodoro()));
+        items.Add(MenuItem("天气", () => _services.OpenToolWindow(ToolWindowKind.Weather)));
+        items.Add(MenuItem("世界时钟", () => _services.OpenToolWindow(ToolWindowKind.WorldClock)));
+        items.Add(MenuItem("桌面时钟", () => _services.OpenToolWindow(ToolWindowKind.DesktopClock)));
+
+        var boards = new MenuItem { Header = Loc.T("tray.boards") };
+        var boardList = _todoService.GetBoards();
+        if (boardList.Count == 0)
+        {
+            boards.Items.Add(new MenuItem { Header = Loc.T("tray.noBoards"), IsEnabled = false });
+        }
+        else
+        {
+            foreach (var board in boardList)
+            {
+                var captured = board;
+                var row = new MenuItem
+                {
+                    Header = $"{captured.Name}（{BoardKinds.DisplayName(captured.Kind)}）",
+                    ToggleType = MenuItemToggleType.CheckBox,
+                    IsChecked = _windows.IsBoardOpen(captured.Id),
+                };
+                row.Click += (_, _) =>
+                {
+                    if (_windows.IsBoardOpen(captured.Id))
+                    {
+                        _windows.CloseBoard(captured.Id);
+                    }
+                    else
+                    {
+                        _windows.OpenBoard(captured);
+                    }
+                };
+                boards.Items.Add(row);
+            }
+        }
+
+        items.Add(boards);
+
+        items.Add(MenuItem(Loc.T("tray.toggleAll") + "  " + HotKeyService.ToggleBoardsHotKey,
+            () => _windows.ToggleBoardsVisibility()));
+
+        items.Add(new Separator());
+        items.Add(MenuItem(Loc.T("common.exit"), () => _services.ExitApplication()));
+
+        return menu;
+    }
+
+    private static MenuItem MenuItem(string header, Action action)
+    {
+        var item = new MenuItem { Header = header };
+        item.Click += (_, _) => action();
+        return item;
+    }
+
     /// <summary>托盘气泡通知（提醒 / 番茄钟结束用，纯本地，不经过任何网络）。</summary>
     public void Notify(string title, string text)
     {

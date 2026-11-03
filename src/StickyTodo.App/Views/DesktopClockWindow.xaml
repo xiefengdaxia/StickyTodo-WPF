@@ -41,7 +41,8 @@
         <StackPanel Margin="16,12,16,14"
                     MouseLeftButtonDown="TitleBar_MouseLeftButtonDown"
                     MouseMove="Root_MouseMove"
-                    MouseLeftButtonUp="Root_MouseLeftButtonUp">
+                    MouseLeftButtonUp="Root_MouseLeftButtonUp"
+                    MouseRightButtonUp="Root_MouseRightButtonUp">
 
             <!-- 日期 + 农历：点一下打开日历 -->
             <Border Style="{StaticResource ClockRow}" Tag="calendar" ToolTip="点击打开日历">

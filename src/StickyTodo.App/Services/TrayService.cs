@@ -84,8 +84,12 @@ public sealed class TrayService : IDisposable
         _boardsMenu = new WinForms.ToolStripMenuItem(Loc.T("tray.boards"));
         menu.Items.Add(_boardsMenu);
 
-        var toggleLabel = Loc.T("tray.toggleAll") + "\t" + HotKeyService.ToggleBoardsHotKey;
-        var toggleAll = new WinForms.ToolStripMenuItem(toggleLabel);
+        // 快捷键走 ShortcutKeyDisplayString：菜单会自动右对齐，不会挤在标题后面
+        var toggleAll = new WinForms.ToolStripMenuItem(Loc.T("tray.toggleAll"))
+        {
+            ShortcutKeyDisplayString = HotKeyService.ToggleBoardsHotKey,
+            ShowShortcutKeys = true,
+        };
         toggleAll.Click += (_, _) => _windows.ToggleBoardsVisibility();
         menu.Items.Add(toggleAll);
 
@@ -160,10 +164,16 @@ public sealed class TrayService : IDisposable
     }
 
     /// <summary>右键托盘图标：在鼠标位置弹菜单。</summary>
-    private void ShowMenuAtCursor()
+    public void ShowMenuAtCursor()
     {
         try
         {
+            // 每次弹出前套一遍皮肤：用户可能刚换过皮肤
+            if (_menu is not null && _services.GetService(typeof(SkinService)) is SkinService skin)
+            {
+                TrayMenuSkin.Apply(_menu, skin.Current);
+            }
+
             _menu?.Show(WinForms.Cursor.Position);
         }
         catch (Exception)
