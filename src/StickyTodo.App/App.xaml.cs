@@ -2228,10 +2228,62 @@ public partial class App : System.Windows.Application
                     if (shotDirectory is not null)
                     {
                         SaveWindowShots(Path.Combine(shotDirectory, "locked"));
+                        Log.Information("[lock] 锁定后截图完成");
                     }
 
-                    Log.Information("[lock] 锁定后截图完成");
-                    Shutdown(0);
+                    // 鼠标穿透 + 解锁徽标回归：锁定态应带 WS_EX_TRANSPARENT 且徽标浮出（不置顶）
+                    var locked = window.DescribeLockInteraction();
+                    Log.Information("[lock] 锁定交互：{Info}", locked);
+
+                    var lockOk = locked.Contains("锁定=True")
+                                 && locked.Contains("穿透=True")
+                                 && locked.Contains("徽标=True")
+                                 && locked.Contains("徽标置顶=False");
+
+                    // 点一下徽标（等价于用户点击）：应解锁、移除穿透、徽标消失
+                    window.UnlockViaChipForTest();
+                    DispatcherTimer? unlockTimer = null;
+                    unlockTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(600) };
+                    unlockTimer.Tick += (_, _) =>
+                    {
+                        unlockTimer!.Stop();
+                        var unlocked = window.DescribeLockInteraction();
+                        Log.Information("[lock] 点徽标解锁后：{Info}", unlocked);
+
+                        var unlockOk = unlocked.Contains("锁定=False")
+                                       && unlocked.Contains("穿透=False")
+                                       && unlocked.Contains("徽标=False");
+
+                        // 再验一次"只是查看"：取消置顶后再锁定，徽标不应是置顶的
+                        //（这样它只在看板露在桌面/前面时可见，被别的程序盖住就看不见）
+                        window.SwitchTopmostForTest();
+                        _ = Task.Delay(300).ContinueWith(_ => Dispatcher.Invoke(() =>
+                        {
+                            window.SwitchLockForTest();
+                        }));
+
+                        var plainTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(900) };
+                        plainTimer.Tick += (_, _) =>
+                        {
+                            plainTimer.Stop();
+                            var plain = window.DescribeLockInteraction();
+                            Log.Information("[lock] 取消置顶后锁定：{Info}（看板置顶={Top}）",
+                                plain, window.IsTopmostForTest);
+
+                            var plainOk = !window.IsTopmostForTest
+                                          && plain.Contains("锁定=True")
+                                          && plain.Contains("徽标置顶=False");
+
+                            window.UnlockViaChipForTest();
+
+                            Log.Information("[lock] 总结果={Result}",
+                                lockOk && unlockOk && plainOk ? "通过" : "失败");
+                            Shutdown(lockOk && unlockOk && plainOk ? 0 : 2);
+                        };
+                        plainTimer.Start();
+                    };
+                    unlockTimer.Start();
+                    return;
                 }
             };
             timer.Start();

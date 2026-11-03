@@ -25,8 +25,15 @@ public partial class UnlockChipWindow : Window
 
         InitializeComponent();
 
-        Owner = board;
-        Loaded += (_, _) => Follow();
+Owner = board;
+Loaded += (_, _) =>
+{
+    // 不置顶，但要压在看板之上：只在"看板露在桌面/前面"时可见可点
+    ClickThrough.HideFromAltTab(this);
+    ClickThrough.PlaceAbove(this, board);
+    Follow();
+};
+board.Activated += OnBoardActivated;
 
         // 看板被拖动/缩放时跟着走
         board.LocationChanged += OnBoardGeometryChanged;
@@ -34,7 +41,14 @@ public partial class UnlockChipWindow : Window
         board.Closed += OnBoardClosed;
     }
 
-    private void OnBoardGeometryChanged(object? sender, EventArgs e) => Follow();
+private void OnBoardGeometryChanged(object? sender, EventArgs e) => Follow();
+
+/// <summary>看板被激活（可能盖过徽标）时，把徽标重新摆到它上面。</summary>
+private void OnBoardActivated(object? sender, EventArgs e)
+{
+    ClickThrough.PlaceAbove(this, _board);
+    Follow();
+}
 
     private void OnBoardClosed(object? sender, EventArgs e) => Close();
 
@@ -60,9 +74,18 @@ public partial class UnlockChipWindow : Window
     private void Chip_Click(object sender, MouseButtonEventArgs e)
     {
         e.Handled = true;
+        TriggerUnlock();
+    }
+
+    /// <summary>??????????????????????</summary>
+    public void TriggerUnlock()
+    {
         _unlock();
         Close();
     }
+
+    /// <summary>??????????????</summary>
+    public bool IsTopmostChip => Topmost;
 
     /// <summary>看板布局变化后手动重定位（首次显示时调用）。</summary>
     public void FollowAnchor() => Follow();
@@ -71,6 +94,7 @@ public partial class UnlockChipWindow : Window
     {
         _board.LocationChanged -= OnBoardGeometryChanged;
         _board.SizeChanged -= OnBoardGeometryChanged;
+        _board.Activated -= OnBoardActivated;
         _board.Closed -= OnBoardClosed;
         base.OnClosed(e);
     }

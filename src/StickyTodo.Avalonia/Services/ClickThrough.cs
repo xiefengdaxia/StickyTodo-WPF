@@ -17,6 +17,10 @@ internal static class ClickThrough
     private const int GwlExStyle = -20;
     private const int WsExTransparent = 0x00000020;
     private const int WsExLayered = 0x00080000;
+    private const int WsExToolWindow = 0x00000080;
+    private const uint SwpNoMove = 0x0002;
+    private const uint SwpNoSize = 0x0001;
+    private const uint SwpNoActivate = 0x0010;
 
     public static void Apply(Window window, bool enabled)
     {
@@ -66,8 +70,40 @@ internal static class ClickThrough
         return new PixelRect(x, y, w, h);
     }
 
+    /// <summary>标记成工具窗口（不进 Alt-Tab）。</summary>
+    public static void HideFromAltTab(Window window)
+    {
+        var handle = window.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
+        if (handle == IntPtr.Zero)
+        {
+            return;
+        }
+
+        var style = GetWindowLong(handle, GwlExStyle);
+        SetWindowLong(handle, GwlExStyle, style | WsExToolWindow);
+    }
+
+    /// <summary>
+    /// 把徽标放到看板正上方（同一 Z 序带内）。徽标刻意不置顶：
+    /// 只在"看板露在桌面/前面"时可见可点，被浏览器等窗口盖住就看不见。
+    /// </summary>
+    public static void PlaceAbove(Window window, Window reference)
+    {
+        var handle = window.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
+        var other = reference.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
+        if (handle == IntPtr.Zero || other == IntPtr.Zero)
+        {
+            return;
+        }
+
+        SetWindowPos(handle, other, 0, 0, 0, 0, SwpNoMove | SwpNoSize | SwpNoActivate);
+    }
+
     [DllImport("user32.dll", SetLastError = true)]
     private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);

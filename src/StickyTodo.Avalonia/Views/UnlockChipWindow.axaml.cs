@@ -28,7 +28,13 @@ public partial class UnlockChipWindow : Window
         board.PositionChanged += OnGeometryChanged;
         board.SizeChanged += OnGeometryChanged;
         board.Closed += OnBoardClosed;
-        Opened += (_, _) => Follow();
+Opened += (_, _) =>
+{
+    ClickThrough.HideFromAltTab(this);
+    ClickThrough.PlaceAbove(this, board);
+    Follow();
+};
+board.Activated += OnBoardActivated;
     }
 
     /// <summary>把徽标摆到锁定按钮正中。</summary>
@@ -48,7 +54,14 @@ public partial class UnlockChipWindow : Window
             r.Y + ((r.Height - h) / 2));
     }
 
-    private void OnGeometryChanged(object? sender, EventArgs e) => Follow();
+private void OnGeometryChanged(object? sender, EventArgs e) => Follow();
+
+/// <summary>看板被激活（可能盖过徽标）时，把徽标重新摆到它上面。</summary>
+private void OnBoardActivated(object? sender, EventArgs e)
+{
+    ClickThrough.PlaceAbove(this, _board);
+    Follow();
+}
 
     private void OnBoardClosed(object? sender, EventArgs e) => Close();
 
@@ -63,6 +76,7 @@ public partial class UnlockChipWindow : Window
     {
         _board.PositionChanged -= OnGeometryChanged;
         _board.SizeChanged -= OnGeometryChanged;
+        _board.Activated -= OnBoardActivated;
         _board.Closed -= OnBoardClosed;
         base.OnClosed(e);
     }

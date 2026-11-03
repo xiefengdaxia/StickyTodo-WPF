@@ -9,7 +9,6 @@
         Background="Transparent"
         ShowInTaskbar="False"
         ShowActivated="False"
-        Topmost="True"
         WindowStartupLocation="Manual"
         FontFamily="Microsoft YaHei UI, Segoe UI"
         UseLayoutRounding="True">

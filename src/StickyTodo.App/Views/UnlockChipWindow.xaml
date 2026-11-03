@@ -9,7 +9,6 @@
         ResizeMode="NoResize"
         ShowInTaskbar="False"
         ShowActivated="False"
-        Topmost="True"
         WindowStartupLocation="Manual"
         FontFamily="Microsoft YaHei UI"
         UseLayoutRounding="True">
@@ -24,8 +23,7 @@
             ToolTip="点击解锁（看板已锁定，鼠标穿透）"
             MouseLeftButtonUp="Chip_Click"
             HorizontalAlignment="Center"
-            VerticalAlignment="Center">
-        <Border.Effect>
+            VerticalAlignment="Center">        <Border.Effect>
             <DropShadowEffect BlurRadius="8" ShadowDepth="1" Opacity="0.35" Color="#FF000000" Direction="270" />
         </Border.Effect>
         <TextBlock Text="🔓"

@@ -533,7 +533,21 @@ private void ToggleLock_Click(object sender, RoutedEventArgs e)
     ApplyLockInteraction();
 }
 
-private UnlockChipWindow? _unlockChip;
+    private UnlockChipWindow? _unlockChip;
+
+    /// <summary>给回归用：锁定交互诊断（穿透是否生效、解锁徽标是否浮出、是否置顶）。</summary>
+    internal string DescribeLockInteraction() =>
+        $"锁定={_viewModel.IsLocked} 穿透={ClickThrough.IsTransparent(this)} " +
+        $"徽标={(_unlockChip is { IsVisible: true })} 徽标置顶={(_unlockChip?.IsTopmostChip ?? false)}";
+
+    /// <summary>给回归用：等同于点一下解锁徽标。</summary>
+    internal void UnlockViaChipForTest() => _unlockChip?.TriggerUnlock();
+
+    /// <summary>?????????????????????????????????</summary>
+    internal void SwitchTopmostForTest() => _viewModel.ToggleTopmost();
+
+    /// <summary>????????????</summary>
+    internal bool IsTopmostForTest => _viewModel.IsTopmost;
 
 /// <summary>
 /// 锁定 = 只供查看：窗口设成鼠标穿透（点下去的是下面那层窗口/桌面），
