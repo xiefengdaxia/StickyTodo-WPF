@@ -38,8 +38,10 @@ public partial class App : System.Windows.Application
     {
         base.OnStartup(e);
 
-        // 渲染模式要在任何窗口出现之前定好（见 SoftwareRendering 的说明）。
-        // 默认软件渲染：这套 UI 全是半透明无边框窗口，硬件加速帮不上忙，反而多占一份 D3D 表面。
+        // 渲染模式必须在任何窗口出现之前定好。
+        // 默认走软件渲染：这套 UI 全是不透明底 + 圆角 + 投影的自绘窗口，
+        // 硬件加速在这里没有收益，反而多占一份 D3D 表面（实测省 ~80 MB 私有内存）。
+        // 想知道硬件加速的对比，可以用 --hardware-render 启动。
         if (!e.Args.Contains("--hardware-render", StringComparer.OrdinalIgnoreCase))
         {
             RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
