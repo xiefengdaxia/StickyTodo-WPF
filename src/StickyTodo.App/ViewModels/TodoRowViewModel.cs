@@ -1,4 +1,4 @@
-﻿﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using StickyTodo.Core.Entities;
 using StickyTodo.Core.Recurrence;
 using StickyTodo.Core.Services;
