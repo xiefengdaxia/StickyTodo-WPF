@@ -56,6 +56,12 @@ public sealed class MemoryTrimmer : IDisposable
         Trim();
     }
 
+    /// <summary>立刻修剪一次（演示/回归用）。</summary>
+    public static void TrimNow()
+    {
+        Trim();
+    }
+
     private static void Trim()
     {
         try

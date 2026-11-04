@@ -294,6 +294,12 @@ public partial class App : Application
             _ = RunSearchDemoAsync(services);
         }
 
+        // 内存构成报告（与 WPF 版的 --mem-report 对齐，方便两版对比）
+        if (HasFlag(args, "--mem-report"))
+        {
+            _ = RunMemReportAsync(services);
+        }
+
         Log.Info($"StickyTodo 启动完成，数据目录 {AppPaths.DataDirectory}");
 
         // 空闲时把工作集还给系统（详见 MemoryTrimmer 的注释）
@@ -441,6 +447,60 @@ public partial class App : Application
         {
             services.ExitApplication();
         }
+    }
+
+    /// <summary>
+    /// --mem-report：打印内存构成（与 WPF 版同名同口径）：管理面板 + 两个看板，
+    /// 分别在「刚打开」「静置」「修剪工作集后」各记一次。
+    /// </summary>
+    private static async Task RunMemReportAsync(AppServices services)
+    {
+        try
+        {
+            LogMemory("启动");
+
+            var board = services.Todos.EnsureDefaultBoard();
+            services.Windows.OpenBoard(board);
+
+            var second = services.Todos.CreateBoard("工作");
+            services.Windows.OpenBoard(second);
+
+            await Task.Delay(4000);
+            LogMemory("三窗口");
+
+            await Task.Delay(1500);
+            LogMemory("静置");
+
+            MemoryTrimmer.TrimNow();
+            await Task.Delay(800);
+            LogMemory("修剪后");
+
+            Environment.ExitCode = 0;
+        }
+        catch (Exception ex)
+        {
+            Log.Error("[mem] 失败：" + ex);
+            Environment.ExitCode = 1;
+        }
+        finally
+        {
+            services.ExitApplication();
+        }
+    }
+
+    /// <summary>一行一个阶段的内存快照。</summary>
+    private static void LogMemory(string stage)
+    {
+        using var proc = System.Diagnostics.Process.GetCurrentProcess();
+        proc.Refresh();
+
+        Log.Info(string.Format(
+            "[mem] {0,-8} 工作集={1,7:N1} MB  私有={2,7:N1} MB  托管={3,6:N1} MB  线程={4,3}",
+            stage,
+            proc.WorkingSet64 / 1024d / 1024d,
+            proc.PrivateMemorySize64 / 1024d / 1024d,
+            GC.GetTotalMemory(false) / 1024d / 1024d,
+            proc.Threads.Count));
     }
 
     /// <summary>本地提醒：到点弹右下角小窗 + 托盘通知。全部在本机完成。</summary>
