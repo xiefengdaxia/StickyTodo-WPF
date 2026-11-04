@@ -197,12 +197,20 @@ public sealed partial class DesktopClockViewModel : ObservableObject
             // 和时钟同一个 UI 线程上下文，赋值走绑定刷新
             await Task.Yield();
 
+            // 3 秒采一次就够看：网速本身是抖动的，1 秒一刷既没意义，
+            // 又因为 NextValue() 每次都要遍历所有网卡实例而白白抬内存。
+            const int sampleSeconds = 3;
+
             while (_speedMonitor == monitor)
             {
-                var (received, sent) = monitor.ReadBytesPerSecond();
-                NetworkSpeedText = $"↓{Core.Net.NetworkSpeedMonitor.Format(received)} ↑{Core.Net.NetworkSpeedMonitor.Format(sent)}";
+                // 读性能计数器是慢操作（每块网卡一次 PDH 调用），放后台线程，
+                // 别让时钟在 UI 线程上每秒卡一下
+                var (received, sent) = await Task.Run(() => monitor.ReadBytesPerSecond()).ConfigureAwait(true);
 
-                await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(true);
+                NetworkSpeedText =
+                    $"↓{Core.Net.NetworkSpeedMonitor.Format(received)} ↑{Core.Net.NetworkSpeedMonitor.Format(sent)}";
+
+                await Task.Delay(TimeSpan.FromSeconds(sampleSeconds)).ConfigureAwait(true);
             }
         }
         catch (Exception)

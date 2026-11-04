@@ -15,12 +15,21 @@ namespace StickyTodo.Notes.Services;
 public sealed class MemoryTrimmer : IDisposable
 {
     private static readonly TimeSpan IdleBeforeTrim = TimeSpan.FromSeconds(25);
+
+    /// <summary>多久没被前台激活（用户在别的程序里）就可以修剪。</summary>
+    private static readonly TimeSpan BackgroundBeforeTrim = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan CheckInterval = TimeSpan.FromSeconds(15);
-    private static readonly TimeSpan StartupGrace = TimeSpan.FromSeconds(20);
+
+    /// <summary>启动后先安静这么久再第一次修剪，避开窗口入场动画。</summary>
+    private static readonly TimeSpan StartupGrace = TimeSpan.FromSeconds(15);
+
+    /// <summary>两次修剪之间的最小间隔。</summary>
+    private static readonly TimeSpan MinGap = TimeSpan.FromSeconds(45);
 
     private readonly DispatcherTimer _timer;
     private readonly Stopwatch _sinceStart = Stopwatch.StartNew();
     private DateTime _lastTrim = DateTime.MinValue;
+    private DateTime _lastForeground = DateTime.UtcNow;
 
     private MemoryTrimmer()
     {
@@ -42,18 +51,41 @@ public sealed class MemoryTrimmer : IDisposable
             return;
         }
 
-        if (DateTime.UtcNow - _lastTrim < TimeSpan.FromMinutes(2))
+        // 刚修剪过就别反复来（每次修剪都会让后续操作多几次缺页）
+        if (DateTime.UtcNow - _lastTrim < MinGap)
         {
             return;
         }
 
-        if (IdleSeconds() < IdleBeforeTrim.TotalSeconds)
+        if (OurWindowIsForeground())
+        {
+            _lastForeground = DateTime.UtcNow;
+            return;
+        }
+
+        var desktopIdle = IdleSeconds();
+        var backgroundFor = (DateTime.UtcNow - _lastForeground).TotalSeconds;
+
+        if (desktopIdle < IdleBeforeTrim.TotalSeconds && backgroundFor < BackgroundBeforeTrim.TotalSeconds)
         {
             return;
         }
 
         _lastTrim = DateTime.UtcNow;
         Trim();
+    }
+
+    /// <summary>当前前台窗口是不是我们自己的。</summary>
+    private static bool OurWindowIsForeground()
+    {
+        var hwnd = GetForegroundWindow();
+        if (hwnd == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        GetWindowThreadProcessId(hwnd, out var pid);
+        return pid == (uint)Environment.ProcessId;
     }
 
     /// <summary>立刻修剪一次（演示/回归用）。</summary>
@@ -105,6 +137,12 @@ public sealed class MemoryTrimmer : IDisposable
 
     [DllImport("user32.dll")]
     private static extern bool GetLastInputInfo(ref LastInputInfo info);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
 
     [DllImport("kernel32.dll")]
     private static extern bool SetProcessWorkingSetSize(IntPtr process, int minimum, int maximum);
