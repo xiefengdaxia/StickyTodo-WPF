@@ -121,6 +121,14 @@ public sealed partial class PerformanceViewModel : ObservableObject
         _monitor.Dispose();
     }
 
+    /// <summary>
+    /// 窗口是不是当前激活窗口（由窗口的 Activated/Deactivated 维护）。
+    /// 用户没在看这块看板时把采样降到 1/3，既省 CPU，也少触碰性能计数器那堆原生缓冲。
+    /// </summary>
+    public bool IsActive { get; set; } = true;
+
+    private int _idleTicks;
+
     private bool _sampling;
 
     /// <summary>
@@ -130,6 +138,12 @@ public sealed partial class PerformanceViewModel : ObservableObject
     private async Task RefreshAsync()
     {
         if (_sampling)
+        {
+            return;
+        }
+
+        // 不在前台时每 3 秒采一次就够（数字还在动，但不用每秒去碰计数器）
+        if (!IsActive && ++_idleTicks % 3 != 0)
         {
             return;
         }

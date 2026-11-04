@@ -32,6 +32,10 @@ public partial class NetworkSpeedWindow : Window
         };
 
         Closed += (_, _) => _viewModel.Stop();
+
+        // 没人在看这块看板时降频采样
+        Activated += (_, _) => _viewModel.IsActive = true;
+        Deactivated += (_, _) => _viewModel.IsActive = false;
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

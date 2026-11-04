@@ -24,9 +24,10 @@ public sealed class MemoryTrimmer : IDisposable
     private static readonly TimeSpan StartupGrace = TimeSpan.FromSeconds(15);
 
     /// <summary>两次修剪之间的最小间隔。</summary>
-    private static readonly TimeSpan MinGap = TimeSpan.FromSeconds(45);
+    private static readonly TimeSpan MinGap = TimeSpan.FromSeconds(25);
 
     private readonly DispatcherTimer _timer;
+    private DispatcherTimer? _firstTrim;
     private readonly Stopwatch _sinceStart = Stopwatch.StartNew();
     private DateTime _lastTrim = DateTime.MinValue;
     private DateTime _lastForeground = DateTime.UtcNow;
@@ -40,8 +41,26 @@ public sealed class MemoryTrimmer : IDisposable
     {
         var trimmer = new MemoryTrimmer();
         trimmer._timer.Start();
+        trimmer.ScheduleFirstTrim();
         Log.Debug("[mem] 空闲内存修剪已启用");
         return trimmer;
+    }
+
+    /// <summary>
+    /// 启动后单独来一次修剪：界面铺开之后工作集往往在一个高点，
+    /// 等入场动画走完（12 秒）就收一次，之后的维护交给 TryTrim。
+    /// </summary>
+    private void ScheduleFirstTrim()
+    {
+        var once = new DispatcherTimer(TimeSpan.FromSeconds(12), DispatcherPriority.Background, (_, _) =>
+        {
+            _firstTrim?.Stop();
+            _lastTrim = DateTime.UtcNow;
+            Trim();
+        });
+
+        once.Start();
+        _firstTrim = once;
     }
 
     private void TryTrim()
@@ -57,16 +76,24 @@ public sealed class MemoryTrimmer : IDisposable
             return;
         }
 
+        var desktopIdle = IdleSeconds();
+
+        // 人已经离开（整个桌面 25 秒没输入）就先修剪，哪怕我们的窗口还开着
+        if (desktopIdle >= IdleBeforeTrim.TotalSeconds)
+        {
+            _lastTrim = DateTime.UtcNow;
+            Trim();
+            return;
+        }
+
+        // 还在用电脑：只有当前台不是我们（用户在别的程序里干活）才动手
         if (OurWindowIsForeground())
         {
             _lastForeground = DateTime.UtcNow;
             return;
         }
 
-        var desktopIdle = IdleSeconds();
-        var backgroundFor = (DateTime.UtcNow - _lastForeground).TotalSeconds;
-
-        if (desktopIdle < IdleBeforeTrim.TotalSeconds && backgroundFor < BackgroundBeforeTrim.TotalSeconds)
+        if ((DateTime.UtcNow - _lastForeground).TotalSeconds < BackgroundBeforeTrim.TotalSeconds)
         {
             return;
         }
@@ -126,7 +153,11 @@ public sealed class MemoryTrimmer : IDisposable
         return idleMs < 0 ? double.MaxValue : idleMs / 1000d;
     }
 
-    public void Dispose() => _timer.Stop();
+    public void Dispose()
+    {
+        _timer.Stop();
+        _firstTrim?.Stop();
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct LastInputInfo

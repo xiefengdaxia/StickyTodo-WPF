@@ -1824,6 +1824,87 @@ public partial class App : System.Windows.Application
     }
 
     /// <summary>
+    /// --all-boards-demo：一次性把所有类型的看板都打开（待办/便签/日历/Token/天气/
+    /// 世界时钟/桌面时钟/网速/性能），按 10 秒一档打印内存与 CPU，
+    /// 用来观察「摊满一屏」时的真实占用，也给内存优化做基线。
+    /// </summary>
+    private async void RunAllBoardsDemo()
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+            _host = BuildHost();
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+
+            ApplyLanguageForCurrentRun();
+            var service = _host.Services.GetRequiredService<TodoService>();
+            var windows = _host.Services.GetRequiredService<WindowManager>();
+
+            var kinds = new[]
+            {
+                BoardKind.Todo, BoardKind.Memo, BoardKind.Calendar, BoardKind.Token,
+                BoardKind.Weather, BoardKind.WorldClock, BoardKind.DesktopClock,
+                BoardKind.NetworkSpeed, BoardKind.Performance,
+            };
+
+            foreach (var kind in kinds)
+            {
+                var board = service.GetBoards().FirstOrDefault(b => b.Kind == kind)
+                            ?? service.CreateBoard(BoardKinds.DisplayName(kind), kind);
+                windows.OpenBoard(board);
+                await Task.Delay(400);
+            }
+
+            LogMemory("看板全开");
+
+            // 正常启动时 OnStartup 会开这个，演示路径要手动补上，否则量出来的不是用户看到的样子
+            _memoryTrimmer = MemoryTrimmer.Start();
+
+            // 每 10 秒记一次，跑一分钟；期间不做任何操作，模拟「摊在桌面不动」
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
+            var ticks = 0;
+            var cpu0 = Process.GetCurrentProcess().TotalProcessorTime;
+            var t0 = DateTime.UtcNow;
+
+            timer.Tick += (_, _) =>
+            {
+                ticks++;
+
+                using var proc = Process.GetCurrentProcess();
+                var cpu = proc.TotalProcessorTime - cpu0;
+                var wall = DateTime.UtcNow - t0;
+
+                Log.Information(
+                    "[allboards] t={Seconds,3}s 工作集={WS,7:N1} MB 私有={Private,7:N1} MB " +
+                    "平均CPU={Cpu,4:N1}% 线程={Threads,3} 句柄={Handles}",
+                    ticks * 10,
+                    proc.WorkingSet64 / 1024d / 1024d,
+                    proc.PrivateMemorySize64 / 1024d / 1024d,
+                    cpu.TotalMilliseconds / wall.TotalMilliseconds / Environment.ProcessorCount * 100,
+                    proc.Threads.Count,
+                    proc.HandleCount);
+
+                if (ticks >= 6)
+                {
+                    timer.Stop();
+                    Shutdown(0);
+                }
+            };
+
+            timer.Start();
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[allboards] 失败");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
     /// --mem-report：只打印内存构成，用来判断「涨在托管堆还是原生资源」。
     /// 输出：工作集 / 私有字节 / 托管堆 / 线程 / 句柄 / 已加载程序集。
     /// </summary>
@@ -3367,6 +3448,13 @@ public partial class App : System.Windows.Application
         if (args.Contains("--mem-report", StringComparer.OrdinalIgnoreCase))
         {
             RunMemReport();
+            return true;
+        }
+
+        // 所有看板同时打开：观察摊满屏幕时的内存与 CPU
+        if (args.Contains("--all-boards-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunAllBoardsDemo();
             return true;
         }
 

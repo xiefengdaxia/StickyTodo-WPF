@@ -5,7 +5,7 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <!-- 版本号：发布脚本会用 -p:Version 覆盖；这里写死是为了本地跑的构建也有正确版本，
          否则「检查更新」拿不到 1.0.0 以外的信息 -->
-    <Version>1.7.7</Version>
+    <Version>1.7.8</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>

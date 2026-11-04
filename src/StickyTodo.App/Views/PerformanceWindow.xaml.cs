@@ -39,6 +39,11 @@ public partial class PerformanceWindow : Window
         };
 
         SizeChanged += (_, _) => DrawCpuChart();
+
+        // 用户没在看这块看板时降频采样（VM 里按 1/3 走）
+        Activated += (_, _) => _viewModel.IsActive = true;
+        Deactivated += (_, _) => _viewModel.IsActive = false;
+
         Closed += (_, _) =>
         {
             _viewModel.PropertyChanged -= OnViewModelPropertyChanged;

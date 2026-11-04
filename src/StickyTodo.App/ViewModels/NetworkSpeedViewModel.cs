@@ -97,8 +97,23 @@ public sealed partial class NetworkSpeedViewModel : ObservableObject
     /// <summary>当前机器上有没有可用的计数器（没有就整板显示提示）。</summary>
     public bool IsAvailable => _monitor.IsAvailable;
 
+    /// <summary>
+    /// 窗口是不是当前激活窗口（由窗口的 Activated/Deactivated 维护）。
+    /// 没人在看时把「枚举连接表 + 解析进程名」这套降到 1/3，省 CPU 与内存。
+    /// </summary>
+    public bool IsActive { get; set; } = true;
+
+    private int _idleTicks;
+
     private void Refresh()
     {
+        // 不在前台时每 3 秒算一次进程明细就够；顶部全机合计仍然每秒更新（很便宜）
+        if (!IsActive && ++_idleTicks % 3 != 0)
+        {
+            var (quickReceived, quickSent) = _monitor.ReadTotal();
+            TotalText = $"↓ {NetworkSpeedMonitor.Format(quickReceived)}   ↑ {NetworkSpeedMonitor.Format(quickSent)}";
+            return;
+        }
         // 全机合计直接用本轮计数器原始值——它和桌面时钟挂件同一来源（Network Interface 计数器），
         // 两边显示的数字因此严格相等。
         // 不能拿列表行求和：行有 1 KB/s 过滤阈值 + 每行 0 位小数取整，
