@@ -12,7 +12,11 @@ namespace StickyTodo.App.Views;
 /// </summary>
 public static class WeatherMenuBuilder
 {
-    public static ContextMenu Build(SkinService skin, AppSettingsService settings)
+    public static ContextMenu Build(
+        SkinService skin,
+        AppSettingsService settings,
+        Window? window = null,
+        string? windowKey = null)
     {
         var menu = new ContextMenu();
 
@@ -33,8 +37,15 @@ public static class WeatherMenuBuilder
 
         menu.Items.Add(skinMenu);
 
-        // 整窗透明度（这两个窗口没有"背景透明度"概念，只有整窗）
-        var winMenu = new MenuItem { Header = $"整窗透明度（{Math.Round(skin.WindowOpacity * 100)}%）" };
+        // 整窗透明度：默认跟随全局，也可以给「这类窗口」单独设一个值
+        var currentOpacity = windowKey is null ? settings.WindowOpacity : settings.GetWindowOpacity(windowKey);
+        var hasOwn = windowKey is not null && settings.HasWindowOpacity(windowKey);
+
+        var winMenu = new MenuItem
+        {
+            Header = $"整窗透明度（{Math.Round(currentOpacity * 100)}%）",
+        };
+
         for (var percent = 10; percent <= 100; percent += 10)
         {
             var value = percent / 100d;
@@ -42,10 +53,35 @@ public static class WeatherMenuBuilder
             {
                 Header = $"{percent}%",
                 IsCheckable = true,
-                IsChecked = Math.Abs(skin.WindowOpacity - value) < 0.005,
+                IsChecked = Math.Abs(currentOpacity - value) < 0.005,
             };
-            item.Click += (_, _) => skin.SetWindowOpacity(value);
+
+            item.Click += (_, _) =>
+            {
+                if (window is null || windowKey is null)
+                {
+                    skin.SetWindowOpacity(value);
+                    return;
+                }
+
+                ToolWindowAppearance.Set(window, settings, value);
+            };
+
             winMenu.Items.Add(item);
+        }
+
+        if (window is not null && windowKey is not null)
+        {
+            winMenu.Items.Add(new Separator());
+
+            var follow = new MenuItem
+            {
+                Header = "跟随全局设置",
+                IsCheckable = true,
+                IsChecked = !hasOwn,
+            };
+            follow.Click += (_, _) => ToolWindowAppearance.Reset(window, settings);
+            winMenu.Items.Add(follow);
         }
 
         menu.Items.Add(winMenu);

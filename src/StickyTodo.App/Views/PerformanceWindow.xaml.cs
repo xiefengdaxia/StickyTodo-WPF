@@ -25,6 +25,8 @@ public partial class PerformanceWindow : Window
         InitializeComponent();
         DataContext = viewModel;
 
+        Loaded += (_, _) => App.ApplyToolWindowOpacity(this);
+
         Loaded += (_, _) =>
         {
             if (!_geometry.Restore())

@@ -371,12 +371,28 @@ public partial class App : System.Windows.Application
             .Build();
     }
 
+    /// <summary>当前进程的设置服务（工具窗/贴图窗没有 DI 时用它取透明度）。</summary>
+    public static AppSettingsService? Settings =>
+        (Current as App)?._host?.Services.GetService<AppSettingsService>();
+
+    /// <summary>按存下来的值给工具窗设整窗透明度（没有单独设置就跟随全局）。</summary>
+    public static void ApplyToolWindowOpacity(Window window)
+    {
+        if (Settings is { } settings)
+        {
+            ToolWindowAppearance.Apply(window, settings);
+        }
+    }
+
     /// <summary>天气窗口的外观菜单（皮肤 + 透明度），天气/世界时钟窗口共用。</summary>
     public void ShowWeatherAppearanceMenu(Window window, FrameworkElement? target)
     {
         var skin = _host!.Services.GetRequiredService<SkinService>();
         var settings = _host.Services.GetRequiredService<AppSettingsService>();
-        var menu = Views.WeatherMenuBuilder.Build(skin, settings);
+
+        // 每个工具窗用自己的 key 存透明度（跟着窗口类型走，不跟具体实例）
+        var key = ToolWindowAppearance.KeyFor(window);
+        var menu = Views.WeatherMenuBuilder.Build(skin, settings, window, key);
 
         if (target is not null)
         {

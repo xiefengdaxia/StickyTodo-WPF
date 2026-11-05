@@ -19,6 +19,8 @@ public partial class NetworkSpeedWindow : Window
         InitializeComponent();
         DataContext = viewModel;
 
+        Loaded += (_, _) => App.ApplyToolWindowOpacity(this);
+
         Loaded += (_, _) =>
         {
             // 有记录就摆回上次的位置；没记录才居中，并保证不超出工作区

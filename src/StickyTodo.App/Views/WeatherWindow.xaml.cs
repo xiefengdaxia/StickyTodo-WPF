@@ -40,6 +40,8 @@ public partial class WeatherWindow : Window
             _geometry.Arm();
         };
 
+        Loaded += (_, _) => App.ApplyToolWindowOpacity(this);
+
         Loaded += async (_, _) => await viewModel.LoadAsync();
     }
 

@@ -55,13 +55,28 @@ internal static class AppearanceMenu
 
         var windowMenu = new MenuItem
         {
-            Header = Loc.F("menu.winOpacity", Math.Round(host.CurrentWindowOpacity * 100)),
+            Header = Loc.F("menu.winOpacityBoard", Math.Round(host.CurrentWindowOpacity * 100)),
         };
 
         for (var percent = 10; percent <= 100; percent += 10)
         {
             windowMenu.Items.Add(BuildOpacityItem(percent, isBackground: false, host, windows));
         }
+
+        windowMenu.Items.Add(new Separator());
+
+        var followGlobal = new MenuItem
+        {
+            Header = Loc.T("menu.opacityFollowGlobal"),
+            IsCheckable = true,
+            IsChecked = !host.HasOwnWindowOpacity,
+        };
+        followGlobal.Click += (_, _) =>
+        {
+            host.ResetWindowOpacity();
+            windows.ApplySkin();
+        };
+        windowMenu.Items.Add(followGlobal);
 
         menu.Items.Add(windowMenu);
 

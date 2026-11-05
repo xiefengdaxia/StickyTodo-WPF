@@ -43,6 +43,8 @@ public partial class DesktopClockWindow : Window
 
         // 嵌入桌面层要等布局完成（知道真实高度）再挂
         ContentRendered += (_, _) => EmbedIntoDesktop();
+        Loaded += (_, _) => App.ApplyToolWindowOpacity(this);
+
         Loaded += (_, _) => viewModel.Start();
 
         // SizeToContent 会随内容（天气轮播文案）改变高度：每次变了都重新贴右下角，

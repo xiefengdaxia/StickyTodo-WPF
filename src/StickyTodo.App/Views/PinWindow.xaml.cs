@@ -57,6 +57,9 @@ public partial class PinWindow : Window
         {
             ClickThrough.HideFromAltTab(this);
 
+            // 贴图自己的透明度（没单独设过就跟随全局）
+            Opacity = App.Settings?.GetWindowOpacity("pin") ?? 1.0;
+
             if (topLeft is null)
             {
                 // 没有指定位置：摆在鼠标所在屏幕的中间偏上
@@ -225,6 +228,49 @@ public partial class PinWindow : Window
         }
 
         var menu = new ContextMenu();
+
+        // 贴图透明度（贴在屏幕上挡东西时很有用）
+        var opacityMenu = new MenuItem
+        {
+            Header = $"透明度（{Math.Round(Opacity * 100)}%）",
+        };
+
+        foreach (var percent in new[] { 30, 50, 70, 85, 100 })
+        {
+            var value = percent / 100d;
+            var item = new MenuItem
+            {
+                Header = $"{percent}%",
+                IsCheckable = true,
+                IsChecked = Math.Abs(Opacity - value) < 0.005,
+            };
+
+            item.Click += (_, _) =>
+            {
+                Opacity = value;
+                App.Settings?.SetWindowOpacity("pin", value);
+            };
+
+            opacityMenu.Items.Add(item);
+        }
+
+        opacityMenu.Items.Add(new Separator());
+
+        var followGlobal = new MenuItem
+        {
+            Header = "跟随全局设置",
+            IsCheckable = true,
+            IsChecked = App.Settings is { } s && !s.HasWindowOpacity("pin"),
+        };
+        followGlobal.Click += (_, _) =>
+        {
+            App.Settings?.ClearWindowOpacity("pin");
+            Opacity = App.Settings?.GetWindowOpacity("pin") ?? 1.0;
+        };
+        opacityMenu.Items.Add(followGlobal);
+
+        menu.Items.Add(opacityMenu);
+        menu.Items.Add(new Separator());
 
         var topmost = new MenuItem
         {

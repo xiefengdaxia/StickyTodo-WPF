@@ -31,6 +31,8 @@ public partial class WorldClockWindow : Window
             _geometry.Arm();
         };
 
+        Loaded += (_, _) => App.ApplyToolWindowOpacity(this);
+
         Loaded += (_, _) => _viewModel.Start();
 
         Closed += (_, _) => _viewModel.Stop();

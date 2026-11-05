@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -282,6 +282,9 @@ public partial class BoardWindow : Window, IStickyWindow
             chipNames,
             draftHint);
     }
+
+    /// <summary>给回归用：直接拿到 ViewModel（验证透明度等外观设置）。</summary>
+    internal ViewModels.BoardViewModel ViewModelForTest => _viewModel;
 
     /// <summary>给回归用：当前列表里的行数。</summary>
     internal int RowCountForTest() => _viewModel.Rows.Count;

@@ -120,6 +120,8 @@ public static class UiStrings
         ["menu.skin"] = ["皮肤", "Theme", "テーマ", "테마"],
         ["menu.bgOpacity"] = ["背景透明度：{0}%", "Background opacity: {0}%", "背景の不透明度：{0}%", "배경 불투명도: {0}%"],
         ["menu.winOpacity"] = ["整窗透明度：{0}%", "Window opacity: {0}%", "ウィンドウの不透明度：{0}%", "창 불투명도: {0}%"],
+        ["menu.winOpacityBoard"] = ["整窗透明度：{0}%（仅此窗口）", "Window opacity: {0}% (this window)", "ウィンドウの不透明度：{0}%（このウィンドウのみ）", "창 불투명도: {0}% (이 창만)"],
+        ["menu.opacityFollowGlobal"] = ["跟随全局设置", "Use global setting", "全体設定に従う", "전역 설정 따르기"],
         ["menu.opacityHint"] = ["10% 一档；精确调整请打开设置页", "10% steps — open Settings for fine control", "10% 刻み（詳細は設定で）", "10% 단위, 세밀한 조정은 설정에서"],
         ["menu.deleteTodo"] = ["删除这条待办", "Delete this to-do", "この項目を削除", "이 항목 삭제"],
         ["due.today"] = ["今天", "Today", "今日", "오늘"],
@@ -402,8 +404,8 @@ public static class UiStrings
         ["tray.resetWindowsNone"] = ["当前没有打开的看板", "No boards are open", "開いているボードがありません", "열린 보드가 없습니다"],
         ["tray.snip"] = ["截图（框选后可标注）", "Capture screen", "スクリーンショット", "화면 캡처"],
         ["tray.pinAgain"] = ["再贴一张上次的截图", "Pin the last capture again", "前回のキャプチャをもう一枚貼る", "마지막 캡처를 한 장 더 붙이기"],
-        ["tray.unlockPins"] = ["解锁全部贴图", "Unlock all pinned images", "すべての貼り付け画像のロック解除", "모든 붙인 이미지 잠금 해제"],
-        ["tray.closePins"] = ["关闭全部贴图", "Close all pinned images", "すべての貼り付け画像を閉じる", "모든 붙인 이미지 닫기"],
+        ["tray.unlockPins"] = ["解锁全部贴图", "Unlock all pinned images", "すべての貼り付け画像のロック解除", "모든 붙인 이미지 잠금 해제"],        ["tray.closePins"] = ["关闭全部贴图", "Close all pinned images", "すべての貼り付け画像を閉じる", "모든 붙인 이미지 닫기"],
+        ["tray.clockOpacity"] = ["桌面时钟透明度", "Desktop clock opacity", "デスクトップ時計の不透明度", "바탕화면 시계 불투명도"],
         ["tray.noBoards"] = ["（没有看板）", "(no boards)", "（ボードなし）", "(보드 없음)"],
     };
 }

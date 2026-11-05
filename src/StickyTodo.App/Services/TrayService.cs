@@ -81,6 +81,49 @@ public sealed class TrayService : IDisposable
         desktopClock.Click += (_, _) => (System.Windows.Application.Current as App)?.OpenTool(ToolWindowKind.DesktopClock);
         menu.Items.Add(desktopClock);
 
+        // 桌面时钟没有自己的外观菜单，透明度放在这里
+        var clockOpacity = new WinForms.ToolStripMenuItem(Loc.T("tray.clockOpacity"));
+        foreach (var percent in new[] { 40, 55, 70, 85, 100 })
+        {
+            var value = percent / 100d;
+            var item = new WinForms.ToolStripMenuItem($"{percent}%");
+            item.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+            {
+                _menu?.Close();
+
+                var settings = System.Windows.Application.Current is App app ? App.Settings : null;
+                settings?.SetWindowOpacity("tool.desktopclock", value);
+
+                foreach (Window window in System.Windows.Application.Current!.Windows)
+                {
+                    if (window is DesktopClockWindow)
+                    {
+                        window.Opacity = value;
+                    }
+                }
+            });
+            clockOpacity.DropDownItems.Add(item);
+        }
+
+        clockOpacity.DropDownItems.Add(new WinForms.ToolStripSeparator());
+        var clockFollow = new WinForms.ToolStripMenuItem(Loc.T("menu.opacityFollowGlobal"));
+        clockFollow.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        {
+            _menu?.Close();
+            App.Settings?.ClearWindowOpacity("tool.desktopclock");
+
+            foreach (Window window in System.Windows.Application.Current!.Windows)
+            {
+                if (window is DesktopClockWindow)
+                {
+                    window.Opacity = App.Settings?.GetWindowOpacity("tool.desktopclock") ?? 1.0;
+                }
+            }
+        });
+        clockOpacity.DropDownItems.Add(clockFollow);
+
+        menu.Items.Add(clockOpacity);
+
         menu.Items.Add(new WinForms.ToolStripSeparator());
 
         // 截图 / 贴图

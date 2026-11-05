@@ -118,9 +118,42 @@ public sealed class AppSettingsService
             ClampWindowOpacity(value).ToString("0.###", CultureInfo.InvariantCulture));
     }
 
+    // ---------------- 每个窗口自己的透明度 ----------------
+
+    /// <summary>某个窗口单独的整窗透明度存在这个 key 下。</summary>
+    public static string WindowOpacityKeyFor(string windowKey) => $"window.{windowKey}.opacity";
+
+    /// <summary>
+    /// 取某个窗口的整窗透明度：单独设过就用它自己的，否则跟随全局设置。
+    /// <paramref name="windowKey"/> 用看板 id，工具窗用 <c>tool.weather</c> 这类固定 key。
+    /// </summary>
+    public double GetWindowOpacity(string windowKey)
+    {
+        var raw = GetString(WindowOpacityKeyFor(windowKey), null);
+        if (string.IsNullOrWhiteSpace(raw)
+            || !double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+        {
+            return WindowOpacity;
+        }
+
+        return ClampWindowOpacity(value);
+    }
+
+    /// <summary>这个窗口有没有单独设过透明度（false = 跟随全局）。</summary>
+    public bool HasWindowOpacity(string windowKey) =>
+        !string.IsNullOrWhiteSpace(GetString(WindowOpacityKeyFor(windowKey), null));
+
+    public void SetWindowOpacity(string windowKey, double value) =>
+        _repository.SetSetting(
+            WindowOpacityKeyFor(windowKey),
+            ClampWindowOpacity(value).ToString("0.###", CultureInfo.InvariantCulture));
+
+    /// <summary>清除单独设置，回到跟随全局。</summary>
+    public void ClearWindowOpacity(string windowKey) =>
+        _repository.SetSetting(WindowOpacityKeyFor(windowKey), string.Empty);
+
     /// <summary>便签默认置顶，符合“贴纸感”。</summary>
     public bool GetBoardTopmost(string boardId) => GetBool(BoardTopmostKey(boardId), true);
-
     public void SetBoardTopmost(string boardId, bool value) =>
         _repository.SetSetting(BoardTopmostKey(boardId), value ? "1" : "0");
 

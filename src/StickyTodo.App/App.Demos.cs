@@ -1825,6 +1825,91 @@ public partial class App : System.Windows.Application
     }
 
     /// <summary>
+    /// --opacity-demo：验证「每个窗口自己的透明度」。
+    /// ① 两个看板设不同透明度，只影响自己；
+    /// ② 值按窗口 key 存进设置，重启能记住；
+    /// ③ 「跟随全局」能清掉单独设置；
+    /// ④ 贴图窗的透明度 key 独立于看板。
+    /// </summary>
+    private async void RunOpacityDemo(string? shotDirectory)
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+            _host = BuildHost();
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+
+            ApplyLanguageForCurrentRun();
+            var service = _host.Services.GetRequiredService<TodoService>();
+            var settings = _host.Services.GetRequiredService<AppSettingsService>();
+            var windows = _host.Services.GetRequiredService<WindowManager>();
+
+            var boardA = service.EnsureDefaultBoard();
+            var boardB = service.GetBoards().FirstOrDefault(b => b.Name == "透明度测试")
+                         ?? service.CreateBoard("透明度测试");
+
+            var winA = (BoardWindow)windows.OpenBoard(boardA);
+            var winB = (BoardWindow)windows.OpenBoard(boardB);
+
+            MainWindow = winA;
+            await Task.Delay(900);
+
+            var globalOpacity = settings.WindowOpacity;
+
+            // ① 只改 A
+            winA.ViewModelForTest.SetWindowOpacity(0.5);
+            await Task.Delay(500);
+
+            var aOk = Math.Abs(winA.Opacity - 0.5) < 0.02;
+            var bOk = Math.Abs(winB.Opacity - globalOpacity) < 0.02;
+
+            // ② 按 key 持久化
+            var savedOk = Math.Abs(settings.GetWindowOpacity(boardA.Id) - 0.5) < 0.02
+                          && settings.HasWindowOpacity(boardA.Id)
+                          && !settings.HasWindowOpacity(boardB.Id);
+
+            Log.Information("[opacity] A={A:N2} B={B:N2} 全局={Global:N2} 只改A={AOk} B未变={BOk} 已持久化={Saved}",
+                winA.Opacity, winB.Opacity, globalOpacity, aOk, bOk, savedOk);
+
+            // ③ 回到跟随全局
+            winA.ViewModelForTest.ResetWindowOpacity();
+            await Task.Delay(400);
+
+            var resetOk = Math.Abs(winA.Opacity - globalOpacity) < 0.02
+                          && !settings.HasWindowOpacity(boardA.Id);
+
+            // ④ 贴图窗独立 key
+            App.Settings!.SetWindowOpacity("pin", 0.6);
+            var pinKeyOk = Math.Abs(settings.GetWindowOpacity("pin") - 0.6) < 0.02
+                           && Math.Abs(settings.GetWindowOpacity(boardA.Id) - globalOpacity) < 0.02;
+
+            Log.Information("[opacity] 跟随全局={Reset} 贴图独立key={Pin}", resetOk, pinKeyOk);
+
+            if (shotDirectory is not null)
+            {
+                winA.ViewModelForTest.SetWindowOpacity(0.55);
+                await Task.Delay(400);
+                SaveWindowShots(Path.Combine(shotDirectory, "opacity"));
+            }
+
+            var ok = aOk && bOk && savedOk && resetOk && pinKeyOk;
+            Log.Information("[opacity] 总结果={Result}", ok ? "通过" : "失败");
+
+            App.Settings!.ClearWindowOpacity("pin");
+            Shutdown(ok ? 0 : 2);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[opacity] 失败");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
     /// --snip-demo：截图 + 标注 + 贴图的端到端回归。
     ///
     /// 用一张合成的「假屏幕」代替真实桌面，这样结果确定、也不受当前桌面内容影响：
@@ -3756,6 +3841,13 @@ public partial class App : System.Windows.Application
         if (args.Contains("--snip-demo", StringComparer.OrdinalIgnoreCase))
         {
             RunSnipDemo(ReadOptionValue(args, "--shot"));
+            return true;
+        }
+
+        // 每个窗口自己的透明度回归
+        if (args.Contains("--opacity-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunOpacityDemo(ReadOptionValue(args, "--shot"));
             return true;
         }
 
