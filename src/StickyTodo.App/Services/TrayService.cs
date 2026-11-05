@@ -81,6 +81,53 @@ public sealed class TrayService : IDisposable
         desktopClock.Click += (_, _) => (System.Windows.Application.Current as App)?.OpenTool(ToolWindowKind.DesktopClock);
         menu.Items.Add(desktopClock);
 
+        menu.Items.Add(new WinForms.ToolStripSeparator());
+
+        // 截图 / 贴图
+        var pins = _services.GetRequiredService<PinManager>();
+
+        var snip = new WinForms.ToolStripMenuItem(Loc.T("tray.snip"))
+        {
+            ShortcutKeyDisplayString = HotKeyService.SnipHotKey,
+            ShowShortcutKeys = true,
+        };
+        snip.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        {
+            _menu?.Close();
+            pins.CaptureAndPin();
+        });
+        menu.Items.Add(snip);
+
+        var pinAgain = new WinForms.ToolStripMenuItem(Loc.T("tray.pinAgain"))
+        {
+            ShortcutKeyDisplayString = HotKeyService.PinAgainHotKey,
+            ShowShortcutKeys = true,
+        };
+        pinAgain.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        {
+            _menu?.Close();
+            pins.PinLast();
+        });
+        menu.Items.Add(pinAgain);
+
+        var unlockPins = new WinForms.ToolStripMenuItem(Loc.T("tray.unlockPins"));
+        unlockPins.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        {
+            _menu?.Close();
+            pins.UnlockAll();
+        });
+        menu.Items.Add(unlockPins);
+
+        var closePins = new WinForms.ToolStripMenuItem(Loc.T("tray.closePins"));
+        closePins.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        {
+            _menu?.Close();
+            pins.CloseAll();
+        });
+        menu.Items.Add(closePins);
+
+        menu.Items.Add(new WinForms.ToolStripSeparator());
+
         _boardsMenu = new WinForms.ToolStripMenuItem(Loc.T("tray.boards"));
         menu.Items.Add(_boardsMenu);
 

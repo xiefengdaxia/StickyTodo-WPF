@@ -1824,6 +1824,195 @@ public partial class App : System.Windows.Application
     }
 
     /// <summary>
+    /// --snip-demo：截图 + 标注 + 贴图的端到端回归。
+    ///
+    /// 用一张合成的「假屏幕」代替真实桌面，这样结果确定、也不受当前桌面内容影响：
+    ///   ① 框选 200x120 的区域；
+    ///   ② 画笔 / 直线 / 矩形 / 文字各画一笔；
+    ///   ③ 合成结果必须是 200x120 且带标注像素；
+    ///   ④ 贴图窗口的长宽比必须和图片一致，滚轮缩放后仍然一致；
+    ///   ⑤ 置顶 / 锁定（鼠标穿透）能来回切。
+    /// </summary>
+    private async void RunSnipDemo(string? shotDirectory)
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+            // 真抓一次全屏：验证 GDI 抓屏这条路径本身是通的（合成图只测标注逻辑）
+            var realCapture = ScreenCaptureService.CaptureVirtualScreen();
+            var virtualBounds = ScreenCaptureService.GetVirtualScreenBounds();
+            var captureOk = realCapture is not null
+                            && Math.Abs(realCapture.PixelWidth - virtualBounds.Width) <= 1
+                            && Math.Abs(realCapture.PixelHeight - virtualBounds.Height) <= 1;
+
+            Log.Information("[snip] 抓屏={Size} 与虚拟桌面一致={Ok}",
+                realCapture is null ? "失败" : $"{realCapture.PixelWidth}x{realCapture.PixelHeight}", captureOk);
+
+            var fake = CreateFakeScreenshot(800, 600);
+
+            if (shotDirectory is not null)
+            {
+                Directory.CreateDirectory(shotDirectory);
+                var fakeEncoder = new PngBitmapEncoder();
+                fakeEncoder.Frames.Add(BitmapFrame.Create(fake));
+                using var fakeStream = File.Create(Path.Combine(shotDirectory, "fake-source.png"));
+                fakeEncoder.Save(fakeStream);
+            }
+
+            var overlay = new SnipOverlayWindow(fake);
+            overlay.UseExactSizeForTest(800, 600);
+            overlay.Show();
+
+            await Task.Delay(700);
+
+            Log.Information(
+                "[snip] 覆盖层={RootW}x{RootH} 背景元素={Bw}x{Bh} 源图={SrcW}x{SrcH}",
+                overlay.RootForTest.ActualWidth, overlay.RootForTest.ActualHeight,
+                overlay.BackdropForTest.ActualWidth, overlay.BackdropForTest.ActualHeight,
+                overlay.BackdropForTest.Source?.Width ?? -1, overlay.BackdropForTest.Source?.Height ?? -1);
+
+            overlay.SelectForTest(new Rect(40, 30, 200, 120));
+            await Task.Delay(200);
+
+            overlay.SetBrushForTest(4, System.Windows.Media.Colors.Red);
+            overlay.DrawForTest("pen", new Point(12, 12), new Point(120, 60));
+            overlay.DrawForTest("line", new Point(10, 100), new Point(180, 20));
+            overlay.DrawForTest("rect", new Point(30, 30), new Point(150, 90));
+            overlay.AddTextForTest(new Point(20, 70), "注意这里");
+
+            await Task.Delay(300);
+
+            if (shotDirectory is not null)
+            {
+                SaveWindowShots(Path.Combine(shotDirectory, "overlay"));
+
+                // 直接把视觉树渲染出来：用来区分「树没画对」还是「窗口合成有问题」
+                var visualShot = new RenderTargetBitmap(800, 600, 96, 96, PixelFormats.Pbgra32);
+                visualShot.Render(overlay.RootForTest);
+
+                var visualEncoder = new PngBitmapEncoder();
+                visualEncoder.Frames.Add(BitmapFrame.Create(visualShot));
+                Directory.CreateDirectory(shotDirectory);
+                using (var visualStream = File.Create(Path.Combine(shotDirectory, "overlay-visual.png")))
+                {
+                    visualEncoder.Save(visualStream);
+                }
+
+                // 再抓一张真实屏幕：GDI 抓的是合成后的画面，就是用户实际看到的样子
+                if (ScreenCaptureService.CaptureVirtualScreen() is { } liveShot)
+                {
+                    Directory.CreateDirectory(shotDirectory);
+                    var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                    encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(liveShot));
+                    using var stream = File.Create(Path.Combine(shotDirectory, "overlay-live.png"));
+                    encoder.Save(stream);
+                }
+            }
+
+            var composed = overlay.ComposeForTest();
+            overlay.Close();
+
+            var sizeOk = composed is { PixelWidth: 200, PixelHeight: 120 };
+
+            // 贴图窗口：尺寸与长宽比
+            var pin = new PinWindow(composed!, new Point(120, 120));
+            pin.Show();
+            await Task.Delay(700);
+
+            var ratio = (double)composed!.PixelWidth / composed.PixelHeight;
+            var pinRatio = pin.Width / pin.Height;
+            var ratioOk = Math.Abs(ratio - pinRatio) < 0.02;
+
+            // 滚轮放大 1.5 倍：尺寸变大、比例不变
+            var before = pin.Width;
+            pin.ApplyZoom(1.5);
+            await Task.Delay(200);
+
+            var zoomOk = Math.Abs((pin.Width / pin.Height) - ratio) < 0.02
+                         && pin.Width > before * 1.4;
+
+            // 置顶 / 锁定
+            pin.ToggleTopmost();
+            var topmostOff = !pin.IsTopmostPin;
+            pin.ToggleTopmost();
+
+            pin.SetLocked(true);
+            await Task.Delay(200);
+            var lockedOk = pin.IsLockedPin && ClickThrough.IsTransparent(pin);
+
+            if (shotDirectory is not null)
+            {
+                SaveWindowShots(Path.Combine(shotDirectory, "pin"));
+            }
+
+            pin.SetLocked(false);
+            var unlockedOk = !pin.IsLockedPin && !ClickThrough.IsTransparent(pin);
+
+            Log.Information(
+                "[snip] 合成={Size} 尺寸正确={SizeOk} 长宽比={RatioOk} 缩放={ZoomOk} 置顶可关={Topmost} 锁定穿透={Locked} 解锁={Unlocked}",
+                $"{composed.PixelWidth}x{composed.PixelHeight}", sizeOk, ratioOk, zoomOk, topmostOff, lockedOk, unlockedOk);
+
+            var ok = captureOk && sizeOk && ratioOk && zoomOk && topmostOff && lockedOk && unlockedOk;
+            Log.Information("[snip] 总结果={Result}", ok ? "通过" : "失败");
+
+            pin.Close();
+            Shutdown(ok ? 0 : 2);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[snip] 失败");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>造一张「假屏幕」：几块色带 + 网格，方便看出裁剪和标注的位置。</summary>
+    private static System.Windows.Media.Imaging.BitmapSource CreateFakeScreenshot(int width, int height)
+    {
+        var visual = new System.Windows.Media.DrawingVisual();
+        using (var dc = visual.RenderOpen())
+        {
+            dc.DrawRectangle(
+                new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x1B, 0x3A, 0x6B)),
+                null, new Rect(0, 0, width, height));
+
+            var colors = new[]
+            {
+                System.Windows.Media.Color.FromRgb(0x0E, 0x8A, 0x74),
+                System.Windows.Media.Color.FromRgb(0xD9, 0x8A, 0x2B),
+                System.Windows.Media.Color.FromRgb(0x8B, 0x4F, 0xB8),
+            };
+
+            for (var i = 0; i < colors.Length; i++)
+            {
+                dc.DrawRectangle(
+                    new System.Windows.Media.SolidColorBrush(colors[i]),
+                    null,
+                    new Rect(0, height / 3.0 * i, width, height / 3.0));
+            }
+
+            var pen = new System.Windows.Media.Pen(System.Windows.Media.Brushes.White, 1);
+            for (var x = 0; x < width; x += 50)
+            {
+                dc.DrawLine(pen, new Point(x, 0), new Point(x, height));
+            }
+
+            for (var y = 0; y < height; y += 50)
+            {
+                dc.DrawLine(pen, new Point(0, y), new Point(width, y));
+            }
+        }
+
+        var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(
+            width, height, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+        bitmap.Render(visual);
+        bitmap.Freeze();
+        return bitmap;
+    }
+
+    /// <summary>
     /// --reset-windows-demo：验证托盘菜单里的「把窗口收回本屏幕」。
     /// 先把几个看板故意甩到屏幕外（模拟换显示器后的坐标失效），再调同一个入口，
     /// 断言每个窗口都回到自己那块屏幕的工作区里。
@@ -3545,6 +3734,13 @@ public partial class App : System.Windows.Application
         if (args.Contains("--reset-windows-demo", StringComparer.OrdinalIgnoreCase))
         {
             RunResetWindowsDemo(ReadOptionValue(args, "--shot"));
+            return true;
+        }
+
+        // 截图 / 标注 / 贴图回归
+        if (args.Contains("--snip-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunSnipDemo(ReadOptionValue(args, "--shot"));
             return true;
         }
 

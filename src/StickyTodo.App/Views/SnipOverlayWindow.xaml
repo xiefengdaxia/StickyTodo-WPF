@@ -1,0 +1,155 @@
+<Window x:Class="StickyTodo.App.Views.SnipOverlayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="截图"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        Topmost="True"
+        WindowStartupLocation="Manual"
+        FontFamily="Microsoft YaHei UI"
+        UseLayoutRounding="True"
+        Cursor="Cross">
+    <Window.Resources>
+        <!-- 深色浮动工具条上的按钮：不跟随皮肤，保证在任意截图背景上都看得清 -->
+        <Style x:Key="SnipTool" TargetType="Button">
+            <Setter Property="Foreground" Value="#E8FFFFFF" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Padding" Value="8,3" />
+            <Setter Property="Margin" Value="1,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root" Background="{TemplateBinding Background}" CornerRadius="5"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="Background" Value="#33FFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SnipPrimary" TargetType="Button" BasedOn="{StaticResource SnipTool}">
+            <Setter Property="Background" Value="#FF3FA9F5" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="8,0,0,0" />
+        </Style>
+
+        <Style x:Key="SnipSwatch" TargetType="Button">
+            <Setter Property="Width" Value="16" />
+            <Setter Property="Height" Value="16" />
+            <Setter Property="Margin" Value="3,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root" CornerRadius="8"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="#66FFFFFF" BorderThickness="1" />
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="BorderBrush" Value="White" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid x:Name="Root" ClipToBounds="True">
+
+        <!-- 整屏截图（原始亮度） -->
+        <Image x:Name="Backdrop" Stretch="Fill" />
+
+        <!-- 整屏压暗：用四条矩形围出选区（比几何裁剪稳，任何渲染路径都准） -->
+        <Canvas x:Name="DimLayer" IsHitTestVisible="False">
+            <Rectangle x:Name="DimFull" Fill="#70000000" />
+            <Rectangle x:Name="DimTop" Fill="#70000000" Visibility="Collapsed" />
+            <Rectangle x:Name="DimBottom" Fill="#70000000" Visibility="Collapsed" />
+            <Rectangle x:Name="DimLeft" Fill="#70000000" Visibility="Collapsed" />
+            <Rectangle x:Name="DimRight" Fill="#70000000" Visibility="Collapsed" />
+        </Canvas>
+
+        <Canvas x:Name="SelectionLayer" Background="Transparent">
+            <Rectangle x:Name="SelectionBorder"
+                       Stroke="#FF3FA9F5" StrokeThickness="1.5"
+                       Visibility="Collapsed" IsHitTestVisible="False" />
+
+            <!-- 画笔画线都落在这个画布上，坐标系是选区左上角 -->
+            <Canvas x:Name="AnnoLayer" ClipToBounds="True" Background="Transparent" />
+        </Canvas>
+
+        <!-- 尺寸提示 + 工具条放在 Canvas 里绝对定位：
+             直接塞进 Grid 的 Border 会被拉满整窗，底色会把截图盖掉 -->
+        <Canvas x:Name="OverlayLayer">
+            <!-- 选区尺寸提示 -->
+            <Border x:Name="SizeBadge"
+                    Background="#CC000000" CornerRadius="3" Padding="6,2"
+                    Visibility="Collapsed" IsHitTestVisible="False">
+                <TextBlock x:Name="SizeText" Foreground="White" FontSize="11" />
+            </Border>
+
+            <!-- 工具条 -->
+            <Border x:Name="Toolbar"
+                    Background="#E6202124" CornerRadius="8" Padding="8,5"
+                    BorderBrush="#40FFFFFF" BorderThickness="1"
+                    Visibility="Collapsed">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+
+                <Button x:Name="PenButton" Tag="pen" Click="Tool_Click" Content="画笔"
+                        Style="{StaticResource SnipTool}" ToolTip="自由画笔（可调粗细）" />
+                <Button x:Name="LineButton" Tag="line" Click="Tool_Click" Content="直线"
+                        Style="{StaticResource SnipTool}" ToolTip="画直线" />
+                <Button x:Name="RectButton" Tag="rect" Click="Tool_Click" Content="矩形"
+                        Style="{StaticResource SnipTool}" ToolTip="画矩形框" />
+                <Button x:Name="TextButton" Tag="text" Click="Tool_Click" Content="文字"
+                        Style="{StaticResource SnipTool}" ToolTip="点一下输入文字" />
+
+                <Rectangle Width="1" Height="18" Fill="#40FFFFFF" Margin="6,0" />
+
+                <!-- 画笔粗细 -->
+                <TextBlock Text="粗细" Foreground="#B0FFFFFF" FontSize="11"
+                           VerticalAlignment="Center" Margin="0,0,4,0" />
+                <Slider x:Name="ThicknessSlider" Width="70" Minimum="1" Maximum="16" Value="3"
+                        VerticalAlignment="Center" IsSnapToTickEnabled="True" TickFrequency="1"
+                        ValueChanged="Thickness_Changed" />
+
+                <Rectangle Width="1" Height="18" Fill="#40FFFFFF" Margin="8,0" />
+
+                <!-- 颜色 -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Tag="#FFF03A3A" Click="Color_Click" Style="{StaticResource SnipSwatch}" Background="#FFF03A3A" />
+                    <Button Tag="#FFFFC400" Click="Color_Click" Style="{StaticResource SnipSwatch}" Background="#FFFFC400" />
+                    <Button Tag="#FF3FA9F5" Click="Color_Click" Style="{StaticResource SnipSwatch}" Background="#FF3FA9F5" />
+                    <Button Tag="#FF35C759" Click="Color_Click" Style="{StaticResource SnipSwatch}" Background="#FF35C759" />
+                    <Button Tag="#FFFFFFFF" Click="Color_Click" Style="{StaticResource SnipSwatch}" Background="#FFFFFFFF" />
+                </StackPanel>
+
+                <Rectangle Width="1" Height="18" Fill="#40FFFFFF" Margin="8,0" />
+
+                <Button Click="Undo_Click" Content="撤销" Style="{StaticResource SnipTool}" ToolTip="撤销上一笔" />
+                <Button Click="Cancel_Click" Content="取消" Style="{StaticResource SnipTool}" ToolTip="取消截图（Esc）" />
+                <Button Click="Pin_Click" Content="贴图" Style="{StaticResource SnipPrimary}" ToolTip="贴到桌面（Enter / F3）" />
+                </StackPanel>
+            </Border>
+        </Canvas>
+
+        <!-- 提示 -->
+        <TextBlock x:Name="Hint"
+                   Text="拖动鼠标选择区域 · Esc 取消"
+                   Foreground="#CCFFFFFF" FontSize="13"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   IsHitTestVisible="False" />
+    </Grid>
+</Window>

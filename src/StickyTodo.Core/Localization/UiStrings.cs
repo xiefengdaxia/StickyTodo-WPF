@@ -400,6 +400,10 @@ public static class UiStrings
         ["tray.toggleAll"] = ["显示 / 隐藏全部便签", "Show / hide all boards", "全ボードの表示／非表示", "모든 보드 표시/숨기기"],
         ["tray.resetWindows"] = ["把窗口收回本屏幕右上角", "Pull all windows back to this screen", "ウィンドウをこの画面の右上に戻す", "모든 창을 이 화면 오른쪽 위로 되돌리기"],
         ["tray.resetWindowsNone"] = ["当前没有打开的看板", "No boards are open", "開いているボードがありません", "열린 보드가 없습니다"],
+        ["tray.snip"] = ["截图（框选后可标注）", "Capture screen", "スクリーンショット", "화면 캡처"],
+        ["tray.pinAgain"] = ["再贴一张上次的截图", "Pin the last capture again", "前回のキャプチャをもう一枚貼る", "마지막 캡처를 한 장 더 붙이기"],
+        ["tray.unlockPins"] = ["解锁全部贴图", "Unlock all pinned images", "すべての貼り付け画像のロック解除", "모든 붙인 이미지 잠금 해제"],
+        ["tray.closePins"] = ["关闭全部贴图", "Close all pinned images", "すべての貼り付け画像を閉じる", "모든 붙인 이미지 닫기"],
         ["tray.noBoards"] = ["（没有看板）", "(no boards)", "（ボードなし）", "(보드 없음)"],
     };
 }

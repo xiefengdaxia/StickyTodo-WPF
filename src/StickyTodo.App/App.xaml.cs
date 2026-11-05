@@ -335,6 +335,7 @@ public partial class App : System.Windows.Application
                 services.AddSingleton<TrayService>();
                 services.AddSingleton<ReminderPump>();
                 services.AddSingleton<HotKeyService>();
+                services.AddSingleton<PinManager>();
                 services.AddSingleton<AutoStartService>();
                 services.AddSingleton<Weather.WeatherService>();
             services.AddSingleton<Weather.WeatherCache>();
@@ -479,15 +480,20 @@ public partial class App : System.Windows.Application
     {
         var hotKeys = _host!.Services.GetRequiredService<HotKeyService>();
         var windows = _host.Services.GetRequiredService<WindowManager>();
+        var pins = _host.Services.GetRequiredService<PinManager>();
 
         hotKeys.Attach(
             host,
             onNewTodo: windows.OpenDefaultBoardForNewTodo,
             onToggleBoards: windows.ToggleBoardsVisibility,
-            onLockActive: () => windows.ToggleActiveLock());
+            onLockActive: () => windows.ToggleActiveLock(),
+            onSnip: () => pins.CaptureAndPin(),
+            onPinAgain: () => pins.PinLast());
 
-        Log.Information("全局快捷键已注册：{New} 新建待办 / {Toggle} 显示隐藏 / {Lock} 锁定当前看板",
-            HotKeyService.NewTodoHotKey, HotKeyService.ToggleBoardsHotKey, HotKeyService.LockActiveHotKey);
+        Log.Information(
+            "全局快捷键已注册：{New} 新建待办 / {Toggle} 显示隐藏 / {Lock} 锁定当前看板 / {Snip} 截图 / {Pin} 再贴一张",
+            HotKeyService.NewTodoHotKey, HotKeyService.ToggleBoardsHotKey, HotKeyService.LockActiveHotKey,
+            HotKeyService.SnipHotKey, HotKeyService.PinAgainHotKey);
     }
 
     /// <summary>把完成时间改到过去某天（只用于演示数据，让三种日期写法都能看到）。</summary>
