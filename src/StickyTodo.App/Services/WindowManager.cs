@@ -4,6 +4,7 @@ using StickyTodo.App.Views;
 using StickyTodo.Core.Entities;
 using StickyTodo.Core.Geometry;
 using StickyTodo.Core.Services;
+using WinForms = System.Windows.Forms;
 
 namespace StickyTodo.App.Services;
 
@@ -364,6 +365,100 @@ public sealed class WindowManager
         {
             _todoService.SaveBoardWindow(board.Id, state);
         }
+    }
+
+    /// <summary>
+    /// 把所有打开的看板 / 工具窗口收回「鼠标所在屏幕」的右上角。
+    ///
+    /// 换显示器、改分辨率、或者在多屏之间拔插之后，窗口常常落在已经不存在的那块屏幕坐标里，
+    /// 用户只看到托盘图标却找不到窗口。托盘菜单里一键就能把它们叫回来。
+    ///
+    /// 排布规则：贴着工作区右上角往下叠，一列放不下就往左再开一列，列之间留一点间距，
+    /// 顺序按窗口打开顺序（等于「我的看板」里的顺序）。
+    /// </summary>
+    /// <returns>实际移动了几个窗口。</returns>
+    public int ResetOpenWindowsToScreen()
+    {
+        var windows = _windows.Values
+            .Where(w => w.IsVisible && w.WindowState != WindowState.Minimized)
+            .ToList();
+
+        if (windows.Count == 0)
+        {
+            return 0;
+        }
+
+        // 目标屏幕 = 鼠标所在屏幕（用户的视线就在那儿）；取不到就退回主屏
+        var screen = WinForms.Screen.FromPoint(WinForms.Cursor.Position) ?? WinForms.Screen.PrimaryScreen;
+        if (screen is null)
+        {
+            return 0;
+        }
+
+        var area = screen.WorkingArea;
+        const int margin = 12;
+        const int gap = 10;
+
+        // 当前列的右边界（屏幕像素）与下一个窗口的顶边
+        var columnRight = area.Right - margin;
+        var y = area.Top + margin;
+        var columnWidth = 0;
+        var moved = 0;
+
+        foreach (var window in windows)
+        {
+            var toDevice = DeviceTransform(window);
+
+            var widthPx = Math.Max(1, (int)Math.Round(window.ActualWidth * toDevice.M11));
+            var heightPx = Math.Max(1, (int)Math.Round(window.ActualHeight * toDevice.M22));
+
+            // 这一列放不下了：往左开一列（只在已经有窗口的时候换列）
+            if (y + heightPx > area.Bottom - margin && y > area.Top + margin)
+            {
+                columnRight -= columnWidth + gap;
+                y = area.Top + margin;
+                columnWidth = 0;
+            }
+
+            var left = columnRight - widthPx;
+            var top = y;
+
+            // 屏幕实在放不下（超宽窗口 / 高缩放）：夹进工作区，别又跑出去
+            left = Math.Max(area.Left, Math.Min(left, area.Right - widthPx));
+            top = Math.Max(area.Top, Math.Min(top, area.Bottom - heightPx));
+
+            // 屏幕像素 -> 该窗口自己的设备无关单位（多屏不同 DPI 时各算各的）
+            var toDip = DeviceToDip(window);
+            var dipLeft = toDip.Transform(new Point(left, top));
+
+            window.Left = dipLeft.X;
+            window.Top = dipLeft.Y;
+
+            y = top + heightPx + gap;
+            columnWidth = Math.Max(columnWidth, widthPx);
+            moved++;
+        }
+
+        Serilog.Log.Information(
+            "[reset] 已把 {Count} 个窗口收回屏幕 {Screen} 右上角（工作区 {L},{T} {W}x{H}）",
+            moved, screen.DeviceName,
+            area.Left, area.Top, area.Width, area.Height);
+
+        return moved;
+    }
+
+    /// <summary>DIP → 屏幕像素（该窗口自己的 DPI）。</summary>
+    private static System.Windows.Media.Matrix DeviceTransform(Window window)
+    {
+        var source = PresentationSource.FromVisual(window);
+        return source?.CompositionTarget?.TransformToDevice ?? System.Windows.Media.Matrix.Identity;
+    }
+
+    /// <summary>屏幕像素 → DIP（该窗口自己的 DPI）。</summary>
+    private static System.Windows.Media.Matrix DeviceToDip(Window window)
+    {
+        var source = PresentationSource.FromVisual(window);
+        return source?.CompositionTarget?.TransformFromDevice ?? System.Windows.Media.Matrix.Identity;
     }
 
     /// <summary>其它可见便签窗口的矩形（已按阴影留白内缩），供吸附计算使用。</summary>

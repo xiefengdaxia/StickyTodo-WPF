@@ -98,6 +98,9 @@ public sealed class TrayService : IDisposable
         menu.Add(Item(Loc.T("tray.toggleAll") + "  " + HotKeyService.ToggleBoardsHotKey,
             () => _windows.ToggleBoardsVisibility()));
 
+        // 换显示器 / 改分辨率后窗口跑到屏幕外时，一键收回当前屏幕右上角
+        menu.Add(Item(Loc.T("tray.resetWindows"), ResetWindows));
+
         menu.Add(new NativeMenuItemSeparator());
 
         menu.Add(Item(Loc.T("common.exit"), () => _services.ExitApplication()));
@@ -230,6 +233,8 @@ public sealed class TrayService : IDisposable
         items.Add(MenuItem(Loc.T("tray.toggleAll") + "  " + HotKeyService.ToggleBoardsHotKey,
             () => _windows.ToggleBoardsVisibility()));
 
+        items.Add(MenuItem(Loc.T("tray.resetWindows"), ResetWindows));
+
         items.Add(new Separator());
         items.Add(MenuItem(Loc.T("common.exit"), () => _services.ExitApplication()));
 
@@ -241,6 +246,16 @@ public sealed class TrayService : IDisposable
         var item = new MenuItem { Header = header };
         item.Click += (_, _) => action();
         return item;
+    }
+
+    /// <summary>把打开的看板 / 时钟收回当前屏幕右上角。</summary>
+    private void ResetWindows()
+    {
+        var moved = _windows.ResetOpenWindowsToScreen();
+        if (moved == 0)
+        {
+            Notify(Loc.T("tray.resetWindowsNone"), "StickyTodo");
+        }
     }
 
     /// <summary>托盘气泡通知（提醒 / 番茄钟结束用，纯本地，不经过任何网络）。</summary>

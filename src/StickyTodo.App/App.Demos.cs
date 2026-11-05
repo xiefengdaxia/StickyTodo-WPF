@@ -1824,6 +1824,89 @@ public partial class App : System.Windows.Application
     }
 
     /// <summary>
+    /// --reset-windows-demo：验证托盘菜单里的「把窗口收回本屏幕」。
+    /// 先把几个看板故意甩到屏幕外（模拟换显示器后的坐标失效），再调同一个入口，
+    /// 断言每个窗口都回到自己那块屏幕的工作区里。
+    /// </summary>
+    private async void RunResetWindowsDemo(string? shotDirectory)
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+            _host = BuildHost();
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+
+            ApplyLanguageForCurrentRun();
+            var service = _host.Services.GetRequiredService<TodoService>();
+            var windows = _host.Services.GetRequiredService<WindowManager>();
+
+            var kinds = new[] { BoardKind.Todo, BoardKind.Memo, BoardKind.Calendar };
+            var opened = new List<Window>();
+
+            foreach (var kind in kinds)
+            {
+                var board = service.GetBoards().FirstOrDefault(b => b.Kind == kind)
+                            ?? service.CreateBoard(BoardKinds.DisplayName(kind), kind);
+                opened.Add(windows.OpenBoard(board));
+                await Task.Delay(300);
+            }
+
+            // 甩到屏幕外：模拟「换了显示器 / 拔了副屏，窗口留在不存在的坐标上」
+            foreach (var window in opened)
+            {
+                window.Left = -6000;
+                window.Top = -6000;
+            }
+
+            await Task.Delay(500);
+
+            var offscreenBefore = opened.Count(w => !IsInsideOwnWorkArea(w));
+
+            // 走与托盘菜单完全相同的入口
+            var moved = windows.ResetOpenWindowsToScreen();
+
+            await Task.Delay(800);
+
+            var offscreenAfter = opened.Count(w => !IsInsideOwnWorkArea(w));
+
+            Log.Information(
+                "[reset] 窗口={Opened} 移动={Moved} 收回前在屏幕外={Before} 收回后在屏幕外={After}",
+                opened.Count, moved, offscreenBefore, offscreenAfter);
+
+            var ok = moved == opened.Count && offscreenBefore == opened.Count && offscreenAfter == 0;
+            Log.Information("[reset] 总结果={Result}", ok ? "通过" : "失败");
+
+            if (shotDirectory is not null)
+            {
+                SaveWindowShots(Path.Combine(shotDirectory, "reset"));
+            }
+
+            Shutdown(ok ? 0 : 2);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[reset] 失败");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>窗口是否在自己那块屏幕的工作区里（留 2px 容差）。</summary>
+    private static bool IsInsideOwnWorkArea(Window window)
+    {
+        var area = ScreenHelper.GetWorkArea(window);
+        const double tolerance = 2;
+
+        return window.Left >= area.Left - tolerance
+               && window.Top >= area.Top - tolerance
+               && window.Left + window.ActualWidth <= area.Right + tolerance
+               && window.Top + window.ActualHeight <= area.Bottom + tolerance;
+    }
+
+    /// <summary>
     /// --all-boards-demo：一次性把所有类型的看板都打开（待办/便签/日历/Token/天气/
     /// 世界时钟/桌面时钟/网速/性能），按 10 秒一档打印内存与 CPU，
     /// 用来观察「摊满一屏」时的真实占用，也给内存优化做基线。
@@ -3455,6 +3538,13 @@ public partial class App : System.Windows.Application
         if (args.Contains("--all-boards-demo", StringComparer.OrdinalIgnoreCase))
         {
             RunAllBoardsDemo();
+            return true;
+        }
+
+        // 托盘「把窗口收回本屏幕」回归
+        if (args.Contains("--reset-windows-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunResetWindowsDemo(ReadOptionValue(args, "--shot"));
             return true;
         }
 

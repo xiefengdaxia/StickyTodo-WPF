@@ -93,6 +93,21 @@ public sealed class TrayService : IDisposable
         toggleAll.Click += (_, _) => _windows.ToggleBoardsVisibility();
         menu.Items.Add(toggleAll);
 
+        // 换显示器 / 改分辨率后窗口跑到屏幕外时，一键收回当前屏幕右上角
+        var resetWindows = new WinForms.ToolStripMenuItem(Loc.T("tray.resetWindows"));
+        resetWindows.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        {
+            // 先把菜单收起来，免得窗口移动时菜单还挂在屏幕上
+            _menu?.Close();
+
+            var moved = _windows.ResetOpenWindowsToScreen();
+            if (moved == 0)
+            {
+                Notify(Loc.T("tray.resetWindowsNone"), "StickyTodo");
+            }
+        });
+        menu.Items.Add(resetWindows);
+
         menu.Items.Add(new WinForms.ToolStripSeparator());
 
         var exit = new WinForms.ToolStripMenuItem(Loc.T("common.exit"));
@@ -168,13 +183,21 @@ public sealed class TrayService : IDisposable
     {
         try
         {
+            if (_menu is null)
+            {
+                return;
+            }
+
             // 每次弹出前套一遍皮肤：用户可能刚换过皮肤
-            if (_menu is not null && _services.GetService(typeof(SkinService)) is SkinService skin)
+            if (_services.GetService(typeof(SkinService)) is SkinService skin)
             {
                 TrayMenuSkin.Apply(_menu, skin.Current);
             }
 
-            _menu?.Show(WinForms.Cursor.Position);
+            // 关键：先把托盘窗口抢到前台，菜单才会在「点别处」时收到失活消息自动收起。
+            // 少这一步的典型症状就是菜单弹出来就赖着不走。
+            _tray?.BringToForeground();
+            _menu.Show(WinForms.Cursor.Position);
         }
         catch (Exception)
         {

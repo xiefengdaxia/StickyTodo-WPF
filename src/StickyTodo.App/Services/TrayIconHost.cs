@@ -71,6 +71,13 @@ internal sealed class TrayIconHost : IDisposable
         Add();
     }
 
+    /// <summary>
+    /// 把托盘图标背后的隐藏窗口抢到前台。
+    /// 右键菜单弹出前必须先做这一步：否则菜单不属于前台窗口，
+    /// 用户点别处时 Windows 不会给菜单发失活消息，菜单就一直挂在那儿不消失。
+    /// </summary>
+    public void BringToForeground() => SetForegroundWindow(_window.Handle);
+
     /// <summary>气泡通知（提醒用，纯本地）。</summary>
     public void ShowBalloon(string title, string text)
     {
@@ -200,4 +207,7 @@ internal sealed class TrayIconHost : IDisposable
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern int RegisterWindowMessage(string message);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(nint hwnd);
 }

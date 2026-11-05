@@ -194,6 +194,75 @@ public sealed class WindowManager
     }
 
     /// <summary>
+    /// 把所有打开的看板 / 工具窗口收回「当前屏幕」的右上角。
+    ///
+    /// 换显示器、改分辨率、多屏拔插之后，窗口常常落在已经不存在的那块屏幕坐标里，
+    /// 用户只看到托盘图标却找不到窗口。托盘菜单里一键就能把它们叫回来。
+    /// 排布：贴右上角往下叠，一列放不下就往左再开一列。
+    /// </summary>
+    /// <returns>实际移动了几个窗口。</returns>
+    public int ResetOpenWindowsToScreen()
+    {
+        var windows = _windows.Values.Where(w => w.IsVisible).ToList();
+        if (windows.Count == 0)
+        {
+            return 0;
+        }
+
+        // 有激活的就跟着它那块屏幕，否则用主屏
+        var anchor = windows.FirstOrDefault(w => w.IsActive) ?? windows[0];
+        var screen = anchor.Screens.ScreenFromWindow(anchor) ?? anchor.Screens.Primary;
+        if (screen is null)
+        {
+            return 0;
+        }
+
+        var scale = screen.Scaling > 0 ? screen.Scaling : 1.0;
+        var work = screen.WorkingArea;
+
+        var margin = (int)Math.Round(12 * scale);
+        var gap = (int)Math.Round(10 * scale);
+
+        var columnRight = work.X + work.Width - margin;
+        var y = work.Y + margin;
+        var columnWidth = 0;
+        var moved = 0;
+
+        foreach (var window in windows)
+        {
+            var widthPx = (int)Math.Round((window.Bounds.Width > 0 ? window.Bounds.Width : window.Width) * scale);
+            var heightPx = (int)Math.Round((window.Bounds.Height > 0 ? window.Bounds.Height : window.Height) * scale);
+
+            if (widthPx <= 0 || heightPx <= 0)
+            {
+                continue;
+            }
+
+            if (y + heightPx > work.Y + work.Height - margin && y > work.Y + margin)
+            {
+                columnRight -= columnWidth + gap;
+                y = work.Y + margin;
+                columnWidth = 0;
+            }
+
+            var left = columnRight - widthPx;
+            var top = y;
+
+            left = Math.Max(work.X, Math.Min(left, work.X + work.Width - widthPx));
+            top = Math.Max(work.Y, Math.Min(top, work.Y + work.Height - heightPx));
+
+            window.Position = new PixelPoint(left, top);
+
+            y = top + heightPx + gap;
+            columnWidth = Math.Max(columnWidth, widthPx);
+            moved++;
+        }
+
+        Log.Info($"[reset] 已把 {moved} 个窗口收回屏幕 {screen.DisplayName} 右上角");
+        return moved;
+    }
+
+    /// <summary>
     /// 把 <paramref name="target"/> 贴到 <paramref name="anchor"/> 边上：
     /// 优先放左边（桌面时钟一般在右下角），左边放不下就放右边；底边对齐，最后夹进工作区。
     /// Avalonia 的 Position / WorkingArea 是物理像素，Bounds 是 DIP，要乘缩放。

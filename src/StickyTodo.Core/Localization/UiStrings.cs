@@ -398,6 +398,8 @@ public static class UiStrings
         ["tray.pomodoro"] = ["番茄时钟", "Pomodoro timer", "ポモドーロタイマー", "뽀모도로 타이머"],
         ["tray.boards"] = ["看板", "Boards", "ボード", "보드"],
         ["tray.toggleAll"] = ["显示 / 隐藏全部便签", "Show / hide all boards", "全ボードの表示／非表示", "모든 보드 표시/숨기기"],
+        ["tray.resetWindows"] = ["把窗口收回本屏幕右上角", "Pull all windows back to this screen", "ウィンドウをこの画面の右上に戻す", "모든 창을 이 화면 오른쪽 위로 되돌리기"],
+        ["tray.resetWindowsNone"] = ["当前没有打开的看板", "No boards are open", "開いているボードがありません", "열린 보드가 없습니다"],
         ["tray.noBoards"] = ["（没有看板）", "(no boards)", "（ボードなし）", "(보드 없음)"],
     };
 }
