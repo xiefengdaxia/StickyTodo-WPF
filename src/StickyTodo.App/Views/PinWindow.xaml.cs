@@ -72,6 +72,17 @@ public partial class PinWindow : Window
         MouseWheel += OnWheel;
         MouseRightButtonUp += OnRightButtonUp;
         MouseDoubleClick += (_, _) => Close();
+
+        // Esc = 关闭（贴图窗默认是激活的，点一下图就有键盘焦点）
+        PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Escape)
+            {
+                e.Handled = true;
+                Close();
+            }
+        };
+
         Closed += (_, _) =>
         {
             _unlockChip?.Close();

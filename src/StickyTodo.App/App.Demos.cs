@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -1957,8 +1958,22 @@ public partial class App : System.Windows.Application
             var ok = captureOk && sizeOk && ratioOk && zoomOk && topmostOff && lockedOk && unlockedOk;
             Log.Information("[snip] 总结果={Result}", ok ? "通过" : "失败");
 
-            pin.Close();
-            Shutdown(ok ? 0 : 2);
+            // Esc = 关闭：直接给窗口发一个 Esc 键事件，确认窗真的关掉了
+            var source = PresentationSource.FromVisual(pin);
+            if (source is not null)
+            {
+                pin.RaiseEvent(new KeyEventArgs(Keyboard.PrimaryDevice, source, Environment.TickCount, Key.Escape)
+                {
+                    RoutedEvent = Keyboard.PreviewKeyDownEvent,
+                });
+            }
+
+            await Task.Delay(300);
+
+            var escClosed = !pin.IsVisible;
+            Log.Information("[snip] Esc 关闭={Closed}", escClosed);
+
+            Shutdown(ok && escClosed ? 0 : 2);
         }
         catch (Exception ex)
         {
