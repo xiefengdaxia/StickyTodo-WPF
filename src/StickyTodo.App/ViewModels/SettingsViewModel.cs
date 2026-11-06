@@ -115,6 +115,10 @@ public partial class SettingsViewModel : ObservableObject
 
     public string ShortcutLockActive => HotKeyService.LockActiveHotKey;
 
+    public string ShortcutSnip => HotKeyService.SnipHotKey;
+
+    public string ShortcutPinAgain => HotKeyService.PinAgainHotKey;
+
     /// <summary>背景透明度，0-100 的百分比（滑块绑定）。</summary>
     [ObservableProperty]
     private double _backgroundOpacity;

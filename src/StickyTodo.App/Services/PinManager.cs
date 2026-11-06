@@ -53,7 +53,16 @@ public sealed class PinManager
         _lastImage = result;
         _lastTopLeft = overlay.SelectionTopLeft;
 
-        Log.Information("[pin] 截图已贴出：{Width}x{Height}", result.PixelWidth, result.PixelHeight);
+        // 「复制」按钮：图已经进剪贴板了，不用再贴一张
+        if (overlay.CopiedOnly)
+        {
+            Log.Information("[pin] 已复制到剪贴板：{Width}x{Height}（未贴到桌面）",
+                result.PixelWidth, result.PixelHeight);
+            return null;
+        }
+
+        Log.Information("[pin] 截图已贴出：{Width}x{Height}（同时已复制到剪贴板）",
+            result.PixelWidth, result.PixelHeight);
         return Pin(result, _lastTopLeft);
     }
 

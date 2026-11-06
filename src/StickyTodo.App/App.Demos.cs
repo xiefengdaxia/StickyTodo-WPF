@@ -2106,6 +2106,11 @@ public partial class App : System.Windows.Application
             }
 
             var composed = overlay.ComposeForTest();
+
+            // 剪贴板：把合成结果放进去，模拟「复制」按钮
+            var copied = composed is not null && SnipOverlayWindow.CopyForTest(composed);
+            var onClipboard = Clipboard.ContainsImage();
+
             overlay.Close();
 
             var sizeOk = composed is { PixelWidth: 200, PixelHeight: 120 };
@@ -2145,10 +2150,12 @@ public partial class App : System.Windows.Application
             var unlockedOk = !pin.IsLockedPin && !ClickThrough.IsTransparent(pin);
 
             Log.Information(
-                "[snip] 合成={Size} 尺寸正确={SizeOk} 长宽比={RatioOk} 缩放={ZoomOk} 置顶可关={Topmost} 锁定穿透={Locked} 解锁={Unlocked}",
-                $"{composed.PixelWidth}x{composed.PixelHeight}", sizeOk, ratioOk, zoomOk, topmostOff, lockedOk, unlockedOk);
+                "[snip] 合成={Size} 尺寸正确={SizeOk} 长宽比={RatioOk} 缩放={ZoomOk} 置顶可关={Topmost} 锁定穿透={Locked} 解锁={Unlocked} 剪贴板={Clip}",
+                $"{composed.PixelWidth}x{composed.PixelHeight}", sizeOk, ratioOk, zoomOk, topmostOff, lockedOk, unlockedOk,
+                copied && onClipboard);
 
-            var ok = captureOk && sizeOk && ratioOk && zoomOk && topmostOff && lockedOk && unlockedOk;
+            var ok = captureOk && sizeOk && ratioOk && zoomOk && topmostOff && lockedOk && unlockedOk
+                     && copied && onClipboard;
             Log.Information("[snip] 总结果={Result}", ok ? "通过" : "失败");
 
             // Esc = 关闭：直接给窗口发一个 Esc 键事件，确认窗真的关掉了

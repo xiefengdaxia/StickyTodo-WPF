@@ -288,6 +288,8 @@ public static class UiStrings
         ["settings.scNewTodo"] = ["新建待办", "New to-do", "新規 ToDo", "새 할 일"],
         ["settings.scToggle"] = ["显示 / 隐藏全部便签", "Show / hide all boards", "全ボードの表示／非表示", "모든 보드 표시/숨기기"],
         ["settings.scLock"] = ["锁定 / 解锁当前看板", "Lock / unlock active board", "現在のボードをロック／解除", "현재 보드 잠금/해제"],
+        ["settings.scSnip"] = ["截图（框选后可标注）", "Capture screen", "スクリーンショット", "화면 캡처"],
+        ["settings.scPinAgain"] = ["再贴一张上次的截图", "Pin the last capture again", "前回のキャプチャをもう一枚貼る", "마지막 캡처를 한 장 더 붙이기"],
         ["settings.data"] = ["数据", "Data", "データ", "데이터"],
         ["settings.entitlement"] = ["会员状态", "Membership", "メンバーシップ", "멤버십"],
         ["settings.stats"] = ["内容统计", "Content stats", "コンテンツ統計", "콘텐츠 통계"],

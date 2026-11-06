@@ -515,15 +515,11 @@ public partial class App : System.Windows.Application
 
     private void AttachHotKeys(Window host)
     {
-        // 主窗体可能一直没显示（上次有看板时我们不弹它），
-        // 没有窗口句柄就注册不了全局热键，这里先把它建出来（窗口仍然不可见）。
-        new System.Windows.Interop.WindowInteropHelper(host).EnsureHandle();
-
         var hotKeys = _host!.Services.GetRequiredService<HotKeyService>();
         var windows = _host.Services.GetRequiredService<WindowManager>();
         var pins = _host.Services.GetRequiredService<PinManager>();
 
-        hotKeys.Attach(
+        var registered = hotKeys.Attach(
             host,
             onNewTodo: windows.OpenDefaultBoardForNewTodo,
             onToggleBoards: windows.ToggleBoardsVisibility,
@@ -532,7 +528,8 @@ public partial class App : System.Windows.Application
             onPinAgain: () => pins.PinLast());
 
         Log.Information(
-            "全局快捷键已注册：{New} 新建待办 / {Toggle} 显示隐藏 / {Lock} 锁定当前看板 / {Snip} 截图 / {Pin} 再贴一张",
+            "全局快捷键已注册 {Count}/5：{New} 新建待办 / {Toggle} 显示隐藏 / {Lock} 锁定当前看板 / {Snip} 截图 / {Pin} 再贴一张",
+            registered,
             HotKeyService.NewTodoHotKey, HotKeyService.ToggleBoardsHotKey, HotKeyService.LockActiveHotKey,
             HotKeyService.SnipHotKey, HotKeyService.PinAgainHotKey);
     }

@@ -41,7 +41,7 @@ public sealed class HotKeyService : IDisposable
     /// <summary>把上一次的截图再贴一张（默认 F3）。</summary>
     public static string PinAgainHotKey => "F3";
 
-    public void Attach(
+    public int Attach(
         Window window,
         Action onNewTodo,
         Action onToggleBoards,
@@ -49,28 +49,38 @@ public sealed class HotKeyService : IDisposable
         Action? onSnip = null,
         Action? onPinAgain = null)
     {
-        if (PresentationSource.FromVisual(window) is not HwndSource source)
+        // 主窗体可能一直没显示过（上次有看板时我们不弹它），这时
+        // PresentationSource.FromVisual 是 null，直接 return 会让所有全局快捷键静默失效。
+        // 用 EnsureHandle 拿到真实 HWND，再取它的 HwndSource。
+        var handle = new System.Windows.Interop.WindowInteropHelper(window).EnsureHandle();
+        var source = HwndSource.FromHwnd(handle);
+
+        if (source is null)
         {
-            return;
+            Serilog.Log.Warning("[hotkey] 拿不到窗口消息源，全局快捷键没有注册");
+            return 0;
         }
 
         _source = source;
-        _handle = source.Handle;
+        _handle = handle;
         source.AddHook(WndProc);
 
-        Register(IdNewTodo, VkN);
-        Register(IdToggleBoards, VkH);
-        Register(IdLockActive, VkL);
+        var registered = 0;
+        registered += Register(IdNewTodo, "新建待办", VkN, ModControl | ModAlt) ? 1 : 0;
+        registered += Register(IdToggleBoards, "显示/隐藏", VkH, ModControl | ModAlt) ? 1 : 0;
+        registered += Register(IdLockActive, "锁定看板", VkL, ModControl | ModAlt) ? 1 : 0;
 
-        // F1 / F3 不带修饰键：单独注册，被别的程序占用时静默失败
-        RegisterBare(IdSnip, VkF1);
-        RegisterBare(IdPinAgain, VkF3);
+        // F1 / F3 不带修饰键
+        registered += Register(IdSnip, "截图", VkF1, 0) ? 1 : 0;
+        registered += Register(IdPinAgain, "再贴一张", VkF3, 0) ? 1 : 0;
 
         _onNewTodo = onNewTodo;
         _onToggleBoards = onToggleBoards;
         _onLockActive = onLockActive;
         _onSnip = onSnip;
         _onPinAgain = onPinAgain;
+
+        return registered;
     }
 
     private Action? _onNewTodo;
@@ -79,14 +89,20 @@ public sealed class HotKeyService : IDisposable
     private Action? _onSnip;
     private Action? _onPinAgain;
 
-    private void Register(int id, uint key)
+    /// <summary>注册一个全局热键；失败（被别的程序占用）时记一条警告，返回 false。</summary>
+    private bool Register(int id, string name, uint key, uint modifiers)
     {
-        // 被别的程序占用时注册失败，静默跳过，不影响其它快捷键
-        RegisterHotKey(_handle, id, ModControl | ModAlt | ModNoRepeat, key);
-    }
+        var ok = RegisterHotKey(_handle, id, modifiers | ModNoRepeat, key);
 
-    /// <summary>不带修饰键的全局热键（F1 / F3）。</summary>
-    private void RegisterBare(int id, uint key) => RegisterHotKey(_handle, id, ModNoRepeat, key);
+        if (!ok)
+        {
+            Serilog.Log.Warning(
+                "[hotkey] {Name} 注册失败（win32={Error}），通常是已被其它程序占用",
+                name, Marshal.GetLastWin32Error());
+        }
+
+        return ok;
+    }
 
     private nint WndProc(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)
     {

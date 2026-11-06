@@ -271,11 +271,27 @@
                                                Foreground="{DynamicResource Brush.Accent}" />
                                 </Border>
                             </Grid>
-                            <Grid>
+                            <Grid Margin="0,0,0,9">
                                 <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.scLock}" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
                                 <Border HorizontalAlignment="Right" Background="{DynamicResource Brush.AccentSoft}"
                                         CornerRadius="6" Padding="8,2">
                                     <TextBlock Text="{Binding ShortcutLockActive}" FontSize="11"
+                                               Foreground="{DynamicResource Brush.Accent}" />
+                                </Border>
+                            </Grid>
+                            <Grid Margin="0,0,0,9">
+                                <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.scSnip}" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
+                                <Border HorizontalAlignment="Right" Background="{DynamicResource Brush.AccentSoft}"
+                                        CornerRadius="6" Padding="8,2">
+                                    <TextBlock Text="{Binding ShortcutSnip}" FontSize="11"
+                                               Foreground="{DynamicResource Brush.Accent}" />
+                                </Border>
+                            </Grid>
+                            <Grid>
+                                <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.scPinAgain}" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
+                                <Border HorizontalAlignment="Right" Background="{DynamicResource Brush.AccentSoft}"
+                                        CornerRadius="6" Padding="8,2">
+                                    <TextBlock Text="{Binding ShortcutPinAgain}" FontSize="11"
                                                Foreground="{DynamicResource Brush.Accent}" />
                                 </Border>
                             </Grid>

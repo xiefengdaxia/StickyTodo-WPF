@@ -317,6 +317,8 @@ public partial class SnipOverlayWindow : Window
 
     private void Cancel_Click(object sender, RoutedEventArgs e) => Cancel();
 
+    private void Copy_Click(object sender, RoutedEventArgs e) => CopyOnly();
+
     private void Pin_Click(object sender, RoutedEventArgs e) => Pin();
 
     // ---------------- 绘制 ----------------
@@ -524,6 +526,11 @@ public partial class SnipOverlayWindow : Window
                 Undo();
                 e.Handled = true;
                 break;
+
+            case Key.C when Keyboard.Modifiers == ModifierKeys.Control:
+                CopyOnly();
+                e.Handled = true;
+                break;
         }
     }
 
@@ -544,8 +551,56 @@ public partial class SnipOverlayWindow : Window
         }
 
         Result = Compose();
+
+        // 贴图的同时也放进剪贴板：可以直接 Ctrl+V 粘到聊天框
+        if (Result is not null)
+        {
+            CopyToClipboard(Result);
+        }
+
         DialogResult = true;
     }
+
+    /// <summary>工具栏「复制」：只放进剪贴板，不贴到桌面。</summary>
+    public void CopyOnly()
+    {
+        if (!_hasSelection || _selection.Width < 1 || _selection.Height < 1)
+        {
+            return;
+        }
+
+        Result = Compose();
+        CopiedOnly = Result is not null && CopyToClipboard(Result);
+        DialogResult = true;
+    }
+
+    /// <summary>用户是不是只选择了「复制」（不要贴到桌面）。</summary>
+    public bool CopiedOnly { get; private set; }
+
+    /// <summary>
+    /// 把图片放进剪贴板。剪贴板同一时间只能被一个程序占用，
+    /// 被别的程序短暂占着时重试几次，别让用户以为没复制上。
+    /// </summary>
+    private static bool CopyToClipboard(BitmapSource image)
+    {
+        for (var attempt = 0; attempt < 4; attempt++)
+        {
+            try
+            {
+                Clipboard.SetImage(image);
+                return true;
+            }
+            catch (Exception)
+            {
+                System.Threading.Thread.Sleep(60);
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>给回归用：把指定图片放进剪贴板（走和「复制」按钮同一条路径）。</summary>
+    internal static bool CopyForTest(BitmapSource image) => CopyToClipboard(image);
 
     /// <summary>给回归用：不走对话框，直接拿到合成结果。</summary>
     internal BitmapSource? ComposeForTest() => Compose();
