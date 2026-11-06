@@ -294,6 +294,12 @@ public partial class App : Application
             _ = RunSearchDemoAsync(services);
         }
 
+        // 四象限视图回归
+        if (HasFlag(args, "--quadrant-demo"))
+        {
+            _ = RunQuadrantDemoAsync(services);
+        }
+
         // 内存构成报告（与 WPF 版的 --mem-report 对齐，方便两版对比）
         if (HasFlag(args, "--mem-report"))
         {
@@ -501,6 +507,63 @@ public partial class App : Application
             proc.PrivateMemorySize64 / 1024d / 1024d,
             GC.GetTotalMemory(false) / 1024d / 1024d,
             proc.Threads.Count));
+    }
+
+    /// <summary>
+    /// --quadrant-demo：四象限视图（Avalonia 版）——
+    /// 未标记的落 ②、拖拽改象限落库、格内新增、视图选择被记住。
+    /// </summary>
+    private static async Task RunQuadrantDemoAsync(AppServices services)
+    {
+        try
+        {
+            var board = services.Todos.EnsureDefaultBoard();
+
+            foreach (var existing in services.Todos.GetTodos(board.Id))
+            {
+                services.Todos.Delete(existing.Id);
+            }
+
+            services.Todos.AddTodo(board.Id, "没标记的待办");
+            var moved = services.Todos.AddTodo(board.Id, "要被拖到第一象限");
+
+            var window = (BoardWindow)services.Windows.OpenBoard(board);
+            await Task.Delay(900);
+
+            var vm = window.ViewModelForTest;
+
+            vm.ToggleQuadrantView();
+            await Task.Delay(400);
+
+            var defaultInQ2 = vm.Quadrant2Rows.Any(r => r.Title == "没标记的待办");
+
+            var row = vm.Quadrant2Rows.First(r => r.Title == "要被拖到第一象限");
+            await vm.SetQuadrantAsync(row, 0);
+            await Task.Delay(500);
+
+            var inQ1 = vm.Quadrant1Rows.Any(r => r.Title == "要被拖到第一象限");
+            var persisted = services.Todos.GetTodos(board.Id).First(t => t.Id == moved.Id).Quadrant == 0;
+
+            await vm.AddToQuadrantAsync(2, "格内新增的");
+            await Task.Delay(500);
+
+            var addedInQ3 = vm.Quadrant3Rows.Any(r => r.Title == "格内新增的");
+
+            Log.Info($"[quadrant] 默认落②={defaultInQ2} 拖到①={inQ1} 已落库={persisted} 格内新增={addedInQ3}");
+
+            var ok = defaultInQ2 && inQ1 && persisted && addedInQ3;
+            Log.Info($"[quadrant] 总结果={(ok ? "通过" : "失败")}");
+            Environment.ExitCode = ok ? 0 : 2;
+        }
+        catch (Exception ex)
+        {
+            Log.Error("[quadrant] 失败：" + ex);
+            Environment.ExitCode = 1;
+        }
+        finally
+        {
+            services.ExitApplication();
+        }
     }
 
     /// <summary>本地提醒：到点弹右下角小窗 + 托盘通知。全部在本机完成。</summary>

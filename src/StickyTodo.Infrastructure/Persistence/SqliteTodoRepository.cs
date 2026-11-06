@@ -12,7 +12,7 @@ namespace StickyTodo.Infrastructure.Persistence;
 /// </summary>
 public sealed class SqliteTodoRepository : ITodoRepository
 {
-    private const int CurrentSchemaVersion = 5;
+    private const int CurrentSchemaVersion = 6;
 
     private readonly string _connectionString;
 
@@ -71,6 +71,11 @@ public sealed class SqliteTodoRepository : ITodoRepository
         if (version < 5)
         {
             connection.Execute(SchemaV5, transaction: tx);
+        }
+
+        if (version < 6)
+        {
+            connection.Execute(SchemaV6, transaction: tx);
         }
 
         connection.Execute($"PRAGMA user_version={CurrentSchemaVersion};", transaction: tx);
@@ -167,6 +172,11 @@ public sealed class SqliteTodoRepository : ITodoRepository
         );
 
         CREATE UNIQUE INDEX IF NOT EXISTS ux_note_board ON note (board_id);
+        """;
+
+    /// <summary>v6：四象限的两个布尔维度（0/1）。</summary>
+    private const string SchemaV6 = """
+        ALTER TABLE todo ADD COLUMN quadrant INTEGER NULL;
         """;
 
     private const string SchemaV5 = """
@@ -298,8 +308,8 @@ public sealed class SqliteTodoRepository : ITodoRepository
 
         connection.Execute(
             """
-            INSERT INTO todo (id, board_id, title, note, is_done, done_at, due_at, sort, created_at, updated_at)
-            VALUES (@Id, @BoardId, @Title, @Note, @IsDone, @DoneAt, @DueAt, @Sort, @CreatedAt, @UpdatedAt);
+            INSERT INTO todo (id, board_id, title, note, is_done, done_at, due_at, quadrant, sort, created_at, updated_at)
+            VALUES (@Id, @BoardId, @Title, @Note, @IsDone, @DoneAt, @DueAt, @Quadrant, @Sort, @CreatedAt, @UpdatedAt);
             """,
             new
             {
@@ -310,6 +320,7 @@ public sealed class SqliteTodoRepository : ITodoRepository
                 IsDone = 0,
                 DoneAt = (long?)null,
                 DueAt = ToUnix(item.DueAt),
+                item.Quadrant,
                 item.Sort,
                 CreatedAt = ToUnix(item.CreatedAt),
                 UpdatedAt = ToUnix(item.UpdatedAt),
@@ -370,6 +381,14 @@ public sealed class SqliteTodoRepository : ITodoRepository
                 doneAt = done ? (long?)ToUnix(DateTimeOffset.Now) : null,
                 now = ToUnix(DateTimeOffset.Now),
             }) > 0;
+    }
+
+    public void SetQuadrant(string todoId, int? quadrant)
+    {
+        using var connection = Open();
+        connection.Execute(
+            "UPDATE todo SET quadrant = @quadrant, updated_at = @now WHERE id = @id;",
+            new { id = todoId, quadrant, now = ToUnix(DateTimeOffset.Now) });
     }
 
     public void ReorderTodos(string boardId, IReadOnlyList<string> orderedTodoIds)
@@ -672,6 +691,7 @@ public sealed class SqliteTodoRepository : ITodoRepository
         RemindAt = FromUnix(row.remind_at),
         RemindedAt = FromUnix(row.reminded_at),
         Recurrence = row.recurrence,
+        Quadrant = row.quadrant,
         Sort = row.sort,
         CreatedAt = FromUnix(row.created_at),
         UpdatedAt = FromUnix(row.updated_at),
@@ -704,6 +724,7 @@ public sealed class SqliteTodoRepository : ITodoRepository
         public long? remind_at { get; set; }
         public long? reminded_at { get; set; }
         public string? recurrence { get; set; }
+        public int? quadrant { get; set; }
         public int sort { get; set; }
         public long created_at { get; set; }
         public long updated_at { get; set; }

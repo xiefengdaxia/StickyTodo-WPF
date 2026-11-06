@@ -1618,6 +1618,108 @@ public partial class BoardWindow : Window, IStickyWindow
     // ---------------- 拖拽排序 / 拖到标签改标签 ----------------
 
     /// <summary>拖动把手按下：只在这里武装拖拽，避免和行内编辑抢鼠标。</summary>
+    // ---------------- 四象限 ----------------
+
+    private void QuadrantToggle_Click(object sender, RoutedEventArgs e) => _viewModel.ToggleQuadrantView();
+
+    private TodoRowViewModel? _quadrantDragRow;
+    private Point _quadrantDragStart;
+
+    /// <summary>在格子里按住卡片：准备拖到别的象限。</summary>
+    private void QuadrantRow_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: TodoRowViewModel row })
+        {
+            _quadrantDragRow = row;
+            _quadrantDragStart = e.GetPosition(this);
+        }
+    }
+
+    private void QuadrantRow_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (_quadrantDragRow is null || e.LeftButton != MouseButtonState.Pressed)
+        {
+            return;
+        }
+
+        var position = e.GetPosition(this);
+        if (Math.Abs(position.X - _quadrantDragStart.X) < 5
+            && Math.Abs(position.Y - _quadrantDragStart.Y) < 5)
+        {
+            return;
+        }
+
+        var row = _quadrantDragRow;
+        _quadrantDragRow = null;
+        DragDrop.DoDragDrop(this, row, DragDropEffects.Move);
+    }
+
+    private void Quadrant_DragOver(object sender, DragEventArgs e)
+    {
+        var ok = e.Data.GetDataPresent(typeof(TodoRowViewModel));
+        e.Effects = ok ? DragDropEffects.Move : DragDropEffects.None;
+
+        if (ok && sender is Border border)
+        {
+            border.BorderThickness = new Thickness(2);
+        }
+
+        e.Handled = true;
+    }
+
+    private void Quadrant_DragLeave(object sender, DragEventArgs e)
+    {
+        if (sender is Border border)
+        {
+            border.BorderThickness = new Thickness(1);
+        }
+    }
+
+    private async void Quadrant_Drop(object sender, DragEventArgs e)
+    {
+        if (sender is Border border)
+        {
+            border.BorderThickness = new Thickness(1);
+        }
+
+        if (sender is not FrameworkElement { Tag: string tag } || !int.TryParse(tag, out var quadrant))
+        {
+            return;
+        }
+
+        if (e.Data.GetData(typeof(TodoRowViewModel)) is not TodoRowViewModel row)
+        {
+            return;
+        }
+
+        await _viewModel.SetQuadrantAsync(row, quadrant);
+    }
+
+    /// <summary>格子底部的输入框：回车把新待办加到这一格。</summary>
+    private async void QuadrantAdd_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+        {
+            return;
+        }
+
+        if (sender is not TextBox { Tag: string tag } box || !int.TryParse(tag, out var quadrant))
+        {
+            return;
+        }
+
+        var text = box.Text;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        box.Clear();
+        e.Handled = true;
+
+        await _viewModel.AddToQuadrantAsync(quadrant, text);
+    }
+
     private void DragHandle_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         var row = (sender as FrameworkElement)?.DataContext as TodoRowViewModel;

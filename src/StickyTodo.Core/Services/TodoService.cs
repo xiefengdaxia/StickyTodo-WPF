@@ -156,6 +156,10 @@ public sealed class TodoService
 
     public bool DeleteTag(string tagId) => _repository.DeleteTag(tagId);
 
+    /// <summary>设置四象限归属（0-3，null = 未归类）。</summary>
+    public void SetQuadrant(string todoId, int? quadrant) =>
+        _repository.SetQuadrant(todoId, quadrant);
+
     /// <summary>改标签颜色（保存到 tag.color）。</summary>
     public bool SetTagColor(string tagId, string color)
     {

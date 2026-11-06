@@ -58,7 +58,13 @@ public sealed class SchemaMigrationTests : IDisposable
         repository.AddCompletion(todo.Id, DateTimeOffset.Now, DateTimeOffset.Now);
         Assert.Single(repository.GetCompletions(todo.Id));
 
-        Assert.Equal(5L, ReadSchemaVersion());
+        // v6：四象限归属
+        repository.SetQuadrant(todo.Id, 2);
+        Assert.Equal(2, repository.GetTodo(todo.Id)!.Quadrant);
+        repository.SetQuadrant(todo.Id, null);
+        Assert.Null(repository.GetTodo(todo.Id)!.Quadrant);
+
+        Assert.Equal(6L, ReadSchemaVersion());
     }
 
     private long ReadSchemaVersion()

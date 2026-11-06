@@ -1,3 +1,4 @@
+using Avalonia;
 using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -362,6 +363,9 @@ private void ApplyLockInteraction()
     // ---------------- 回归测试用入口 ----------------
 
     /// <summary>给回归用：当前列表的行对象（比较引用即可证明「没有整表重建」）。</summary>
+    /// <summary>给回归用：直接拿到 ViewModel（四象限 / 透明度等断言）。</summary>
+    internal BoardViewModel ViewModelForTest => _viewModel;
+
     internal IReadOnlyList<TodoRowViewModel> RowsForTest => _viewModel.Rows;
 
     /// <summary>给回归用：设置搜索关键字（同时展开搜索框）。</summary>
@@ -486,6 +490,100 @@ private void ApplyLockInteraction()
             e.Handled = true;
             await ShowChipMenuAsync(control, chip);
         }
+    }
+
+    // ---------------- 四象限 ----------------
+
+    private const string QuadrantDragFormat = "StickyTodo.TodoRow";
+    private TodoRowViewModel? _quadrantDragRow;
+    private Point _quadrantDragStart;
+
+    private void QuadrantToggle_Click(object? sender, RoutedEventArgs e) =>
+        _viewModel.ToggleQuadrantView();
+
+    private async void QuadrantDone_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Control { Tag: TodoRowViewModel row })
+        {
+            await _viewModel.MarkDoneAsync(row);
+        }
+    }
+
+    private void QuadrantRow_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is Control { Tag: TodoRowViewModel row })
+        {
+            _quadrantDragRow = row;
+            _quadrantDragStart = e.GetPosition(this);
+        }
+    }
+
+    private async void QuadrantRow_PointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_quadrantDragRow is null || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            return;
+        }
+
+        var position = e.GetPosition(this);
+        if (Math.Abs(position.X - _quadrantDragStart.X) < 5
+            && Math.Abs(position.Y - _quadrantDragStart.Y) < 5)
+        {
+            return;
+        }
+
+        var row = _quadrantDragRow;
+        _quadrantDragRow = null;
+
+        var data = new DataObject();
+        data.Set(QuadrantDragFormat, row);
+        await DragDrop.DoDragDrop(e, data, DragDropEffects.Move);
+    }
+
+    private void Quadrant_DragOver(object? sender, DragEventArgs e)
+    {
+        e.DragEffects = e.Data.Contains(QuadrantDragFormat) ? DragDropEffects.Move : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private async void Quadrant_Drop(object? sender, DragEventArgs e)
+    {
+        if (sender is not Control { Tag: string tag } || !int.TryParse(tag, out var quadrant))
+        {
+            return;
+        }
+
+        if (e.Data.Get(QuadrantDragFormat) is not TodoRowViewModel row)
+        {
+            return;
+        }
+
+        await _viewModel.SetQuadrantAsync(row, quadrant);
+    }
+
+    /// <summary>格子底部的输入框：回车把新待办加到这一格。</summary>
+    private async void QuadrantAdd_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+        {
+            return;
+        }
+
+        if (sender is not TextBox { Tag: string tag } box || !int.TryParse(tag, out var quadrant))
+        {
+            return;
+        }
+
+        var text = box.Text;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        box.Text = string.Empty;
+        e.Handled = true;
+
+        await _viewModel.AddToQuadrantAsync(quadrant, text);
     }
 
     private async Task ShowChipMenuAsync(Control target, TagChipViewModel chip)

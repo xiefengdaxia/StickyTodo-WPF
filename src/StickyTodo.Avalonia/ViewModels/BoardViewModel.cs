@@ -29,6 +29,7 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost, IRefres
         _isTopmost = settings.GetBoardTopmost(board.Id);
         _isLocked = settings.GetBoardLocked(board.Id);
         _windowOpacity = skin.WindowOpacity;
+        _isQuadrantView = string.Equals(settings.GetBoardView(board.Id), "quadrant", StringComparison.OrdinalIgnoreCase);
 
         _undoTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
         _undoTimer.Tick += (_, _) => ClearUndoDelete();
@@ -105,7 +106,39 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost, IRefres
     [NotifyPropertyChangedFor(nameof(CanAdd))]
     [NotifyPropertyChangedFor(nameof(DraftPlaceholder))]
     [NotifyPropertyChangedFor(nameof(HasNoRows))]
+    [NotifyPropertyChangedFor(nameof(ShowQuadrants))]
     private TodoViewMode _viewMode = TodoViewMode.Todo;
+
+    /// <summary>待办视图的呈现方式：列表 / 四象限（只影响「待办」视图）。</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsListView))]
+    [NotifyPropertyChangedFor(nameof(ShowQuadrants))]
+    private bool _isQuadrantView;
+
+    public bool IsListView => !IsQuadrantView;
+
+    public bool ShowQuadrants => IsQuadrantView && IsTodoView;
+
+    public string QuadrantToggleTip => Loc.T("view.quadrantTip");
+
+    public ObservableCollection<TodoRowViewModel> Quadrant1Rows { get; } = new();
+    public ObservableCollection<TodoRowViewModel> Quadrant2Rows { get; } = new();
+    public ObservableCollection<TodoRowViewModel> Quadrant3Rows { get; } = new();
+    public ObservableCollection<TodoRowViewModel> Quadrant4Rows { get; } = new();
+
+    public string Quadrant1Title => Loc.T("quadrant.q1");
+    public string Quadrant1Subtitle => Loc.T("quadrant.q1Sub");
+    public string Quadrant2Title => Loc.T("quadrant.q2");
+    public string Quadrant2Subtitle => Loc.T("quadrant.q2Sub");
+    public string Quadrant3Title => Loc.T("quadrant.q3");
+    public string Quadrant3Subtitle => Loc.T("quadrant.q3Sub");
+    public string Quadrant4Title => Loc.T("quadrant.q4");
+    public string Quadrant4Subtitle => Loc.T("quadrant.q4Sub");
+
+    public int Quadrant1Count => Quadrant1Rows.Count;
+    public int Quadrant2Count => Quadrant2Rows.Count;
+    public int Quadrant3Count => Quadrant3Rows.Count;
+    public int Quadrant4Count => Quadrant4Rows.Count;
 
     public bool IsTodoView => ViewMode == TodoViewMode.Todo;
 
@@ -559,6 +592,8 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost, IRefres
                 ? Loc.F("board.itemCount", visible.Count)
                 : Loc.F("board.itemCountInTag", visible.Count, filterName);
 
+        RebuildQuadrants();
+
         return;
 
         // 标签胶囊 & 搜索关键字是「与」的关系：两个都满足才可见
@@ -572,6 +607,104 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost, IRefres
             };
 
             return tagOk && MatchesSearch(item);
+        }
+    }
+
+    /// <summary>
+    /// 把当前可见行按象限分组（复用同一批行对象）。
+    /// 没有任何象限标记的行按「② 重要不紧急」显示，只是显示层默认，不改库。
+    /// </summary>
+    private void RebuildQuadrants()
+    {
+        Quadrant1Rows.Clear();
+        Quadrant2Rows.Clear();
+        Quadrant3Rows.Clear();
+        Quadrant4Rows.Clear();
+
+        foreach (var row in Rows)
+        {
+            var target = EffectiveQuadrant(row.Item) switch
+            {
+                0 => Quadrant1Rows,
+                2 => Quadrant3Rows,
+                3 => Quadrant4Rows,
+                _ => Quadrant2Rows,
+            };
+
+            target.Add(row);
+        }
+
+        OnPropertyChanged(nameof(Quadrant1Count));
+        OnPropertyChanged(nameof(Quadrant2Count));
+        OnPropertyChanged(nameof(Quadrant3Count));
+        OnPropertyChanged(nameof(Quadrant4Count));
+    }
+
+    /// <summary>四象限归属：0=① 1=② 2=③ 3=④；未归类按 ② 显示。</summary>
+    public static int EffectiveQuadrant(TodoItem item) => item.Quadrant is >= 0 and <= 3 ? item.Quadrant.Value : 1;
+
+    /// <summary>拖动改象限。</summary>
+    public async Task SetQuadrantAsync(TodoRowViewModel row, int quadrant)
+    {
+        if (EffectiveQuadrant(row.Item) == quadrant && row.Item.Quadrant is not null)
+        {
+            return;
+        }
+
+        try
+        {
+            ErrorText = null;
+            await Task.Run(() => _service.SetQuadrant(row.Id, quadrant));
+            row.Item.Quadrant = quadrant;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorText = ex.Message;
+        }
+    }
+
+    /// <summary>在某一格里直接新增一条（自动带上该象限标记）。</summary>
+    public async Task<bool> AddToQuadrantAsync(int quadrant, string title)
+    {
+        var clean = title?.Trim() ?? string.Empty;
+        if (clean.Length == 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            ErrorText = null;
+
+            await Task.Run(() =>
+            {
+                var todo = _service.AddTodo(BoardId, clean);
+                _service.SetQuadrant(todo.Id, quadrant);
+            });
+
+            await LoadAsync();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            ErrorText = ex.Message;
+            return false;
+        }
+    }
+
+    /// <summary>列表 / 四象限 切换（记住选择）。</summary>
+    public void ToggleQuadrantView()
+    {
+        IsQuadrantView = !IsQuadrantView;
+
+        try
+        {
+            _settings.SetBoardView(BoardId, IsQuadrantView ? "quadrant" : "list");
+        }
+        catch (Exception)
+        {
+            // 记不住不影响使用
         }
     }
 

@@ -28,6 +28,12 @@ public sealed class TodoItem
     /// <summary>重复规则（RFC 5545 RRULE，如 FREQ=WEEKLY;BYDAY=MO,WE），null 表示不重复。</summary>
     public string? Recurrence { get; set; }
 
+    /// <summary>
+    /// 四象限归属：0=①重要且紧急，1=②重要不紧急，2=③紧急不重要，3=④都不重要；
+    /// null = 还没归类（界面上默认按 ② 显示，拖动后才写值）。
+    /// </summary>
+    public int? Quadrant { get; set; }
+
     public int Sort { get; set; }
 
     public DateTimeOffset CreatedAt { get; init; }

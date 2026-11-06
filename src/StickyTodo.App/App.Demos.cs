@@ -1825,6 +1825,99 @@ public partial class App : System.Windows.Application
     }
 
     /// <summary>
+    /// --quadrant-demo：四象限视图回归。
+    /// ① 没标记的待办按「②重要不紧急」显示（不改库）；
+    /// ② 拖到别的象限会写库并立刻换格；
+    /// ③ 格内新增自动带上该象限；
+    /// ④ 视图选择按看板记住。
+    /// </summary>
+    private async void RunQuadrantDemo(string? shotDirectory)
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+            _host = BuildHost();
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+
+            ApplyLanguageForCurrentRun();
+            var service = _host.Services.GetRequiredService<TodoService>();
+            var settings = _host.Services.GetRequiredService<AppSettingsService>();
+            var windows = _host.Services.GetRequiredService<WindowManager>();
+
+            var board = service.EnsureDefaultBoard();
+            foreach (var existing in service.GetTodos(board.Id))
+            {
+                service.Delete(existing.Id);
+            }
+
+            service.AddTodo(board.Id, "没标记的待办");
+            var moved = service.AddTodo(board.Id, "要被拖到第一象限");
+
+            var window = (BoardWindow)windows.OpenBoard(board);
+            MainWindow = window;
+            await Task.Delay(900);
+
+            var vm = window.ViewModelForTest;
+
+            // ① 切到四象限：未标记的应落在 ②
+            vm.ToggleQuadrantView();
+            await Task.Delay(400);
+
+            var defaultInQ2 = vm.Quadrant2Rows.Any(r => r.Title == "没标记的待办");
+            var q2CountBefore = vm.Quadrant2Rows.Count;
+
+            // ② 拖到 ①
+            var row = vm.Quadrant2Rows.First(r => r.Title == "要被拖到第一象限");
+            await vm.SetQuadrantAsync(row, 0);
+            await Task.Delay(500);
+
+            var inQ1 = vm.Quadrant1Rows.Any(r => r.Title == "要被拖到第一象限");
+            var persisted = service.GetTodos(board.Id).First(t => t.Id == moved.Id).Quadrant == 0;
+
+            // ③ 格内新增
+            await vm.AddToQuadrantAsync(2, "格内新增的");
+            await Task.Delay(500);
+
+            var addedInQ3 = vm.Quadrant3Rows.Any(r => r.Title == "格内新增的")
+                            && service.GetTodos(board.Id).First(t => t.Title == "格内新增的").Quadrant == 2;
+
+            // ④ 视图记住
+            var viewSaved = settings.GetBoardView(board.Id) == "quadrant";
+
+            Log.Information(
+                "[quadrant] 默认落②={DefaultQ2}(②共{Count}) 拖到①={Q1} 已落库={Persisted} 格内新增={Added} 视图已记住={Saved}",
+                defaultInQ2, q2CountBefore, inQ1, persisted, addedInQ3, viewSaved);
+
+            var ok = defaultInQ2 && inQ1 && persisted && addedInQ3 && viewSaved;
+
+            if (shotDirectory is not null)
+            {
+                await Task.Delay(300);
+                SaveWindowShots(Path.Combine(shotDirectory, "quadrant"));
+            }
+
+            // 切回列表：所有行都应还在
+            vm.ToggleQuadrantView();
+            await Task.Delay(400);
+            var backToList = vm.Rows.Count == 3;
+
+            Log.Information("[quadrant] 切回列表行数={Count} 正确={Ok}", vm.Rows.Count, backToList);
+            Log.Information("[quadrant] 总结果={Result}", ok && backToList ? "通过" : "失败");
+
+            Shutdown(ok && backToList ? 0 : 2);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[quadrant] 失败");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
     /// --tag-add-demo：选中标签后再新增待办，新待办要自动归到该标签；
     /// 选「全部 / 未分类」时照旧不加标签。
     /// </summary>
@@ -3970,6 +4063,13 @@ public partial class App : System.Windows.Application
         if (args.Contains("--tag-add-demo", StringComparer.OrdinalIgnoreCase))
         {
             RunTagAddDemo(ReadOptionValue(args, "--shot"));
+            return true;
+        }
+
+        // 四象限视图回归
+        if (args.Contains("--quadrant-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunQuadrantDemo(ReadOptionValue(args, "--shot"));
             return true;
         }
 

@@ -16,6 +16,75 @@
         UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Display">
 
+    <Window.Resources>
+        <!-- 四象限：格子 / 卡片 / 勾选圈 / 格内新增框 -->
+        <Style x:Key="QuadrantCard" TargetType="Border">
+            <Setter Property="Margin" Value="3" />
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="AllowDrop" Value="True" />
+        </Style>
+
+        <Style x:Key="QuadrantRowCard" TargetType="Border">
+            <Setter Property="Padding" Value="6,3" />
+            <Setter Property="Margin" Value="0,0,0,2" />
+            <Setter Property="CornerRadius" Value="5" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#18FFFFFF" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="QuadrantCircle" TargetType="Button">
+            <Setter Property="Width" Value="14" />
+            <Setter Property="Height" Value="14" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Ring" CornerRadius="7" BorderThickness="1.4"
+                                BorderBrush="{DynamicResource Brush.InkSoft}" Background="Transparent" />
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Ring" Property="Background" Value="{DynamicResource Brush.AccentSoft}" />
+                                <Setter TargetName="Ring" Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="QuadrantAddBox" TargetType="TextBox">
+            <Setter Property="Margin" Value="7,0,7,6" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
+            <Setter Property="CaretBrush" Value="{DynamicResource Brush.Ink}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border CornerRadius="5" Background="#12FFFFFF" Padding="6,3">
+                            <Grid>
+                                <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center" />
+                                <TextBlock x:Name="Watermark" Text="＋ 添加到此格" FontSize="11" Opacity="0.38"
+                                           VerticalAlignment="Center" IsHitTestVisible="False"
+                                           Visibility="Collapsed" />
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Text" Value="">
+                                <Setter TargetName="Watermark" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
     <!-- 外层留出阴影空间，真正的便签是里面这张圆角纸 -->
     <Border x:Name="NoteRoot"
             Margin="10"
@@ -304,7 +373,8 @@
                 </Grid>
 
                 <!-- 待办列表（表格行内编辑 + 可拖拽排序） -->
-                <Grid Grid.Row="1" Margin="0,8,0,0">
+                <Grid Grid.Row="1" Margin="0,8,0,0"
+                      Visibility="{Binding ShowQuadrants, Converter={StaticResource InverseBoolToVis}}">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
@@ -667,6 +737,187 @@
                     </Border>
                 </Grid>
 
+                <!-- 四象限视图：与列表共用同一批待办 -->
+                <Grid Grid.Row="1" Margin="0,8,0,0"
+                      Visibility="{Binding ShowQuadrants, Converter={StaticResource BoolToVis}}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Row="0" Grid.Column="0" Tag="0" Style="{StaticResource QuadrantCard}"
+                            Background="#14E5484D" BorderBrush="#33E5484D"
+                            DragOver="Quadrant_DragOver" DragLeave="Quadrant_DragLeave" Drop="Quadrant_Drop">
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Top" Margin="8,6,8,4">
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="3" Height="12" CornerRadius="2" Background="#E5484D" Margin="0,0,6,0" />
+                                    <TextBlock Text="{Binding Quadrant1Title}" FontSize="11.5" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource Brush.Ink}" />
+                                    <TextBlock Text="{Binding Quadrant1Count}" FontSize="11" Opacity="0.55" Margin="5,0,0,0" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding Quadrant1Subtitle}" FontSize="10" Opacity="0.45" Margin="9,1,0,0" />
+                            </StackPanel>
+                            <TextBox DockPanel.Dock="Bottom" Tag="0" Style="{StaticResource QuadrantAddBox}"
+                                     KeyDown="QuadrantAdd_KeyDown" />
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="6,0,6,4">
+                                <ItemsControl ItemsSource="{Binding Quadrant1Rows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource QuadrantRowCard}" Tag="{Binding}"
+                                                    MouseLeftButtonDown="QuadrantRow_MouseDown"
+                                                    MouseMove="QuadrantRow_MouseMove">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Button Grid.Column="0" Style="{StaticResource QuadrantCircle}"
+                                                            Click="RowDone_Click" ToolTip="完成" />
+                                                    <TextBlock Grid.Column="1" Text="{Binding Title}" FontSize="12"
+                                                               Margin="6,0,0,0" VerticalAlignment="Center"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               Foreground="{DynamicResource Brush.Ink}" />
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Border>
+
+                    <Border Grid.Row="0" Grid.Column="1" Tag="1" Style="{StaticResource QuadrantCard}"
+                            Background="#143FA9F5" BorderBrush="#333FA9F5"
+                            DragOver="Quadrant_DragOver" DragLeave="Quadrant_DragLeave" Drop="Quadrant_Drop">
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Top" Margin="8,6,8,4">
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="3" Height="12" CornerRadius="2" Background="#3FA9F5" Margin="0,0,6,0" />
+                                    <TextBlock Text="{Binding Quadrant2Title}" FontSize="11.5" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource Brush.Ink}" />
+                                    <TextBlock Text="{Binding Quadrant2Count}" FontSize="11" Opacity="0.55" Margin="5,0,0,0" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding Quadrant2Subtitle}" FontSize="10" Opacity="0.45" Margin="9,1,0,0" />
+                            </StackPanel>
+                            <TextBox DockPanel.Dock="Bottom" Tag="1" Style="{StaticResource QuadrantAddBox}"
+                                     KeyDown="QuadrantAdd_KeyDown" />
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="6,0,6,4">
+                                <ItemsControl ItemsSource="{Binding Quadrant2Rows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource QuadrantRowCard}" Tag="{Binding}"
+                                                    MouseLeftButtonDown="QuadrantRow_MouseDown"
+                                                    MouseMove="QuadrantRow_MouseMove">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Button Grid.Column="0" Style="{StaticResource QuadrantCircle}"
+                                                            Click="RowDone_Click" ToolTip="完成" />
+                                                    <TextBlock Grid.Column="1" Text="{Binding Title}" FontSize="12"
+                                                               Margin="6,0,0,0" VerticalAlignment="Center"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               Foreground="{DynamicResource Brush.Ink}" />
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Border>
+
+                    <Border Grid.Row="1" Grid.Column="0" Tag="2" Style="{StaticResource QuadrantCard}"
+                            Background="#14F5A524" BorderBrush="#33F5A524"
+                            DragOver="Quadrant_DragOver" DragLeave="Quadrant_DragLeave" Drop="Quadrant_Drop">
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Top" Margin="8,6,8,4">
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="3" Height="12" CornerRadius="2" Background="#F5A524" Margin="0,0,6,0" />
+                                    <TextBlock Text="{Binding Quadrant3Title}" FontSize="11.5" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource Brush.Ink}" />
+                                    <TextBlock Text="{Binding Quadrant3Count}" FontSize="11" Opacity="0.55" Margin="5,0,0,0" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding Quadrant3Subtitle}" FontSize="10" Opacity="0.45" Margin="9,1,0,0" />
+                            </StackPanel>
+                            <TextBox DockPanel.Dock="Bottom" Tag="2" Style="{StaticResource QuadrantAddBox}"
+                                     KeyDown="QuadrantAdd_KeyDown" />
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="6,0,6,4">
+                                <ItemsControl ItemsSource="{Binding Quadrant3Rows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource QuadrantRowCard}" Tag="{Binding}"
+                                                    MouseLeftButtonDown="QuadrantRow_MouseDown"
+                                                    MouseMove="QuadrantRow_MouseMove">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Button Grid.Column="0" Style="{StaticResource QuadrantCircle}"
+                                                            Click="RowDone_Click" ToolTip="完成" />
+                                                    <TextBlock Grid.Column="1" Text="{Binding Title}" FontSize="12"
+                                                               Margin="6,0,0,0" VerticalAlignment="Center"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               Foreground="{DynamicResource Brush.Ink}" />
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Border>
+
+                    <Border Grid.Row="1" Grid.Column="1" Tag="3" Style="{StaticResource QuadrantCard}"
+                            Background="#14808080" BorderBrush="#33808080"
+                            DragOver="Quadrant_DragOver" DragLeave="Quadrant_DragLeave" Drop="Quadrant_Drop">
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Top" Margin="8,6,8,4">
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="3" Height="12" CornerRadius="2" Background="#8B8B8B" Margin="0,0,6,0" />
+                                    <TextBlock Text="{Binding Quadrant4Title}" FontSize="11.5" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource Brush.Ink}" />
+                                    <TextBlock Text="{Binding Quadrant4Count}" FontSize="11" Opacity="0.55" Margin="5,0,0,0" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding Quadrant4Subtitle}" FontSize="10" Opacity="0.45" Margin="9,1,0,0" />
+                            </StackPanel>
+                            <TextBox DockPanel.Dock="Bottom" Tag="3" Style="{StaticResource QuadrantAddBox}"
+                                     KeyDown="QuadrantAdd_KeyDown" />
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="6,0,6,4">
+                                <ItemsControl ItemsSource="{Binding Quadrant4Rows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource QuadrantRowCard}" Tag="{Binding}"
+                                                    MouseLeftButtonDown="QuadrantRow_MouseDown"
+                                                    MouseMove="QuadrantRow_MouseMove">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Button Grid.Column="0" Style="{StaticResource QuadrantCircle}"
+                                                            Click="RowDone_Click" ToolTip="完成" />
+                                                    <TextBlock Grid.Column="1" Text="{Binding Title}" FontSize="12"
+                                                               Margin="6,0,0,0" VerticalAlignment="Center"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               Foreground="{DynamicResource Brush.Ink}" />
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Border>
+                </Grid>
+
                 <!-- 底部：状态 + TODO/Done 视图切换 -->
                 <Border Grid.Row="2"
                         BorderBrush="{DynamicResource Brush.Line}"
@@ -725,22 +976,32 @@
                                        Visibility="{Binding ErrorText, Converter={StaticResource NullToCollapsed}}" />
                         </StackPanel>
 
-                        <!-- 分段切换：待办 / 已完成 -->
-                        <Border Grid.Column="1"
-                                CornerRadius="9"
-                                Background="{DynamicResource Brush.ChipIdle}"
-                                BorderBrush="{DynamicResource Brush.Line}"
-                                BorderThickness="1"
-                                Padding="2">
-                            <StackPanel Orientation="Horizontal">
-                                <Button x:Name="TodoTab" Style="{StaticResource SegmentTab}" Click="TodoTab_Click" ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=view.todoTip}">
-                                    <TextBlock Text="{Binding TodoViewText}" />
-                                </Button>
-                                <Button x:Name="DoneTab" Style="{StaticResource SegmentTab}" Click="DoneTab_Click" ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=view.doneTip}">
-                                    <TextBlock Text="{Binding DoneViewText}" />
-                                </Button>
-                            </StackPanel>
-                        </Border>
+                        <!-- 分段切换：待办 / 已完成；左边是「列表 / 四象限」切换 -->
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button x:Name="QuadrantToggle"
+                                    Content="▦"
+                                    FontSize="12"
+                                    Padding="6,2"
+                                    Margin="0,0,4,0"
+                                    Style="{StaticResource Button.Ghost}"
+                                    ToolTip="{Binding QuadrantToggleTip}"
+                                    Click="QuadrantToggle_Click" />
+
+                            <Border CornerRadius="9"
+                                    Background="{DynamicResource Brush.ChipIdle}"
+                                    BorderBrush="{DynamicResource Brush.Line}"
+                                    BorderThickness="1"
+                                    Padding="2">
+                                <StackPanel Orientation="Horizontal">
+                                    <Button x:Name="TodoTab" Style="{StaticResource SegmentTab}" Click="TodoTab_Click" ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=view.todoTip}">
+                                        <TextBlock Text="{Binding TodoViewText}" />
+                                    </Button>
+                                    <Button x:Name="DoneTab" Style="{StaticResource SegmentTab}" Click="DoneTab_Click" ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=view.doneTip}">
+                                        <TextBlock Text="{Binding DoneViewText}" />
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
                     </Grid>
                 </Border>
             </Grid>

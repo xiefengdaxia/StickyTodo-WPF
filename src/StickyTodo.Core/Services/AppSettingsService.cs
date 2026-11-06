@@ -120,7 +120,6 @@ public sealed class AppSettingsService
 
     /// <summary>上次在看板上选中的标签胶囊：返回 "all" / "none" / 标签 id；没记录返回 null。</summary>
     public static string BoardChipKey(string boardId) => $"board.{boardId}.chip";
-
     public string? GetBoardChip(string boardId)
     {
         var raw = GetString(BoardChipKey(boardId), null);
@@ -129,6 +128,14 @@ public sealed class AppSettingsService
 
     public void SetBoardChip(string boardId, string chipKey) =>
         _repository.SetSetting(BoardChipKey(boardId), chipKey);
+
+    /// <summary>看板上次用的是列表还是四象限视图。</summary>
+    public static string BoardViewKey(string boardId) => $"board.{boardId}.view";
+
+    public string GetBoardView(string boardId) => GetString(BoardViewKey(boardId), "list");
+
+    public void SetBoardView(string boardId, string view) =>
+        _repository.SetSetting(BoardViewKey(boardId), view);
 
     // ---------------- 每个窗口自己的透明度 ----------------
     /// <summary>某个窗口单独的整窗透明度存在这个 key 下。</summary>

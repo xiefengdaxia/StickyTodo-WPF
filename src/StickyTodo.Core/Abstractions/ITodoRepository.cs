@@ -31,6 +31,9 @@ public interface ITodoRepository
 
     bool SetTodoDone(string id, bool done);
 
+    /// <summary>设置四象限归属（0-3，null = 未归类）。</summary>
+    void SetQuadrant(string todoId, int? quadrant);
+
     /// <summary>按给定顺序重排该看板下所有待办。</summary>
     void ReorderTodos(string boardId, IReadOnlyList<string> orderedTodoIds);
 
