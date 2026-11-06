@@ -116,15 +116,7 @@ public partial class App : System.Windows.Application
             var manager = _host.Services.GetRequiredService<ManagerWindow>();
             MainWindow = manager;
 
-            // --autostart（开机自启拉起）：不弹管理面板，只把上次的看板摆出来。
-            // 若根本没恢复出窗口（比如首次开机、或上次全关了），才退化成显示管理面板，
-            // 否则用户会以为程序没启动。
             var launchedByAutoStart = e.Args.Contains("--autostart", StringComparer.OrdinalIgnoreCase);
-
-            if (!launchedByAutoStart)
-            {
-                manager.Show();
-            }
 
             var tray = _host.Services.GetRequiredService<TrayService>();
 
@@ -165,24 +157,27 @@ public partial class App : System.Windows.Application
             // 开机自启：注册表与用户设置对齐（换了安装路径时自动更新）
             SyncAutoStart();
 
-            // 恢复上次会话：重新打开上次开着的便签/日历看板（位置大小由各窗口自己恢复）
+            // 恢复上次会话：重新打开上次开着的便签/日历/时钟（位置大小由各窗口自己恢复）
+            var restored = 0;
             if (!isDemo)
             {
-                var restored = _host.Services.GetRequiredService<WindowManager>().RestoreSession();
+                restored = _host.Services.GetRequiredService<WindowManager>().RestoreSession();
                 if (restored > 0)
                 {
-                    Log.Information("已恢复上次会话的 {Count} 个看板窗口", restored);
-                }
-                else if (launchedByAutoStart)
-                {
-                    // 没有可恢复的窗口，兜底把管理面板显示出来
-                    manager.Show();
-                }
-                else
-                {
-                    manager.Show();
+                    Log.Information("已恢复上次会话的 {Count} 个窗口", restored);
                 }
             }
+
+            // 只有「没有可恢复的窗口」时才弹主窗体。
+            // 上次留着便签/时钟，说明用户要的就是那套桌面；再弹管理面板只会挡视线。
+            var showManager = isDemo || restored == 0;
+            if (showManager)
+            {
+                manager.Show();
+            }
+
+            Log.Information("[startup] 恢复窗口={Restored} 显示主窗体={ShowManager}（开机自启={AutoStart}）",
+                restored, showManager, launchedByAutoStart);
 
             // --create-tool-demo <weather|worldclock|desktopclock>：打开一个工具型看板（进「我的看板」列表）。
             // 已有同类型的就复用，否则每次启动都会多建一个看板。
@@ -494,6 +489,10 @@ public partial class App : System.Windows.Application
 
     private void AttachHotKeys(Window host)
     {
+        // 主窗体可能一直没显示（上次有看板时我们不弹它），
+        // 没有窗口句柄就注册不了全局热键，这里先把它建出来（窗口仍然不可见）。
+        new System.Windows.Interop.WindowInteropHelper(host).EnsureHandle();
+
         var hotKeys = _host!.Services.GetRequiredService<HotKeyService>();
         var windows = _host.Services.GetRequiredService<WindowManager>();
         var pins = _host.Services.GetRequiredService<PinManager>();
