@@ -38,6 +38,9 @@ public partial class App : System.Windows.Application
     {
         base.OnStartup(e);
 
+        // 启动耗时打点：日志里能看到每个阶段各花了多久（用户报「启动慢」时先看这个）
+        var startupWatch = System.Diagnostics.Stopwatch.StartNew();
+
         // 渲染模式必须在任何窗口出现之前定好。
         // 默认走软件渲染：这套 UI 全是不透明底 + 圆角 + 投影的自绘窗口，
         // 硬件加速在这里没有收益，反而多占一份 D3D 表面（实测省 ~80 MB 私有内存）。
@@ -71,10 +74,14 @@ public partial class App : System.Windows.Application
         try
         {
             _host = BuildHost();
+            Log.Information("[startup] 依赖注入就绪 {Ms} ms", startupWatch.ElapsedMilliseconds);
+
             await _host.StartAsync();
+            Log.Information("[startup] 后台宿主已启动 {Ms} ms", startupWatch.ElapsedMilliseconds);
 
             var repository = _host.Services.GetRequiredService<ITodoRepository>();
             repository.Initialize();
+            Log.Information("[startup] 数据库就绪 {Ms} ms", startupWatch.ElapsedMilliseconds);
 
             // 回归/演示路径也要跟随设置里的语言
             ApplyLanguageForCurrentRun();
@@ -118,6 +125,29 @@ public partial class App : System.Windows.Application
 
             var launchedByAutoStart = e.Args.Contains("--autostart", StringComparer.OrdinalIgnoreCase);
 
+            // 先把上次的看板/时钟恢复出来，再去做托盘、热键这些「后台设施」：
+            // 用户最关心的是窗口什么时候出现，托盘晚半秒没人会注意。
+            var restored = 0;
+            if (!isDemo)
+            {
+                restored = _host.Services.GetRequiredService<WindowManager>().RestoreSession();
+                if (restored > 0)
+                {
+                    Log.Information("已恢复上次会话的 {Count} 个窗口", restored);
+                }
+            }
+
+            // 只有「没有可恢复的窗口」时才弹主窗体。
+            // 上次留着便签/时钟，说明用户要的就是那套桌面；再弹管理面板只会挡视线。
+            var showManager = isDemo || restored == 0;
+            if (showManager)
+            {
+                manager.Show();
+            }
+
+            Log.Information("[startup] 恢复窗口={Restored} 显示主窗体={ShowManager}（开机自启={AutoStart}）用时 {Ms} ms",
+                restored, showManager, launchedByAutoStart, startupWatch.ElapsedMilliseconds);
+
             var tray = _host.Services.GetRequiredService<TrayService>();
 
             // 先刷掉上次被强杀进程留下的托盘图标，再挂自己的图标
@@ -156,28 +186,6 @@ public partial class App : System.Windows.Application
 
             // 开机自启：注册表与用户设置对齐（换了安装路径时自动更新）
             SyncAutoStart();
-
-            // 恢复上次会话：重新打开上次开着的便签/日历/时钟（位置大小由各窗口自己恢复）
-            var restored = 0;
-            if (!isDemo)
-            {
-                restored = _host.Services.GetRequiredService<WindowManager>().RestoreSession();
-                if (restored > 0)
-                {
-                    Log.Information("已恢复上次会话的 {Count} 个窗口", restored);
-                }
-            }
-
-            // 只有「没有可恢复的窗口」时才弹主窗体。
-            // 上次留着便签/时钟，说明用户要的就是那套桌面；再弹管理面板只会挡视线。
-            var showManager = isDemo || restored == 0;
-            if (showManager)
-            {
-                manager.Show();
-            }
-
-            Log.Information("[startup] 恢复窗口={Restored} 显示主窗体={ShowManager}（开机自启={AutoStart}）",
-                restored, showManager, launchedByAutoStart);
 
             // --create-tool-demo <weather|worldclock|desktopclock>：打开一个工具型看板（进「我的看板」列表）。
             // 已有同类型的就复用，否则每次启动都会多建一个看板。
@@ -218,7 +226,8 @@ public partial class App : System.Windows.Application
                 _ = manager.RefreshAsync();
             }
 
-            Log.Information("StickyTodo 启动完成，数据目录 {Directory}", AppPaths.DataDirectory);
+            Log.Information("StickyTodo 启动完成，数据目录 {Directory}，应用内 {Ms} ms，进程起 {Total} ms（含运行时初始化）",
+                AppPaths.DataDirectory, startupWatch.ElapsedMilliseconds, SinceProcessStartMs());
 
             // 空闲时把工作集还给系统（详见 MemoryTrimmer 的注释）
             _memoryTrimmer = MemoryTrimmer.Start();
@@ -364,6 +373,23 @@ public partial class App : System.Windows.Application
                 services.AddTransient<DesktopClockWindow>();
             })
             .Build();
+    }
+
+    /// <summary>
+    /// 从进程启动到现在过了多久（毫秒）。用来把「运行时初始化 + 单文件解压」也算进启动耗时，
+    /// 日志里的 [startup] 打点只从 OnStartup 开始计时。
+    /// </summary>
+    private static long SinceProcessStartMs()
+    {
+        try
+        {
+            using var process = System.Diagnostics.Process.GetCurrentProcess();
+            return (long)(DateTime.Now - process.StartTime).TotalMilliseconds;
+        }
+        catch (Exception)
+        {
+            return -1;
+        }
     }
 
     /// <summary>当前进程的设置服务（工具窗/贴图窗没有 DI 时用它取透明度）。</summary>
