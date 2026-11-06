@@ -203,7 +203,23 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
         try
         {
             ErrorText = null;
-            var created = await Task.Run(() => _service.AddTodo(BoardId, title));
+
+            // 当前选中的是一个具体标签时，新增的待办直接归到这个标签下
+            // （选「全部」或「未分类」时照旧不加标签）
+            var chip = SelectedChip;
+
+            var created = await Task.Run(() =>
+            {
+                var todo = _service.AddTodo(BoardId, title);
+
+                if (chip.IsRealTag && chip.TagId is { } tagId)
+                {
+                    _service.SetTodoTags(todo.Id, [tagId]);
+                }
+
+                return todo;
+            });
+
             DraftTitle = string.Empty;
             await LoadAsync();
 

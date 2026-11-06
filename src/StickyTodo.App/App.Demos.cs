@@ -1825,6 +1825,93 @@ public partial class App : System.Windows.Application
     }
 
     /// <summary>
+    /// --tag-add-demo：选中标签后再新增待办，新待办要自动归到该标签；
+    /// 选「全部 / 未分类」时照旧不加标签。
+    /// </summary>
+    private async void RunTagAddDemo(string? shotDirectory)
+    {
+        AppPaths.EnsureCreated();
+        ConfigureLogging();
+
+        try
+        {
+            _host = BuildHost();
+            var repository = _host.Services.GetRequiredService<ITodoRepository>();
+            repository.Initialize();
+
+            ApplyLanguageForCurrentRun();
+            var service = _host.Services.GetRequiredService<TodoService>();
+            var windows = _host.Services.GetRequiredService<WindowManager>();
+
+            var board = service.EnsureDefaultBoard();
+            foreach (var existing in service.GetTodos(board.Id))
+            {
+                service.Delete(existing.Id);
+            }
+
+            var tag = service.CreateTag("工作");
+
+            var window = (BoardWindow)windows.OpenBoard(board);
+            MainWindow = window;
+            await Task.Delay(900);
+
+            var viewModel = window.ViewModelForTest;
+
+            // ① 选中「工作」标签后新增
+            var chip = viewModel.Chips.First(c => c.TagId == tag.Id);
+            await viewModel.SelectChipAsync(chip);
+
+            viewModel.DraftTitle = "带标签新增的待办";
+            await viewModel.CommitDraftAsync();
+            await Task.Delay(500);
+
+            var created = service.GetTodos(board.Id).FirstOrDefault(t => t.Title == "带标签新增的待办");
+            var tagsOfCreated = created is null
+                ? []
+                : service.GetTodoTagMap(board.Id).TryGetValue(created.Id, out var ids) ? ids : [];
+
+            var taggedOk = created is not null && tagsOfCreated.Contains(tag.Id);
+            var visibleOk = viewModel.Rows.Any(r => r.Title == "带标签新增的待办");
+
+            // ② 切回「全部」再新增：不应带标签
+            await viewModel.SelectChipAsync(viewModel.Chips.First(c => c.IsAll));
+
+            viewModel.DraftTitle = "不带标签的待办";
+            await viewModel.CommitDraftAsync();
+            await Task.Delay(500);
+
+            var plain = service.GetTodos(board.Id).FirstOrDefault(t => t.Title == "不带标签的待办");
+            var plainTags = plain is null
+                ? []
+                : service.GetTodoTagMap(board.Id).TryGetValue(plain.Id, out var ids2) ? ids2 : [];
+
+            var plainOk = plain is not null && plainTags.Count == 0;
+
+            Log.Information(
+                "[tagadd] 选标签新增：有标签={Tagged} 出现在当前筛选里={Visible} 标签={Tags} | 全部视图新增：无标签={Plain}",
+                taggedOk, visibleOk, string.Join(",", tagsOfCreated), plainOk);
+
+            var ok = taggedOk && visibleOk && plainOk;
+            Log.Information("[tagadd] 总结果={Result}", ok ? "通过" : "失败");
+
+            if (shotDirectory is not null)
+            {
+                await viewModel.SelectChipAsync(viewModel.Chips.First(c => c.TagId == tag.Id));
+                await Task.Delay(300);
+                SaveWindowShots(Path.Combine(shotDirectory, "tagadd"));
+            }
+
+            Shutdown(ok ? 0 : 2);
+        }
+        catch (Exception ex)
+        {
+            Log.Fatal(ex, "[tagadd] 失败");
+            Log.CloseAndFlush();
+            Shutdown(1);
+        }
+    }
+
+    /// <summary>
     /// --opacity-demo：验证「每个窗口自己的透明度」。
     /// ① 两个看板设不同透明度，只影响自己；
     /// ② 值按窗口 key 存进设置，重启能记住；
@@ -3848,6 +3935,13 @@ public partial class App : System.Windows.Application
         if (args.Contains("--opacity-demo", StringComparer.OrdinalIgnoreCase))
         {
             RunOpacityDemo(ReadOptionValue(args, "--shot"));
+            return true;
+        }
+
+        // 选中标签后新增待办自动归到该标签
+        if (args.Contains("--tag-add-demo", StringComparer.OrdinalIgnoreCase))
+        {
+            RunTagAddDemo(ReadOptionValue(args, "--shot"));
             return true;
         }
 
