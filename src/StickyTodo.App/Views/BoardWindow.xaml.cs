@@ -1304,6 +1304,48 @@ public partial class BoardWindow : Window, IStickyWindow
 
         var menu = new ContextMenu();
 
+        // 颜色：直接给一排色块，点一下就生效
+        var colorMenu = new MenuItem { Header = "颜色" };
+
+        foreach (var hex in TagColors.Palette)
+        {
+            var color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(hex);
+
+            var item = new MenuItem
+            {
+                Header = new StackPanel
+                {
+                    Orientation = System.Windows.Controls.Orientation.Horizontal,
+                    Children =
+                    {
+                        new System.Windows.Shapes.Rectangle
+                        {
+                            Width = 12,
+                            Height = 12,
+                            RadiusX = 3,
+                            RadiusY = 3,
+                            Margin = new Thickness(0, 0, 8, 0),
+                            VerticalAlignment = VerticalAlignment.Center,
+                            Fill = new System.Windows.Media.SolidColorBrush(color),
+                        },
+                        new System.Windows.Controls.TextBlock
+                        {
+                            Text = hex,
+                            VerticalAlignment = VerticalAlignment.Center,
+                            FontSize = 11,
+                            Opacity = 0.7,
+                        },
+                    },
+                },
+                IsCheckable = true,
+                IsChecked = string.Equals(tag.Color, hex, StringComparison.OrdinalIgnoreCase),
+            };
+
+            var picked = hex;
+            item.Click += async (_, _) => await _viewModel.SetTagColorAsync(tag, picked);
+            colorMenu.Items.Add(item);
+        }
+
         var rename = new MenuItem { Header = "重命名标签…" };
         rename.Click += async (_, _) =>
         {
@@ -1327,6 +1369,7 @@ public partial class BoardWindow : Window, IStickyWindow
             }
         };
 
+        menu.Items.Add(colorMenu);
         menu.Items.Add(rename);
         menu.Items.Add(remove);
         menu.PlacementTarget = element;

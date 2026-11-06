@@ -118,8 +118,19 @@ public sealed class AppSettingsService
             ClampWindowOpacity(value).ToString("0.###", CultureInfo.InvariantCulture));
     }
 
-    // ---------------- 每个窗口自己的透明度 ----------------
+    /// <summary>上次在看板上选中的标签胶囊：返回 "all" / "none" / 标签 id；没记录返回 null。</summary>
+    public static string BoardChipKey(string boardId) => $"board.{boardId}.chip";
 
+    public string? GetBoardChip(string boardId)
+    {
+        var raw = GetString(BoardChipKey(boardId), null);
+        return string.IsNullOrWhiteSpace(raw) ? null : raw;
+    }
+
+    public void SetBoardChip(string boardId, string chipKey) =>
+        _repository.SetSetting(BoardChipKey(boardId), chipKey);
+
+    // ---------------- 每个窗口自己的透明度 ----------------
     /// <summary>某个窗口单独的整窗透明度存在这个 key 下。</summary>
     public static string WindowOpacityKeyFor(string windowKey) => $"window.{windowKey}.opacity";
 

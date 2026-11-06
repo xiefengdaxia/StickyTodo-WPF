@@ -445,7 +445,8 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
 
     private void RebuildChips()
     {
-        var previous = Chips.FirstOrDefault(c => c.IsSelected)?.TagId;
+        var selectedBefore = Chips.FirstOrDefault(c => c.IsSelected);
+        var previous = selectedBefore?.TagId;
         Chips.Clear();
 
         var all = new TagChipViewModel(null, Loc.T("tag.all"), TagColors.Default) { Count = _all.Count };
@@ -464,9 +465,25 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
             });
         }
 
-        var target = previous is null ? all : Chips.FirstOrDefault(c => c.TagId == previous) ?? all;
+        // 首次构建时没有「上一个选中」，就恢复上次用的胶囊；
+        // 之后的重建沿用当前选中（比如删标签、改颜色后刷新列表，不该跳回「全部」）。
+        var wanted = selectedBefore is not null
+            ? ChipKeyOf(selectedBefore)
+            : _settings.GetBoardChip(BoardId);
+
+        var target = wanted switch
+        {
+            null or "all" => all,
+            "none" => noTag,
+            _ => Chips.FirstOrDefault(c => c.TagId == wanted) ?? all,
+        };
+
         target.IsSelected = true;
     }
+
+    /// <summary>胶囊的持久化标识：全部 / 未分类 / 标签 id。</summary>
+    private static string ChipKeyOf(TagChipViewModel chip) =>
+        chip.TagId is null ? "all" : chip.TagId.Length == 0 ? "none" : chip.TagId;
 
     private TagChipViewModel SelectedChip => Chips.FirstOrDefault(c => c.IsSelected) ?? Chips[0];
 
@@ -641,6 +658,16 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
         foreach (var item in Chips)
         {
             item.IsSelected = ReferenceEquals(item, chip);
+        }
+
+        // 记住这次选择：下次打开这个看板直接用同一个筛选
+        try
+        {
+            _settings.SetBoardChip(BoardId, ChipKeyOf(chip));
+        }
+        catch (Exception)
+        {
+            // 记不住不影响使用
         }
 
         SyncRows();
@@ -938,6 +965,21 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost
         {
             ErrorText = null;
             await Task.Run(() => _service.DeleteTag(tag.Id));
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            ErrorText = ex.Message;
+        }
+    }
+
+    /// <summary>改标签颜色（右键菜单里的色板）。</summary>
+    public async Task SetTagColorAsync(Tag tag, string color)
+    {
+        try
+        {
+            ErrorText = null;
+            await Task.Run(() => _service.SetTagColor(tag.Id, color));
             await LoadAsync();
         }
         catch (Exception ex)

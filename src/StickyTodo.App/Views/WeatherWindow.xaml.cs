@@ -40,9 +40,51 @@ public partial class WeatherWindow : Window
             _geometry.Arm();
         };
 
-        Loaded += (_, _) => App.ApplyToolWindowOpacity(this);
+        Loaded += (_, _) =>
+        {
+            App.ApplyToolWindowOpacity(this);
+            viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        };
 
-        Loaded += async (_, _) => await viewModel.LoadAsync();
+        Closed += (_, _) => viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+
+        Loaded += async (_, _) =>
+        {
+            await viewModel.LoadAsync();
+
+            // 等一帧让预报内容把窗口撑开，再做两件事：
+            // ① 超过屏幕就退回可滚动（小屏兜底）；② 记一行「是否需要滚动」方便回归。
+            await Task.Delay(250);
+            FitToContent();
+        };
+    }
+
+    /// <summary>天气数据是异步到的：到一次就重新量一次高度。</summary>
+    private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(WeatherViewModel.Days) or nameof(WeatherViewModel.IsBusyOverlayVisible))
+        {
+            Dispatcher.BeginInvoke(new Action(FitToContent), System.Windows.Threading.DispatcherPriority.Background);
+        }
+    }
+
+    /// <summary>
+    /// 窗口高度跟随内容（XAML 里 SizeToContent="Height"），
+    /// 内容比屏幕还高时才退回固定高度 + 滚动，保证小屏也不会把标题栏顶出屏幕。
+    /// </summary>
+    private void FitToContent()
+    {
+        var maxHeight = SystemParameters.WorkArea.Height - 40;
+
+        if (ActualHeight > maxHeight)
+        {
+            SizeToContent = SizeToContent.Manual;
+            Height = maxHeight;
+        }
+
+        Serilog.Log.Debug("[weather] 窗口高={Height:0} 视口={Viewport:0} 内容={Extent:0} 需要滚动={Scroll}",
+            ActualHeight, ForecastScroll.ViewportHeight, ForecastScroll.ExtentHeight,
+            ForecastScroll.ExtentHeight > ForecastScroll.ViewportHeight + 0.5);
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

@@ -502,19 +502,46 @@ private void ApplyLockInteraction()
         }
         else
         {
+            var tag = _viewModel.Tags.FirstOrDefault(t => t.Id == chip.TagId);
+
+            // 颜色：一排色块，点一下即生效
+            var colorMenu = new MenuItem { Header = "颜色" };
+            foreach (var hex in TagColors.Palette)
+            {
+                var picked = hex;
+                var item = new MenuItem
+                {
+                    Header = hex,
+                    ToggleType = MenuItemToggleType.Radio,
+                    IsChecked = tag is not null && string.Equals(tag.Color, hex, StringComparison.OrdinalIgnoreCase),
+                };
+
+                item.Click += async (_, _) =>
+                {
+                    if (tag is not null)
+                    {
+                        await _viewModel.SetTagColorAsync(tag, picked);
+                    }
+                };
+
+                colorMenu.Items.Add(item);
+            }
+
+            menu.Items.Add(colorMenu);
+
             var rename = new MenuItem { Header = Loc.T("common.rename") };
             rename.Click += async (_, _) =>
             {
-                var tag = _viewModel.Tags.FirstOrDefault(t => t.Id == chip.TagId);
-                if (tag is null)
+                var current = _viewModel.Tags.FirstOrDefault(t => t.Id == chip.TagId);
+                if (current is null)
                 {
                     return;
                 }
 
-                var name = await PromptWindow.PromptAsync(this, Loc.T("common.rename"), Loc.T("tag.name"), tag.Name);
+                var name = await PromptWindow.PromptAsync(this, Loc.T("common.rename"), Loc.T("tag.name"), current.Name);
                 if (name is not null)
                 {
-                    await _viewModel.RenameTagAsync(tag, name);
+                    await _viewModel.RenameTagAsync(current, name);
                 }
             };
             menu.Items.Add(rename);
@@ -522,10 +549,10 @@ private void ApplyLockInteraction()
             var delete = new MenuItem { Header = Loc.T("common.delete") };
             delete.Click += async (_, _) =>
             {
-                var tag = _viewModel.Tags.FirstOrDefault(t => t.Id == chip.TagId);
-                if (tag is not null)
+                var current = _viewModel.Tags.FirstOrDefault(t => t.Id == chip.TagId);
+                if (current is not null)
                 {
-                    await _viewModel.DeleteTagAsync(tag);
+                    await _viewModel.DeleteTagAsync(current);
                 }
             };
             menu.Items.Add(delete);

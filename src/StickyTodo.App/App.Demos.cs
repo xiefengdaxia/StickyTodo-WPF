@@ -1887,11 +1887,32 @@ public partial class App : System.Windows.Application
 
             var plainOk = plain is not null && plainTags.Count == 0;
 
-            Log.Information(
-                "[tagadd] 选标签新增：有标签={Tagged} 出现在当前筛选里={Visible} 标签={Tags} | 全部视图新增：无标签={Plain}",
-                taggedOk, visibleOk, string.Join(",", tagsOfCreated), plainOk);
+            // ③ 改标签颜色
+            var newColor = TagColors.Palette[3];
+            await viewModel.SetTagColorAsync(tag, newColor);
+            await Task.Delay(400);
 
-            var ok = taggedOk && visibleOk && plainOk;
+            var updated = service.GetTags().First(t => t.Id == tag.Id);
+            var colorOk = string.Equals(updated.Color, newColor, StringComparison.OrdinalIgnoreCase);
+
+            // ④ 记住上次选中的胶囊：选好标签后关掉再打开
+            await viewModel.SelectChipAsync(viewModel.Chips.First(c => c.TagId == tag.Id));
+            await Task.Delay(400);
+
+            windows.CloseBoard(board.Id);
+            await Task.Delay(600);
+
+            var reopened = (BoardWindow)windows.OpenBoard(board);
+            await Task.Delay(900);
+
+            var selectedChip = reopened.ViewModelForTest.Chips.FirstOrDefault(c => c.IsSelected);
+            var chipOk = selectedChip?.TagId == tag.Id;
+
+            Log.Information(
+                "[tagadd] 选标签新增：有标签={Tagged} 出现在当前筛选里={Visible} 标签={Tags} | 全部视图新增：无标签={Plain} | 改颜色={Color} | 记住胶囊={Chip}({ChipName})",
+                taggedOk, visibleOk, string.Join(",", tagsOfCreated), plainOk, colorOk, chipOk, selectedChip?.Name);
+
+            var ok = taggedOk && visibleOk && plainOk && colorOk && chipOk;
             Log.Information("[tagadd] 总结果={Result}", ok ? "通过" : "失败");
 
             if (shotDirectory is not null)

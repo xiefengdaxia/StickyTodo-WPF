@@ -156,6 +156,17 @@ public sealed class TodoService
 
     public bool DeleteTag(string tagId) => _repository.DeleteTag(tagId);
 
+    /// <summary>改标签颜色（保存到 tag.color）。</summary>
+    public bool SetTagColor(string tagId, string color)
+    {
+        if (string.IsNullOrWhiteSpace(color))
+        {
+            return false;
+        }
+
+        return _repository.SetTagColor(tagId, color);
+    }
+
     public void SetTodoTags(string todoId, IReadOnlyList<string> tagIds) =>
         _repository.SetTodoTags(todoId, tagIds);
 

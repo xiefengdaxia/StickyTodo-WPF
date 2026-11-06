@@ -1,11 +1,12 @@
-<Window x:Class="StickyTodo.App.Views.WeatherWindow"
+﻿<Window x:Class="StickyTodo.App.Views.WeatherWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:StickyTodo.App.Controls"
         Title="{Binding BoardName}"
         Icon="/Assets/stickytodo.ico"
-        Width="880" Height="700"
+        Width="880" Height="820"
         MinWidth="640" MinHeight="480"
+        SizeToContent="Height"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
@@ -316,7 +317,7 @@
 
                     <TextBlock Grid.Row="0" Text="天气预报" Style="{StaticResource Text.Section}" Margin="0,0,0,10" />
 
-                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                    <ScrollViewer x:Name="ForecastScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto"
                                   VerticalContentAlignment="Center">
                         <StackPanel VerticalAlignment="Center">
                             <!-- 第一排：星期 / 日期 / 图标 / 天气 -->
@@ -334,7 +335,7 @@
                                                        Foreground="{DynamicResource Brush.Ink}" />
                                             <TextBlock Text="{Binding DateLabel}" Style="{StaticResource Text.Caption}"
                                                        HorizontalAlignment="Center" Margin="0,4,0,10" />
-                                            <TextBlock Text="{Binding IconGlyph}" FontSize="34"
+                                            <TextBlock Text="{Binding IconGlyph}" FontSize="30"
                                                        HorizontalAlignment="Center"
                                                        FontFamily="Segoe UI Symbol, Microsoft YaHei UI"
                                                        Foreground="#FFFFB300" />
@@ -347,7 +348,7 @@
                             </ItemsControl>
 
                             <!-- 高低温曲线：列中心和上下两排对齐 -->
-                            <controls:TempChart Days="{Binding Days}" Height="120" Margin="4,8" />
+                            <controls:TempChart Days="{Binding Days}" Height="96" Margin="4,6" />
 
                             <!-- 第二排：图标 / 天气 / 风向 / 风级 -->
                             <ItemsControl ItemsSource="{Binding Days}">
@@ -359,7 +360,7 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <StackPanel HorizontalAlignment="Center">
-                                            <TextBlock Text="{Binding IconGlyph2}" FontSize="28"
+                                            <TextBlock Text="{Binding IconGlyph2}" FontSize="24"
                                                        HorizontalAlignment="Center"
                                                        FontFamily="Segoe UI Symbol, Microsoft YaHei UI"
                                                        Foreground="#FFFFB300" />

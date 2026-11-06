@@ -41,6 +41,9 @@ public interface ITodoRepository
 
     bool RenameTag(string tagId, string name);
 
+    /// <summary>改标签颜色（界面上的色点）。</summary>
+    bool SetTagColor(string tagId, string color);
+
     bool DeleteTag(string tagId);
 
     /// <summary>返回「待办 id → 标签 id 列表」，只取该看板下的待办。</summary>

@@ -431,6 +431,12 @@ public sealed class SqliteTodoRepository : ITodoRepository
         return connection.Execute("UPDATE tag SET name = @name WHERE id = @tagId;", new { tagId, name }) > 0;
     }
 
+    public bool SetTagColor(string tagId, string color)
+    {
+        using var connection = Open();
+        return connection.Execute("UPDATE tag SET color = @color WHERE id = @tagId;", new { tagId, color }) > 0;
+    }
+
     public bool DeleteTag(string tagId)
     {
         using var connection = Open();
