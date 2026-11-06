@@ -40,6 +40,9 @@ jobs:
             6.0.x
       - name: Test
         run: dotnet test tests/StickyTodo.Tests/StickyTodo.Tests.csproj -c Release --nologo
+      # 冒烟测试要跑 App 的 exe，而 dotnet test 不会编译 App 项目（测试只引用 Core/Infra）
+      - name: Build app
+        run: dotnet build src/StickyTodo.App/StickyTodo.App.csproj -c Release --nologo
       - name: Smoke (--selftest)
         shell: pwsh
         run: |
