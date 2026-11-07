@@ -71,6 +71,20 @@ TODO / Done view switch:
 |---|---|---|
 | ![Todo view](artifacts/board-todo-view.png) | ![Done view](artifacts/board-done-view.png) | ![Inline edit](artifacts/board-inline-edit.png) |
 
+Four-quadrant view (the ▦ button at the bottom switches list ⇄ quadrants; drag a card to re-file it; unfiled to-dos show under “Important, not urgent”):
+
+![Four quadrants](artifacts/board-quadrant.png)
+
+Screenshot and pin (F1 to capture, then pen / line / rectangle / text; a pin can stay on top, lock with click-through, and zoom with the wheel):
+
+| Capture overlay (the selection stays bright, the toolbar floats below it) | Pinned image (drag anywhere, Esc closes) |
+|---|---|
+| ![Capture](artifacts/snip-overlay.png) | ![Pin](artifacts/pin-board.png) |
+
+Every window has its own opacity (the board below is at 55%, the desktop shows through):
+
+![Window opacity](artifacts/board-opacity.png)
+
 The UI in four languages (board names are user data and stay as typed):
 
 | English | 日本語 | 한국어 |
@@ -301,6 +315,11 @@ Dependency direction: `App -> Infrastructure -> Core`. Core knows nothing about 
   - The to-do view shows unfinished items in your manual drag order
   - The Done view shows completed items **sorted by completion time, newest first**, each row labeled with when it was completed (today 14:41 / yesterday 09:05 / Oct 18 20:11 / Dec 30 2025 08:00)
   - The draft input is disabled in the Done view so you can't add something invisible
+- **Four-quadrant view**: the ▦ button at the bottom switches between list and quadrants over the **same to-dos**
+  - Important & urgent (do now) / Important, not urgent (schedule) / Urgent, not important (delegate) / Neither (do less) — each with a colour bar, subtitle and live count
+  - **Dragging a card into another quadrant re-files it** and saves immediately; every quadrant has its own add box
+  - To-dos without a quadrant are **shown** under "Important, not urgent" (display-only until you drag them), so old data does not pile up under "Neither"
+  - The choice is remembered per board
 - **Due date (countdown)**: right-click to set today / tomorrow / this weekend / custom; rows show "N days left / due today / N days overdue", overdue in red
 - **Reminders**: right-click to set in 30 minutes / in 1 hour / today at 18:00 / tomorrow at 09:00 / custom; when due, a bottom-right popup plus a tray balloon, with "Snooze 10 min"; polled every 20 seconds, entirely local
 - **Recurring to-dos (RFC 5545 RRULE)**: right-click to pick daily / every weekday / weekly / biweekly / monthly / last day of month / yearly, or enter a custom RRULE (e.g. `FREQ=MONTHLY;BYDAY=2TU`)
@@ -317,6 +336,8 @@ Dependency direction: `App -> Infrastructure -> Core`. Core knows nothing about 
 - `Ctrl+Alt+N` new to-do (opens the default to-do board and focuses the input)
 - `Ctrl+Alt+H` show / hide all notes
 - `Ctrl+Alt+L` lock / unlock the active board
+- `F1` capture the screen (annotate, then pin with Enter)
+- `F3` pin the last capture again (multiple pins)
 - If registration fails (taken by another program) it is skipped silently and startup is unaffected
 
 **Motion (consistent immediate feedback)**
@@ -464,6 +485,15 @@ Quota checks are only allowed in `TodoService`; the UI's only job is to surface 
 **M6 (done)**
 - [x] **Four-language UI**: 简体中文 / English / 日本語 / 한국어, switchable live in Settings, with lunar terminology kept in Chinese; unit tests guard translation completeness and placeholder consistency
 - [x] **Four README versions**: `README.md` (zh) / `.en.md` / `.ja.md` / `.ko.md`, cross-linked at the top
+
+**M11 (done)**
+- [x] **Four-quadrant view**: a second view of the to-do board sharing the same to-dos; drag a card to re-file it, add straight into a quadrant, unclassified items show under "Important, not urgent", and the choice is remembered per board (schema v6)
+- [x] **Screenshot & pin**: F1 captures the screen, then pen (1–16 px) / line / rectangle / text / 5 colours / undo; Enter pins it **and** copies it to the clipboard, Ctrl+C copies only, F3 pins the last capture again; pins stay on top, can lock with click-through, zoom with the wheel, close with Esc
+- [x] **Per-window opacity**: boards, weather, world clock, network, performance, desktop clock and pins each have their own opacity, with "use global"
+- [x] **Tags**: right-click to change colour (8 swatches); a new to-do inherits the selected tag; the board remembers the last selected chip
+- [x] **Quieter startup**: restores only last session's boards/clocks without showing the manager; startup order tuned and instrumented with `[startup]` timings
+- [x] **Tray “pull windows back”**: one click returns every board to the top-right of the current screen; the tray menu now closes on focus loss
+- [x] **Fixes**: recurrence drifting on machines in other time zones, global hotkeys silently failing when the manager is hidden, the weather board needing scrolling, the tray menu staying open
 
 **M4 extension**
 - [ ] ICS subscription and import/export
