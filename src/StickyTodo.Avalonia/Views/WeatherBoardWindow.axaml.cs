@@ -25,6 +25,15 @@ public partial class WeatherBoardWindow : Window
 
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
+        // 工具窗自己的整窗透明度（没单独设过就跟随全局）
+        Opened += (_, _) =>
+        {
+            if (App.Services is { } services)
+            {
+                Services.ToolWindowOpacity.Apply(this, services.Settings);
+            }
+        };
+
         // 有记录就摆回上次的位置；没记录才居中，并保证不超出工作区
         Opened += (_, _) =>
         {
@@ -182,7 +191,8 @@ public partial class WeatherBoardWindow : Window
     {
         if (App.Services is { } services)
         {
-            var menu = Views.WeatherMenuBuilder.BuildMenu(services.Skin, () => services.Windows.ApplySkin());
+            var menu = Views.WeatherMenuBuilder.BuildMenu(
+                services.Settings, services.Skin, this, () => services.Windows.ApplySkin());
             menu.PlacementTarget = this;
             menu.Open(this);
         }

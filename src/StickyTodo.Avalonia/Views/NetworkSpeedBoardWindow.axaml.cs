@@ -21,6 +21,15 @@ public partial class NetworkSpeedBoardWindow : Window
 
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
+        // 工具窗自己的整窗透明度（没单独设过就跟随全局）
+        Opened += (_, _) =>
+        {
+            if (App.Services is { } services)
+            {
+                Services.ToolWindowOpacity.Apply(this, services.Settings);
+            }
+        };
+
         Opened += (_, _) =>
         {
             if (!_geometry.Restore())
@@ -71,7 +80,8 @@ public partial class NetworkSpeedBoardWindow : Window
     {
         if (App.Services is { } services)
         {
-            var menu = Views.WeatherMenuBuilder.BuildMenu(services.Skin, () =>
+            var menu = Views.WeatherMenuBuilder.BuildMenu(
+                services.Settings, services.Skin, this, () =>
             {
                 services.Windows.ApplySkin();
             });

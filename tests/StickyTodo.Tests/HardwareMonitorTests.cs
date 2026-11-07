@@ -1,7 +1,10 @@
-﻿using StickyTodo.Core.Hardware;
+﻿using System.Runtime.Versioning;
+using StickyTodo.Core.Hardware;
 
 namespace StickyTodo.Tests;
 
+/// <summary>性能计数器只在 Windows 上有，测试也只在 Windows 上跑（CI 与本地一致）。</summary>
+[SupportedOSPlatform("windows")]
 public sealed class HardwareMonitorTests
 {
     [Fact]

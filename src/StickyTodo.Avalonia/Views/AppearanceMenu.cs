@@ -12,7 +12,7 @@ internal static class AppearanceMenu
         var menu = new ContextMenu();
         menu.Items.Add(BuildSkinMenu(host, windows));
         menu.Items.Add(BuildOpacityMenu(Loc.F("menu.bgOpacity", Math.Round(host.CurrentOpacity * 100)), isBackground: true, host, windows));
-        menu.Items.Add(BuildOpacityMenu(Loc.F("menu.winOpacity", Math.Round(host.CurrentWindowOpacity * 100)), isBackground: false, host, windows));
+        menu.Items.Add(BuildOpacityMenu(Loc.F("menu.winOpacityBoard", Math.Round(host.CurrentWindowOpacity * 100)), isBackground: false, host, windows));
         menu.Items.Add(new Separator());
         menu.Items.Add(new MenuItem { Header = Loc.T("menu.opacityHint"), IsEnabled = false });
         return menu;
@@ -80,6 +80,25 @@ internal static class AppearanceMenu
             };
 
             root.Items.Add(item);
+        }
+
+        if (!isBackground)
+        {
+            // 每个窗口单独设的透明度可以取消，回到跟随全局设置
+            root.Items.Add(new Separator());
+
+            var followGlobal = new MenuItem
+            {
+                Header = Loc.T("menu.opacityFollowGlobal"),
+                ToggleType = MenuItemToggleType.CheckBox,
+                IsChecked = !host.HasOwnWindowOpacity,
+            };
+            followGlobal.Click += (_, _) =>
+            {
+                host.ResetWindowOpacity();
+                windows.ApplySkin();
+            };
+            root.Items.Add(followGlobal);
         }
 
         return root;

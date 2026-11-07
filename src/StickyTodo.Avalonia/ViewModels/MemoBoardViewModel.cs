@@ -27,7 +27,7 @@ public partial class MemoBoardViewModel : ObservableObject, IAppearanceHost, IRe
         _boardName = board.Name;
         _isTopmost = settings.GetBoardTopmost(board.Id);
         _isLocked = settings.GetBoardLocked(board.Id);
-        _windowOpacity = skin.WindowOpacity;
+        _windowOpacity = settings.GetWindowOpacity(board.Id);
     }
 
     public Board Board { get; }
@@ -137,7 +137,14 @@ public partial class MemoBoardViewModel : ObservableObject, IAppearanceHost, IRe
 
     public double CurrentOpacity => _skin.Opacity;
 
-    public double CurrentWindowOpacity => _skin.WindowOpacity;
+    /// <summary>本看板自己的整窗透明度（没单独设过就跟随全局）。</summary>
+    public double CurrentWindowOpacity => _settings.GetWindowOpacity(AppearanceKey);
+
+    /// <summary>外观设置存在哪个 key 下：看板用它自己的 id。</summary>
+    public string AppearanceKey => BoardId;
+
+    /// <summary>这个看板有没有单独设过透明度（false = 跟随全局）。</summary>
+    public bool HasOwnWindowOpacity => _settings.HasWindowOpacity(AppearanceKey);
 
     public void SetSkin(string skinKey)
     {
@@ -153,8 +160,17 @@ public partial class MemoBoardViewModel : ObservableObject, IAppearanceHost, IRe
 
     public void SetWindowOpacity(double opacity)
     {
-        _skin.SetWindowOpacity(opacity);
-        WindowOpacity = _skin.WindowOpacity;
+        // 只改这个看板：存到 board.<id> 下，其它窗口不受影响
+        _settings.SetWindowOpacity(AppearanceKey, opacity);
+        WindowOpacity = _settings.GetWindowOpacity(AppearanceKey);
+        OnPropertyChanged(nameof(CurrentWindowOpacity));
+    }
+
+    /// <summary>取消本看板的单独设置，回到「跟随全局」。</summary>
+    public void ResetWindowOpacity()
+    {
+        _settings.ClearWindowOpacity(AppearanceKey);
+        WindowOpacity = _settings.GetWindowOpacity(AppearanceKey);
         OnPropertyChanged(nameof(CurrentWindowOpacity));
     }
 
@@ -163,6 +179,6 @@ public partial class MemoBoardViewModel : ObservableObject, IAppearanceHost, IRe
         OnPropertyChanged(nameof(CurrentSkinKey));
         OnPropertyChanged(nameof(CurrentOpacity));
         OnPropertyChanged(nameof(CurrentWindowOpacity));
-        WindowOpacity = _skin.WindowOpacity;
+        WindowOpacity = _settings.GetWindowOpacity(AppearanceKey);
     }
 }

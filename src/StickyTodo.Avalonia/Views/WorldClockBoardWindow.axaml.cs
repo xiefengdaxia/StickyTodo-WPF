@@ -21,6 +21,15 @@ public partial class WorldClockBoardWindow : Window
 
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
+        // 工具窗自己的整窗透明度（没单独设过就跟随全局）
+        Opened += (_, _) =>
+        {
+            if (App.Services is { } services)
+            {
+                Services.ToolWindowOpacity.Apply(this, services.Settings);
+            }
+        };
+
         Opened += (_, _) =>
         {
             if (!_geometry.Restore())
@@ -71,12 +80,15 @@ public partial class WorldClockBoardWindow : Window
     {
         if (App.Services is { } services)
         {
-            var skin = services.Skin;
-            var menu = Views.WeatherMenuBuilder.BuildMenu(skin, () =>
-            {
-                // 改动后刷新所有窗口资源
-                services.Windows.ApplySkin();
-            });
+            var menu = Views.WeatherMenuBuilder.BuildMenu(
+                services.Settings,
+                services.Skin,
+                this,
+                () =>
+                {
+                    // 改动后刷新所有窗口资源
+                    services.Windows.ApplySkin();
+                });
             menu.PlacementTarget = this;
             menu.Open(this);
         }

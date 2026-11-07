@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using Avalonia.Threading;
 using StickyTodo.Core.Entities;
 using StickyTodo.Core.Services;
@@ -7,59 +6,37 @@ namespace StickyTodo.Notes.Services;
 
 /// <summary>
 /// 本地提醒泵：每 20 秒查一次「到点且没提醒过」的待办，弹窗后立刻标记已提醒。
-/// 全程在本机完成，不依赖任何推送服务。
+/// 查询/写库/防重入逻辑在 Core 的 ReminderPumpCore（与 WPF 版共用），这里只管定时。
 /// </summary>
 public sealed class ReminderPump : IDisposable
 {
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(20);
 
-    private readonly TodoService _service;
+    private readonly ReminderPumpCore _core;
     private readonly DispatcherTimer _timer;
 
     public ReminderPump(TodoService service)
     {
-        _service = service;
+        _core = new ReminderPumpCore(service);
         _timer = new DispatcherTimer { Interval = Interval };
-        _timer.Tick += async (_, _) => await CheckAsync();
+        _timer.Tick += async (_, _) => await _core.CheckAsync();
     }
 
     /// <summary>到点的待办（在 UI 线程触发）。</summary>
-    public event EventHandler<TodoItem>? ReminderDue;
+    public event EventHandler<TodoItem>? ReminderDue
+    {
+        add => _core.ReminderDue += value;
+        remove => _core.ReminderDue -= value;
+    }
 
     public void Start()
     {
         _timer.Start();
-        _ = CheckAsync(); // 启动时也查一次，避免错过关机期间的提醒
+        _ = _core.CheckAsync(); // 启动时也查一次，避免错过关机期间的提醒
     }
 
-    public async Task CheckAsync()
-    {
-        IReadOnlyList<TodoItem> due;
-        try
-        {
-            due = await Task.Run(() => _service.GetDueReminders(DateTimeOffset.Now));
-        }
-        catch (Exception)
-        {
-            // 数据库临时不可用不该影响主流程，下一轮再试
-            return;
-        }
-
-        foreach (var item in due)
-        {
-            // 先标记再弹窗：即使弹窗过程出错也不会反复骚扰
-            try
-            {
-                _service.MarkReminded(item.Id, DateTimeOffset.Now);
-            }
-            catch (Exception)
-            {
-                continue;
-            }
-
-            ReminderDue?.Invoke(this, item);
-        }
-    }
+    /// <summary>手动查一轮（演示/回归用），与定时触发走同一条防重入路径。</summary>
+    public Task CheckAsync() => _core.CheckAsync();
 
     public void Dispose() => _timer.Stop();
 }

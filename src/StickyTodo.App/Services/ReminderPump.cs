@@ -6,78 +6,37 @@ namespace StickyTodo.App.Services;
 
 /// <summary>
 /// 本地提醒泵：每 20 秒查一次「到点且没提醒过」的待办，弹窗后立刻标记已提醒。
-/// 全程在本机完成，不依赖任何推送服务。
+/// 查询/写库/防重入逻辑在 Core 的 ReminderPumpCore（与 Avalonia 版共用），这里只管定时。
 /// </summary>
 public sealed class ReminderPump : IDisposable
 {
     private static readonly TimeSpan Interval = TimeSpan.FromSeconds(20);
 
-    private readonly TodoService _service;
+    private readonly ReminderPumpCore _core;
     private readonly DispatcherTimer _timer;
 
     public ReminderPump(TodoService service)
     {
-        _service = service;
+        _core = new ReminderPumpCore(service);
         _timer = new DispatcherTimer { Interval = Interval };
-        _timer.Tick += async (_, _) => await CheckAsync();
+        _timer.Tick += async (_, _) => await _core.CheckAsync();
     }
 
     /// <summary>到点的待办（在 UI 线程触发）。</summary>
-    public event EventHandler<TodoItem>? ReminderDue;
+    public event EventHandler<TodoItem>? ReminderDue
+    {
+        add => _core.ReminderDue += value;
+        remove => _core.ReminderDue -= value;
+    }
 
     public void Start()
     {
         _timer.Start();
-        _ = CheckAsync(); // 启动时也查一次，避免错过关机期间的提醒
+        _ = _core.CheckAsync(); // 启动时也查一次，避免错过关机期间的提醒
     }
 
-    /// <summary>正在查询（防止上一轮还没结束、这一轮又进来，导致同一条提醒弹两次）。</summary>
-    private bool _checking;
-
-    public async Task CheckAsync()
-    {
-        if (_checking)
-        {
-            return;
-        }
-
-        _checking = true;
-
-        try
-        {
-            IReadOnlyList<TodoItem> due;
-            try
-            {
-                due = await Task.Run(() => _service.GetDueReminders(DateTimeOffset.Now));
-            }
-            catch (Exception)
-            {
-                // 数据库临时不可用不该影响主流程，下一轮再试
-                return;
-            }
-
-            foreach (var item in due)
-            {
-                // 先标记再弹窗：即使弹窗过程出错也不会反复骚扰
-                try
-                {
-                    // 写库放到后台，别在 UI 线程上做一次磁盘往返
-                    var id = item.Id;
-                    await Task.Run(() => _service.MarkReminded(id, DateTimeOffset.Now));
-                }
-                catch (Exception)
-                {
-                    continue;
-                }
-
-                ReminderDue?.Invoke(this, item);
-            }
-        }
-        finally
-        {
-            _checking = false;
-        }
-    }
+    /// <summary>手动查一轮（演示/回归用），与定时触发走同一条防重入路径。</summary>
+    public Task CheckAsync() => _core.CheckAsync();
 
     public void Dispose() => _timer.Stop();
 }

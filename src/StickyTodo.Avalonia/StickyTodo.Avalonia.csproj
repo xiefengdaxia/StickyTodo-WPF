@@ -2,8 +2,10 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <!-- 关键：Avalonia UI + net6.0 是官方包仍保留、且运行时还能装到 Windows 7 SP1 的组合 -->
-    <TargetFramework>net6.0</TargetFramework>
+    <!-- 关键：Avalonia UI + net6.0 是官方包仍保留、且运行时还能装到 Windows 7 SP1 的组合。
+         本应用只跑 Windows，故用 net6.0-windows：平台分析器不再对 Windows 专属 API
+         （性能计数器等）报 CA1416，也不影响 Win7 路线 -->
+    <TargetFramework>net6.0-windows</TargetFramework>
     <Version>1.7.9</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -15,6 +17,9 @@
     <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
     <!-- .NET 6 已 EOL，SDK 会提示 NETSDK1138；这是 Win7 路线的已知取舍 -->
     <NoWarn>$(NoWarn);NETSDK1138</NoWarn>
+    <!-- AVLN3001：这些窗口都由代码 new 出来（构造带 VM 参数），运行时 XAML 加载器从不按
+         URI 实例化它们，所以「没有公共无参构造」不影响任何行为 -->
+    <NoWarn>$(NoWarn);AVLN3001</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

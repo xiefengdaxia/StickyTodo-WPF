@@ -1,7 +1,10 @@
+using System.Runtime.Versioning;
 using StickyTodo.Core.Net;
 
 namespace StickyTodo.Tests;
 
+/// <summary>网速计数器只在 Windows 上有，测试也只在 Windows 上跑（CI 与本地一致）。</summary>
+[SupportedOSPlatform("windows")]
 public sealed class NetworkSpeedFormatTests
 {
     [Theory]

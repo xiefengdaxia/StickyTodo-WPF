@@ -9,6 +9,7 @@ namespace StickyTodo.Core.Net;
 /// <param name="ProcessName">进程名（不含扩展名）。</param>
 /// <param name="Received">每秒下载字节。</param>
 /// <param name="Sent">每秒上传字节。</param>
+[SupportedOSPlatform("windows")]
 public readonly record struct ProcessSpeed(int ProcessId, string ProcessName, double Received, double Sent)
 {
     public string Display => NetworkSpeedMonitor.Format(Received);
