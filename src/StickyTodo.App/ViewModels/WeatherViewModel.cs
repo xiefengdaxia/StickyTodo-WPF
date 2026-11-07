@@ -386,7 +386,7 @@ public sealed partial class WeatherViewModel : ObservableObject
         WeatherFetchOutcome outcome;
         try
         {
-            outcome = await Task.Run(() => _weather.FetchWithOutcomeAsync(city));
+            outcome = await _weather.FetchWithOutcomeAsync(city);
         }
         finally
         {

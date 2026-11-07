@@ -67,7 +67,8 @@ public sealed class WorldClockViewModel : ObservableObject
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _timer.Tick += (_, _) => Refresh();
-        _timer.Start();
+        // 定时器由窗口的 Loaded → Start() 启动、Closed → Stop() 停止，
+        // 构造里不启动，免得将来有人从 DI 取走单例后秒表跟着进程常驻
         Refresh();
     }
 

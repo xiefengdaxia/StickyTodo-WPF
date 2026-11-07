@@ -32,7 +32,7 @@ public partial class PomodoroWindow : Window
     private double _targetProgress;
     private double _displayedProgress;
 
-    /// <summary>30fps 的圆环补间计时器。</summary>
+    /// <summary>30fps 的圆环补间计时器（只在显示进度没追上目标时启动，追平即停）。</summary>
     private readonly DispatcherTimer _ringTimer;
 
     public PomodoroWindow(PomodoroViewModel viewModel, Action<string, string>? notify = null, bool autoTick = true)
@@ -148,6 +148,12 @@ public partial class PomodoroWindow : Window
         // 这样圆环看起来是"连续流走"而不是每 250ms 跳一格。
         _targetProgress = Math.Clamp(_viewModel.Progress, 0, 1);
         _displayedProgress = Math.Clamp(_displayedProgress, 0, 1);
+
+        // 有差距才启动补间（追平后 StepRingAnimation 会自己停），别让 Render 级定时器一直空转
+        if (_displayedProgress != _targetProgress)
+        {
+            _ringTimer.Start();
+        }
     }
 
     /// <summary>把显示进度朝目标推进一帧（EaseOut 近似），并刷新描边。</summary>
@@ -157,6 +163,7 @@ public partial class PomodoroWindow : Window
         {
             _displayedProgress = _targetProgress;
             ApplyRing(_displayedProgress);
+            _ringTimer.Stop();
             return;
         }
 
@@ -169,6 +176,7 @@ public partial class PomodoroWindow : Window
                 ApplyRing(_displayedProgress);
             }
 
+            _ringTimer.Stop();
             return;
         }
 

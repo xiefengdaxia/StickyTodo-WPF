@@ -220,7 +220,7 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         }
     }
 
-    /// <summary>重新算农历 + 节气/节日 + 今日日程。</summary>
+    /// <summary>重新算农历 + 节气/节日 + 今日日程（日程部分异步，不阻塞调用方）。</summary>
     private void RefreshDayTexts()
     {
         var today = DateOnly.FromDateTime(DateTime.Now);
@@ -229,7 +229,7 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         _lunarText = BuildLunarText(today);
         OnPropertyChanged(nameof(LunarText));
 
-        RefreshAgenda(today);
+        _ = RefreshAgendaAsync(today);
     }
 
     private static string BuildLunarText(DateOnly day)
@@ -253,15 +253,18 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         return text.Length == 0 ? extra : text + " · " + extra;
     }
 
-    private void RefreshAgenda(DateOnly day)
+    private async Task RefreshAgendaAsync(DateOnly day)
     {
         AgendaSnapshot snapshot;
         try
         {
             var from = new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue));
             var to = new DateTimeOffset(day.AddDays(1).ToDateTime(TimeOnly.MinValue)).AddTicks(-1);
-            snapshot = AgendaSummary.Build(
-                _todos.GetCalendarEntries(from, to, includeDone: true), day, DateTimeOffset.Now);
+            // 查库 + 重复规则展开都放后台：时钟每 30 秒就要来一遍，
+            // 同步跑在 UI 线程上，磁盘一忙时钟就卡（同 ReminderPump 的做法）
+            var entries = await Task.Run(() => _todos.GetCalendarEntries(from, to, includeDone: true))
+                .ConfigureAwait(true);
+            snapshot = AgendaSummary.Build(entries, day, DateTimeOffset.Now);
         }
         catch (Exception ex)
         {
@@ -371,7 +374,7 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         }
         else if (_rotation % 30 == 0)
         {
-            RefreshAgenda(_day);
+            await RefreshAgendaAsync(_day);
         }
 
         UpdateWeatherLine();
@@ -487,7 +490,7 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         // 只看默认城市：查不到就明确说"暂无数据"，不拿别的城市的天气顶上
         var city = _cities[Math.Min(_currentCityIndex, _cities.Count - 1)];
         _loadedCity = city;
-        var outcome = await Task.Run(() => _weather.FetchWithOutcomeAsync(city));
+        var outcome = await _weather.FetchWithOutcomeAsync(city);
 
         if (outcome.Success && outcome.Report is { Days.Count: > 0 })
         {

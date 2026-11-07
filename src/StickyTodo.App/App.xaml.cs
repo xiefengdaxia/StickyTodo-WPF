@@ -220,11 +220,14 @@ public partial class App : System.Windows.Application
                 _host.Services.GetRequiredService<WindowManager>().OpenBoard(board);
             }
 
+#if DEBUG
+            // --demo 会往真实库里写演示数据，只随 Debug 构建保留（RunDemo 在 App.Demos.cs）
             if (isDemo)
             {
                 RunDemo(shotDirectory, e.Args.Contains("--reminder-demo", StringComparer.OrdinalIgnoreCase));
                 _ = manager.RefreshAsync();
             }
+#endif
 
             Log.Information("StickyTodo 启动完成，数据目录 {Directory}，应用内 {Ms} ms，进程起 {Total} ms（含运行时初始化）",
                 AppPaths.DataDirectory, startupWatch.ElapsedMilliseconds, SinceProcessStartMs());
@@ -306,7 +309,13 @@ public partial class App : System.Windows.Application
     private static void ConfigureLogging()
     {
         Log.Logger = new LoggerConfiguration()
+            // 文件 sink 是逐条同步落盘的，Debug 级别里混着拖拽这类高频事件，
+            // Release 降到 Information：拖动窗口时不再在 UI 线程上持续写磁盘
+#if DEBUG
             .MinimumLevel.Debug()
+#else
+            .MinimumLevel.Information()
+#endif
             .WriteTo.Debug()
             .WriteTo.File(
                 Path.Combine(AppPaths.LogDirectory, "app-.log"),
@@ -345,8 +354,7 @@ public partial class App : System.Windows.Application
             services.AddSingleton<Weather.WeatherCache>();
                 // 检查更新：仓库地址来自 git remote（见 UpdateRepository.StickyTodo）
                 services.AddSingleton(new StickyTodo.Updates.GitHubUpdateChecker());
-                services.AddSingleton<ViewModels.WorldClockViewModel>();
-                services.AddSingleton<ViewModels.DesktopClockViewModel>();
+                // 世界时钟/桌面时钟的 VM 由 WindowManager 直接 new（每窗口一份），不走 DI
                 services.AddSingleton<Core.Abstractions.ITokenStatsProvider>(sp =>
                 {
                     if (TokenProviderOverride is not null)
@@ -534,6 +542,7 @@ public partial class App : System.Windows.Application
             HotKeyService.SnipHotKey, HotKeyService.PinAgainHotKey);
     }
 
+#if DEBUG
     /// <summary>把完成时间改到过去某天（只用于演示数据，让三种日期写法都能看到）。</summary>
     private static void BackdateCompletion(string todoId, DateTimeOffset doneAt)
     {
@@ -546,6 +555,7 @@ public partial class App : System.Windows.Application
         command.Parameters.AddWithValue("@id", todoId);
         command.ExecuteNonQuery();
     }
+#endif
 
     /// <summary>
     /// 退出前固化会话（谁要调 Shutdown 就先调这个）。

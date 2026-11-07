@@ -64,7 +64,26 @@ public sealed class SchemaMigrationTests : IDisposable
         repository.SetQuadrant(todo.Id, null);
         Assert.Null(repository.GetTodo(todo.Id)!.Quadrant);
 
-        Assert.Equal(6L, ReadSchemaVersion());
+        // v7：due_at 索引（老库迁移后也要有）
+        using (var check = new SqliteConnection(
+                   new SqliteConnectionStringBuilder { DataSource = _databasePath }.ToString()))
+        {
+            check.Open();
+            var indexes = new List<string>();
+            using (var command = check.CreateCommand())
+            {
+                command.CommandText = "SELECT name FROM sqlite_master WHERE type='index' AND name='ix_todo_due';";
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    indexes.Add(reader.GetString(0));
+                }
+            }
+
+            Assert.Single(indexes);
+        }
+
+        Assert.Equal(7L, ReadSchemaVersion());
     }
 
     private long ReadSchemaVersion()

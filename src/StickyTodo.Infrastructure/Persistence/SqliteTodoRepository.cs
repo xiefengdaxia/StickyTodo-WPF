@@ -12,7 +12,7 @@ namespace StickyTodo.Infrastructure.Persistence;
 /// </summary>
 public sealed class SqliteTodoRepository : ITodoRepository
 {
-    private const int CurrentSchemaVersion = 6;
+    private const int CurrentSchemaVersion = 7;
 
     private readonly string _connectionString;
 
@@ -76,6 +76,11 @@ public sealed class SqliteTodoRepository : ITodoRepository
         if (version < 6)
         {
             connection.Execute(SchemaV6, transaction: tx);
+        }
+
+        if (version < 7)
+        {
+            connection.Execute(SchemaV7, transaction: tx);
         }
 
         connection.Execute($"PRAGMA user_version={CurrentSchemaVersion};", transaction: tx);
@@ -177,6 +182,11 @@ public sealed class SqliteTodoRepository : ITodoRepository
     /// <summary>v6：四象限的两个布尔维度（0/1）。</summary>
     private const string SchemaV6 = """
         ALTER TABLE todo ADD COLUMN quadrant INTEGER NULL;
+        """;
+
+    /// <summary>v7：日历/日程查询按 due_at 过滤（桌面时钟每 30 秒查一次），补个索引。</summary>
+    private const string SchemaV7 = """
+        CREATE INDEX IF NOT EXISTS ix_todo_due ON todo (due_at);
         """;
 
     private const string SchemaV5 = """

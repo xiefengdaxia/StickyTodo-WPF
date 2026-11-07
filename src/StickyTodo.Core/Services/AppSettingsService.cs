@@ -29,6 +29,14 @@ public sealed class AppSettingsService
 
     private readonly ITodoRepository _repository;
 
+    /// <summary>
+    /// 设置的进程内缓存：设置读得比写得勤（桌面时钟每 5 秒就要比对一轮默认城市），
+    /// 不能每读一个属性都全表 SELECT 一遍。写操作走 <see cref="SetSetting"/> 同步更新缓存。
+    /// 库里这一张表的写入方只有本服务，所以缓存不会与数据库脱节。
+    /// </summary>
+    private readonly object _settingsLock = new();
+    private Dictionary<string, string>? _settingsCache;
+
     public AppSettingsService(ITodoRepository repository)
     {
         _repository = repository;
@@ -72,14 +80,14 @@ public sealed class AppSettingsService
     public string Language
     {
         get => Localization.AppLanguages.Resolve(GetString(LanguageKey, null)).Key;
-        set => _repository.SetSetting(LanguageKey, Localization.AppLanguages.Resolve(value).Key);
+        set => SetSetting(LanguageKey, Localization.AppLanguages.Resolve(value).Key);
     }
 
     /// <summary>背景色方案。</summary>
     public string Skin
     {
         get => GetString(SkinKey, DefaultSkin);
-        set => _repository.SetSetting(SkinKey, value);
+        set => SetSetting(SkinKey, value);
     }
 
     /// <summary>背景不透明度（只作用于背景层，文字始终保持清晰）。</summary>
@@ -95,7 +103,7 @@ public sealed class AppSettingsService
 
             return ClampOpacity(value);
         }
-        set => _repository.SetSetting(
+        set => SetSetting(
             OpacityKey,
             ClampOpacity(value).ToString("0.###", CultureInfo.InvariantCulture));
     }
@@ -113,7 +121,7 @@ public sealed class AppSettingsService
 
             return ClampWindowOpacity(value);
         }
-        set => _repository.SetSetting(
+        set => SetSetting(
             WindowOpacityKey,
             ClampWindowOpacity(value).ToString("0.###", CultureInfo.InvariantCulture));
     }
@@ -127,7 +135,7 @@ public sealed class AppSettingsService
     }
 
     public void SetBoardChip(string boardId, string chipKey) =>
-        _repository.SetSetting(BoardChipKey(boardId), chipKey);
+        SetSetting(BoardChipKey(boardId), chipKey);
 
     /// <summary>看板上次用的是列表还是四象限视图。</summary>
     public static string BoardViewKey(string boardId) => $"board.{boardId}.view";
@@ -135,7 +143,7 @@ public sealed class AppSettingsService
     public string GetBoardView(string boardId) => GetString(BoardViewKey(boardId), "list");
 
     public void SetBoardView(string boardId, string view) =>
-        _repository.SetSetting(BoardViewKey(boardId), view);
+        SetSetting(BoardViewKey(boardId), view);
 
     // ---------------- 每个窗口自己的透明度 ----------------
     /// <summary>某个窗口单独的整窗透明度存在这个 key 下。</summary>
@@ -162,36 +170,36 @@ public sealed class AppSettingsService
         !string.IsNullOrWhiteSpace(GetString(WindowOpacityKeyFor(windowKey), null));
 
     public void SetWindowOpacity(string windowKey, double value) =>
-        _repository.SetSetting(
+        SetSetting(
             WindowOpacityKeyFor(windowKey),
             ClampWindowOpacity(value).ToString("0.###", CultureInfo.InvariantCulture));
 
     /// <summary>清除单独设置，回到跟随全局。</summary>
     public void ClearWindowOpacity(string windowKey) =>
-        _repository.SetSetting(WindowOpacityKeyFor(windowKey), string.Empty);
+        SetSetting(WindowOpacityKeyFor(windowKey), string.Empty);
 
     /// <summary>便签默认置顶，符合“贴纸感”。</summary>
     public bool GetBoardTopmost(string boardId) => GetBool(BoardTopmostKey(boardId), true);
     public void SetBoardTopmost(string boardId, bool value) =>
-        _repository.SetSetting(BoardTopmostKey(boardId), value ? "1" : "0");
+        SetSetting(BoardTopmostKey(boardId), value ? "1" : "0");
 
     public bool GetBoardLocked(string boardId) => GetBool(BoardLockedKey(boardId), false);
 
     public void SetBoardLocked(string boardId, bool value) =>
-        _repository.SetSetting(BoardLockedKey(boardId), value ? "1" : "0");
+        SetSetting(BoardLockedKey(boardId), value ? "1" : "0");
 
     /// <summary>是否开机自启（这里只存"用户期望值"，注册表由 App 层同步）。</summary>
     public bool AutoStart
     {
         get => GetBool(AutoStartKey, false);
-        set => _repository.SetSetting(AutoStartKey, value ? "1" : "0");
+        set => SetSetting(AutoStartKey, value ? "1" : "0");
     }
 
     /// <summary>启动时是否恢复上次打开的看板，默认开。</summary>
     public bool RestoreSession
     {
         get => GetBool(RestoreSessionKey, true);
-        set => _repository.SetSetting(RestoreSessionKey, value ? "1" : "0");
+        set => SetSetting(RestoreSessionKey, value ? "1" : "0");
     }
 
     /// <summary>
@@ -204,7 +212,7 @@ public sealed class AppSettingsService
             var raw = GetString(TokenDatabasePathKey, null);
             return string.IsNullOrWhiteSpace(raw) ? string.Empty : raw.Trim();
         }
-        set => _repository.SetSetting(TokenDatabasePathKey, value.Trim());
+        set => SetSetting(TokenDatabasePathKey, value.Trim());
     }
 
     /// <summary>Token 面板自动刷新间隔（秒）。只允许 5 / 15 / 30，其它值归一到 15。</summary>
@@ -220,7 +228,7 @@ public sealed class AppSettingsService
 
             return seconds is 5 or 15 or 30 ? seconds : 15;
         }
-        set => _repository.SetSetting(TokenRefreshSecondsKey, (value is 5 or 15 or 30 ? value : 15).ToString());
+        set => SetSetting(TokenRefreshSecondsKey, (value is 5 or 15 or 30 ? value : 15).ToString());
     }
 
     /// <summary>Token 面板上次选的统计范围（天）：0=今天，3/7/30。</summary>
@@ -236,7 +244,7 @@ public sealed class AppSettingsService
 
             return days is 0 or 3 or 7 or 30 ? days : 0;
         }
-        set => _repository.SetSetting(TokenRangeDaysKey, (value is 0 or 3 or 7 or 30 ? value : 0).ToString());
+        set => SetSetting(TokenRangeDaysKey, (value is 0 or 3 or 7 or 30 ? value : 0).ToString());
     }
 
     /// <summary>Token 面板上次选的客户端（agent id），空 = 全部。</summary>
@@ -245,7 +253,7 @@ public sealed class AppSettingsService
     public string TokenAgent
     {
         get => (GetString(TokenAgentKey, null) ?? string.Empty).Trim();
-        set => _repository.SetSetting(TokenAgentKey, value.Trim());
+        set => SetSetting(TokenAgentKey, value.Trim());
     }
 
     /// <summary>番茄钟今天完成几个（跨天自动归零）。</summary>
@@ -256,7 +264,7 @@ public sealed class AppSettingsService
             var raw = GetString(PomodoroCountTodayKey, null);
             return int.TryParse(raw, out var count) && count > 0 ? count : 0;
         }
-        set => _repository.SetSetting(PomodoroCountTodayKey, Math.Max(0, value).ToString());
+        set => SetSetting(PomodoroCountTodayKey, Math.Max(0, value).ToString());
     }
 
     /// <summary>番茄钟计数对应的日期。</summary>
@@ -267,7 +275,7 @@ public sealed class AppSettingsService
             var raw = GetString(PomodoroCountDateKey, null);
             return DateOnly.TryParse(raw, out var date) ? date : null;
         }
-        set => _repository.SetSetting(PomodoroCountDateKey, value?.ToString("yyyy-MM-dd") ?? string.Empty);
+        set => SetSetting(PomodoroCountDateKey, value?.ToString("yyyy-MM-dd") ?? string.Empty);
     }
 
     /// <summary>上次开着哪些看板。用逗号拼接，看板数量很少，不需要建表。</summary>
@@ -283,7 +291,7 @@ public sealed class AppSettingsService
 
             return raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         }
-        set => _repository.SetSetting(OpenBoardsKey, string.Join(",", value));
+        set => SetSetting(OpenBoardsKey, string.Join(",", value));
     }
 
     /// <summary>天气看板的城市列表（中文城市名）。默认【双峰、岳麓、芙蓉、苏州、炎陵、杭州】。</summary>
@@ -300,7 +308,7 @@ public sealed class AppSettingsService
             var cities = raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             return cities.Length > 0 ? cities : DefaultWeatherCities;
         }
-        set => _repository.SetSetting(WeatherCitiesKey, string.Join(",", value));
+        set => SetSetting(WeatherCitiesKey, string.Join(",", value));
     }
 
     public const string WeatherDefaultCityKey = "weather.defaultCity";
@@ -322,7 +330,7 @@ public sealed class AppSettingsService
             var clean = raw.Trim();
             return WeatherCities.Contains(clean, StringComparer.Ordinal) ? clean : null;
         }
-        set => _repository.SetSetting(WeatherDefaultCityKey, value?.Trim() ?? string.Empty);
+        set => SetSetting(WeatherDefaultCityKey, value?.Trim() ?? string.Empty);
     }
 
     /// <summary>实际生效的默认城市：没设置（或已失效）就是列表第一个。</summary>
@@ -361,8 +369,26 @@ public sealed class AppSettingsService
 
     private string GetString(string key, string? fallback)
     {
-        var all = _repository.GetSettings();
-        return all.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value) ? value : fallback ?? string.Empty;
+        lock (_settingsLock)
+        {
+            var cache = _settingsCache ??= new Dictionary<string, string>(_repository.GetSettings(), StringComparer.Ordinal);
+            return cache.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
+                ? value
+                : fallback ?? string.Empty;
+        }
+    }
+
+    /// <summary>写库并同步缓存。设成空串表示「清掉该项」，缓存里也留着这个空值，语义一致。</summary>
+    private void SetSetting(string key, string value)
+    {
+        _repository.SetSetting(key, value);
+        lock (_settingsLock)
+        {
+            if (_settingsCache is not null)
+            {
+                _settingsCache[key] = value;
+            }
+        }
     }
 
     private bool GetBool(string key, bool fallback)

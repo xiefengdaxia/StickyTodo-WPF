@@ -1248,7 +1248,6 @@ public partial class BoardWindow : Window, IStickyWindow
 
         var hasRow = e.Data.GetDataPresent(typeof(TodoRowViewModel));
         e.Effects = hasRow ? DragDropEffects.Move : DragDropEffects.None;
-        Serilog.Log.Debug("[tag] DragOver：hasRow={Has} effects={Effects}", hasRow, e.Effects);
         e.Handled = true;
     }
 

@@ -32,6 +32,13 @@
     <Using Remove="System.Drawing" />
   </ItemGroup>
 
+  <!-- App.Demos.cs（约 3600 行截图/回归演示）只进 Debug 构建：
+       Release 包不带演示逻辑，也不会被 demo 类命令行参数误触发写库。
+       CI 冒烟用的 selftest / portable-check / mem-report 在 App.Smoke.cs，仍随 Release 发布 -->
+  <ItemGroup Condition="'$(Configuration)' == 'Release'">
+    <Compile Remove="App.Demos.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\StickyTodo.Core\StickyTodo.Core.csproj" />
     <ProjectReference Include="..\StickyTodo.Infrastructure\StickyTodo.Infrastructure.csproj" />
