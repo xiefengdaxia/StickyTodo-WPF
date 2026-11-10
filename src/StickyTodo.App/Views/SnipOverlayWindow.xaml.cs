@@ -34,6 +34,10 @@ public partial class SnipOverlayWindow : Window
     private Rect _selection;
     private bool _hasSelection;
 
+    // 双击＝直接截图：记住进入「重新框选」之前的选区，第二下点下去直接出图
+    private Rect _selectionBeforeReframe;
+    private bool _hadSelectionBeforeReframe;
+
     // 选区拖拽
     private bool _dragging;
     private Point _dragOrigin;
@@ -146,6 +150,19 @@ public partial class SnipOverlayWindow : Window
             return;
         }
 
+        // 双击的第二下：恢复进入框选前的选区，直接截图收工
+        if (e.ClickCount >= 2 && _hadSelectionBeforeReframe && _tool == Tool.Select)
+        {
+            _selection = _selectionBeforeReframe;
+            _hasSelection = true;
+            CopyOnly();
+            return;
+        }
+
+        // 记住框选前的选区（双击的第二下要用）
+        _hadSelectionBeforeReframe = _hasSelection;
+        _selectionBeforeReframe = _selection;
+
         // 重新框选
         _dragging = true;
         _dragOrigin = point;
@@ -187,6 +204,7 @@ public partial class SnipOverlayWindow : Window
                 // 太小的框当作误点：恢复提示
                 _selection = Rect.Empty;
                 _hasSelection = false;
+                _hadSelectionBeforeReframe = false;
                 SelectionBorder.Visibility = Visibility.Collapsed;
                 ShowFullDim();
                 Hint.Visibility = Visibility.Visible;
@@ -194,6 +212,7 @@ public partial class SnipOverlayWindow : Window
             }
 
             _hasSelection = true;
+            _hadSelectionBeforeReframe = false;
             ApplySelectionVisual(_selection, showHandles: true);
             ShowToolbar();
             return;
@@ -555,13 +574,13 @@ public partial class SnipOverlayWindow : Window
         // 贴图的同时也放进剪贴板：可以直接 Ctrl+V 粘到聊天框
         if (Result is not null)
         {
-            CopyToClipboard(Result);
+            CopyToClipboardInBackground(Result);
         }
 
         DialogResult = true;
     }
 
-    /// <summary>工具栏「复制」：只放进剪贴板，不贴到桌面。</summary>
+    /// <summary>工具栏「截图」：只放进剪贴板，不贴到桌面。</summary>
     public void CopyOnly()
     {
         if (!_hasSelection || _selection.Width < 1 || _selection.Height < 1)
@@ -570,15 +589,52 @@ public partial class SnipOverlayWindow : Window
         }
 
         Result = Compose();
-        CopiedOnly = Result is not null && CopyToClipboard(Result);
+        CopiedOnly = Result is not null;
+
+        if (Result is not null)
+        {
+            CopyToClipboardInBackground(Result);
+        }
+
         DialogResult = true;
     }
 
-    /// <summary>用户是不是只选择了「复制」（不要贴到桌面）。</summary>
+    /// <summary>用户是不是只选择了「截图」（不要贴到桌面）。</summary>
     public bool CopiedOnly { get; private set; }
 
     /// <summary>
-    /// 把图片放进剪贴板。剪贴板同一时间只能被一个程序占用，
+    /// 把图片放进剪贴板：大图要几百毫秒，放独立 STA 线程后台做，
+    /// 覆盖层立刻关闭，不让 UI 线程跟着卡。图已 Freeze，跨线程安全。
+    /// </summary>
+    private static void CopyToClipboardInBackground(BitmapSource image)
+    {
+        var thread = new System.Threading.Thread(() =>
+        {
+            for (var attempt = 0; ; attempt++)
+            {
+                try
+                {
+                    Clipboard.SetImage(image);
+                    return;
+                }
+                catch (Exception)
+                {
+                    // 剪贴板同一时间只能被一个程序占用，被别的程序短暂占着时重试几次
+                    if (attempt >= 3)
+                    {
+                        return;
+                    }
+
+                    System.Threading.Thread.Sleep(120);
+                }
+            }
+        });
+        thread.SetApartmentState(System.Threading.ApartmentState.STA);
+        thread.Start();
+    }
+
+    /// <summary>
+    /// 同步写剪贴板（回归测试用，保证断言时剪贴板已经写完）。
     /// 被别的程序短暂占着时重试几次，别让用户以为没复制上。
     /// </summary>
     private static bool CopyToClipboard(BitmapSource image)

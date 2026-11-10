@@ -139,16 +139,16 @@
                 <Rectangle Width="1" Height="18" Fill="#40FFFFFF" Margin="8,0" />
 
                 <Button Click="Undo_Click" Content="撤销" Style="{StaticResource SnipTool}" ToolTip="撤销上一笔" />
-                <Button Click="Copy_Click" Content="复制" Style="{StaticResource SnipTool}" ToolTip="复制到剪贴板（Ctrl+C），可直接粘到聊天框" />
                 <Button Click="Cancel_Click" Content="取消" Style="{StaticResource SnipTool}" ToolTip="取消截图（Esc）" />
                 <Button Click="Pin_Click" Content="贴图" Style="{StaticResource SnipPrimary}" ToolTip="贴到桌面并复制（Enter / F3）" />
+                <Button Click="Copy_Click" Content="截图" Style="{StaticResource SnipTool}" ToolTip="截图到剪贴板（Ctrl+C / 双击选区），可直接粘到聊天框" />
                 </StackPanel>
             </Border>
         </Canvas>
 
         <!-- 提示 -->
         <TextBlock x:Name="Hint"
-                   Text="拖动鼠标选择区域 · Esc 取消"
+                   Text="拖动鼠标选择区域 · 双击直接截图 · Esc 取消"
                    Foreground="#CCFFFFFF" FontSize="13"
                    HorizontalAlignment="Center" VerticalAlignment="Center"
                    IsHitTestVisible="False" />
