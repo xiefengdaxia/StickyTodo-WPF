@@ -124,6 +124,7 @@ jobs:
   # 需要真实桌面的那 20 多个 --xxx-demo（截图、拖拽、置顶窗口）
   # 在无人值守 runner 上不稳定，仍在本地用 tools/ 里的脚本跑。
   # 这里只挑不依赖截图的 --skin-check，确认 10 套皮肤的资源仍然加载得起来。
+  # 它和 --recurrence-demo 一样只编进 Debug 构建，所以这个 job 编 Debug。
   skin-check:
     name: headless demo (--skin-check)
     runs-on: windows-latest
@@ -135,11 +136,11 @@ jobs:
         with:
           dotnet-version: 8.0.x
       - name: Build
-        run: dotnet build src/StickyTodo.App/StickyTodo.App.csproj -c Release --nologo
+        run: dotnet build src/StickyTodo.App/StickyTodo.App.csproj -c Debug --nologo
       - name: Run --skin-check
         shell: pwsh
         run: |
-          $exe = "src/StickyTodo.App/bin/Release/net8.0-windows/StickyTodo.exe"
+          $exe = "src/StickyTodo.App/bin/Debug/net8.0-windows/StickyTodo.exe"
           $env:STICKYTODO_DATA_DIR = Join-Path $env:RUNNER_TEMP "skin-check-data"
           $p = Start-Process $exe -ArgumentList '--skin-check' -PassThru
           if (-not $p.WaitForExit(120000)) { $p.Kill(); throw '--skin-check 超时' }

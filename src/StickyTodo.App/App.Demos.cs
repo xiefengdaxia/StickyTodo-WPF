@@ -53,9 +53,9 @@ public partial class App : System.Windows.Application
 
             var ok = true;
 
-            // 1) 数量与唯一性
+            // 1) 数量与唯一性（经典黄 + 豆沙绿 + 素白 + 薄荷 + 天青 + 淡紫 + 樱花 + 暖橘杏 + 3 套暗色 = 11）
             Log.Information("[skin] 共 {Count} 套皮肤", NoteSkins.All.Count);
-            ok &= NoteSkins.All.Count == 10;
+            ok &= NoteSkins.All.Count == 11;
             ok &= NoteSkins.All.Select(s => s.Key).Distinct(StringComparer.OrdinalIgnoreCase).Count() == NoteSkins.All.Count;
             ok &= NoteSkins.All.Select(s => s.DisplayName).Distinct().Count() == NoteSkins.All.Count;
 

@@ -253,7 +253,7 @@ Dependency direction: `App -> Infrastructure -> Core`. Core knows nothing about 
 **Appearance (sticker feel)**
 - **No system title bars anywhere**: the manager, Settings, note windows and prompt share a hand-drawn title bar (draggable; the manager and Settings also support edge resizing and maximizing)
 - Note windows are **borderless, rounded, with a drop shadow** and 8px edge resizing (handled via `WM_NCHITTEST`)
-- **10 themes**: Classic Yellow / Paper White / Mint / Sky Blue / Violet / Sakura Pink / Apricot / Graphite Night / Midnight Ink / Espresso (3 dark ones switch to light text automatically)
+- **11 themes**: Classic Yellow / Beansprout / Paper White / Mint / Sky Blue / Violet / Sakura Pink / Apricot / Graphite Night / Midnight Ink / Espresso (Beansprout is the eye-friendly paper; the 3 dark ones switch to light text automatically)
 - **Two independent opacity controls, 10% steps (10 levels)**: background opacity 10–100% (only the paper becomes translucent, text stays sharp) and window opacity 10–100% (fades the text too)
 - **Only notes, memo boards and the calendar are translucent**; the manager and Settings are opaque windows
 - Hand-drawn controls: rounded checkboxes, slim sliders, flat scrollbars, segmented switch, cards, and a **context menu** (submenu arrows, check marks, separators, colors follow the theme)
@@ -271,7 +271,7 @@ Dependency direction: `App -> Infrastructure -> Core`. Core knows nothing about 
 
 **Settings (standalone window)**
 - **Language dropdown**: the four languages in their native names, applied immediately
-- The 10 themes are shown as a **color-card grid** (two rows of five); one click applies everywhere instantly, no restart
+- The 11 themes are shown as a **color-card grid** (six per row); one click applies everywhere instantly, no restart
 - Two opacity sliders with live preview and instant saving
 - A list of the three global hotkeys
 - Data section: membership status, content statistics (boards / to-dos / done / tags), local storage path
