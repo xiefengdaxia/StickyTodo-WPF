@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using StickyTodo.Core.Abstractions;
 
 namespace StickyTodo.Core.Services;
@@ -312,6 +312,93 @@ public sealed class AppSettingsService
     }
 
     public const string WeatherDefaultCityKey = "weather.defaultCity";
+
+    // ---------------- 护眼（防蓝光滤镜） ----------------
+
+    /// <summary>防蓝光滤镜开关。</summary>
+    public const string EyeFilterEnabledKey = "eye.filter.enabled";
+
+    /// <summary>滤镜颜色（#RRGGBB）。预设四档和自定义共用这一个键。</summary>
+    public const string EyeFilterColorKey = "eye.filter.color";
+
+    /// <summary>滤镜强度（10-50，步进 5）。</summary>
+    public const string EyeFilterStrengthKey = "eye.filter.strength";
+
+    public const string DefaultEyeFilterColor = "#FF9F45";
+
+    public const int DefaultEyeFilterStrength = 25;
+
+    /// <summary>
+    /// 豆沙绿护眼（显卡 gamma 校色）：把屏幕上的纯白映射成 #C7EDCC。
+    /// 记事本 / Word 这类白底程序的背景跟着变绿，系统级的，不是本应用的窗口。
+    /// </summary>
+    public const string EyeGammaEnabledKey = "eye.gamma.enabled";
+
+    /// <summary>
+    /// 色温护眼：按开尔文色温压 R/G/B 三个通道，
+    /// 只改颜色不动对比度，所以没有「蒙一层灰」的雾感。
+    /// </summary>
+    public const string EyeTempEnabledKey = "eye.temp.enabled";
+
+    public const string EyeTempKelvinKey = "eye.temp.kelvin";
+
+    /// <summary>默认色温：3400K（日落档）。</summary>
+    public const int DefaultEyeTempKelvin = 3400;
+
+    public const int MinEyeTempKelvin = 1900;
+    public const int MaxEyeTempKelvin = 6500;
+
+    public bool EyeTempEnabled
+    {
+        get => GetBool(EyeTempEnabledKey, false);
+        set => SetSetting(EyeTempEnabledKey, value ? "1" : "0");
+    }
+
+    public int EyeTempKelvin
+    {
+        get
+        {
+            var raw = GetString(EyeTempKelvinKey, null);
+            return int.TryParse(raw, out var value)
+                ? Math.Clamp(value, MinEyeTempKelvin, MaxEyeTempKelvin)
+                : DefaultEyeTempKelvin;
+        }
+        set => SetSetting(EyeTempKelvinKey, Math.Clamp(value, MinEyeTempKelvin, MaxEyeTempKelvin).ToString());
+    }
+
+    public bool EyeGammaEnabled
+    {
+        get => GetBool(EyeGammaEnabledKey, false);
+        set => SetSetting(EyeGammaEnabledKey, value ? "1" : "0");
+    }
+
+    public bool EyeFilterEnabled
+    {
+        get => GetBool(EyeFilterEnabledKey, false);
+        set => SetSetting(EyeFilterEnabledKey, value ? "1" : "0");
+    }
+
+    public string EyeFilterColor
+    {
+        get
+        {
+            var raw = GetString(EyeFilterColorKey, null);
+            return string.IsNullOrWhiteSpace(raw) ? DefaultEyeFilterColor : raw.Trim();
+        }
+        set => SetSetting(EyeFilterColorKey, value.Trim());
+    }
+
+    public int EyeFilterStrength
+    {
+        get
+        {
+            var raw = GetString(EyeFilterStrengthKey, null);
+            return int.TryParse(raw, out var value)
+                ? (int)Math.Clamp(Math.Round(value / 5d) * 5, 10, 50)
+                : DefaultEyeFilterStrength;
+        }
+        set => SetSetting(EyeFilterStrengthKey, ((int)Math.Clamp(Math.Round(value / 5d) * 5, 10, 50)).ToString());
+    }
 
     /// <summary>
     /// 默认城市：桌面时钟优先显示它，天气看板打开时也默认选中它。

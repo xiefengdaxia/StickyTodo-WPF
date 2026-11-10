@@ -31,6 +31,26 @@ public partial class SettingsWindow : Window
         }
     }
 
+    private void EyePreset_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.Button { Tag: string hex })
+        {
+            _viewModel.SetEyePreset(hex);
+        }
+    }
+
+    private void EyeCustomBox_LostFocus(object sender, RoutedEventArgs e) =>
+        _viewModel.CommitEyeCustomColor(EyeCustomBox.Text);
+
+    private void EyeCustomBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            _viewModel.CommitEyeCustomColor(EyeCustomBox.Text);
+            EyeCustomBox.MoveFocus(new System.Windows.Input.TraversalRequest(System.Windows.Input.FocusNavigationDirection.Next));
+        }
+    }
+
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ClickCount == 2)

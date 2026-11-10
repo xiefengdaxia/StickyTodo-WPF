@@ -234,6 +234,10 @@ public partial class App : System.Windows.Application
 
             // 空闲时把工作集还给系统（详见 MemoryTrimmer 的注释）
             _memoryTrimmer = MemoryTrimmer.Start();
+
+            // 护眼：滤镜盖回来 / 豆沙绿校色恢复
+            _host!.Services.GetRequiredService<EyeCareFilter>().ApplyFromSettings();
+            _host!.Services.GetRequiredService<EyeGammaService>().ApplyFromSettings();
         }
         catch (Exception ex)
         {
@@ -349,6 +353,8 @@ public partial class App : System.Windows.Application
                 services.AddSingleton<ReminderPump>();
                 services.AddSingleton<HotKeyService>();
                 services.AddSingleton<PinManager>();
+                services.AddSingleton<EyeCareFilter>();
+                services.AddSingleton<EyeGammaService>();
                 services.AddSingleton<AutoStartService>();
                 services.AddSingleton<Weather.WeatherService>();
             services.AddSingleton<Weather.WeatherCache>();
@@ -593,6 +599,8 @@ public partial class App : System.Windows.Application
             {
                 _host.Services.GetService<WindowManager>()?.CloseAll();
                 _host.Services.GetService<TrayService>()?.Dispose();
+                _host.Services.GetService<EyeCareFilter>()?.Dispose();
+                _host.Services.GetService<EyeGammaService>()?.Dispose();
                 _memoryTrimmer?.Dispose();
                 await _host.StopAsync(TimeSpan.FromSeconds(3));
                 _host.Dispose();

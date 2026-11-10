@@ -85,6 +85,12 @@ Every window has its own opacity (the board below is at 55%, the desktop shows t
 
 ![Window opacity](artifacts/board-opacity.png)
 
+A third eye-care option: colour temperature. Off on the left, 3400K on the right — same contrast, just warmer; no grey veil like a tint layer:
+
+| Temperature off | Temperature 3400K |
+|---|---|
+| ![Temperature off](artifacts/eye-temp-off.png) | ![Temperature 3400K](artifacts/eye-temp-on.png) |
+
 The UI in four languages (board names are user data and stay as typed):
 
 | English | 日本語 | 한국어 |
@@ -253,6 +259,15 @@ Dependency direction: `App -> Infrastructure -> Core`. Core knows nothing about 
 - Hand-drawn controls: rounded checkboxes, slim sliders, flat scrollbars, segmented switch, cards, and a **context menu** (submenu arrows, check marks, separators, colors follow the theme)
 - Title-bar buttons: 📌 always-on-top, 🔒 lock, 🎨 quick theme, ⋯ manager, ✕ close
 - Notes do not occupy a taskbar slot (sticker style); access them from the tray or the manager
+
+**Eye care (three options, mutually exclusive)**
+- **Colour temperature (recommended)**: a 1900K–6500K slider (3400K by default) that **multiplies** the blue/green channels down to the chosen Kelvin — no tint layer, so the screen gets *warmer*, not hazier, and contrast stays
+  - It runs on the DWM compositor's multiply colour matrix (Magnification API), so it also works where GDI gamma tables are silently ignored (remote desktop, virtual displays, HDR); if Magnification is unavailable it falls back to per-monitor gamma
+  - The tray “Eye care” menu has six presets: 6500 / 5500 / 4500 / 3400 / 2700 / 2000K
+  - Screenshots are **divided back** by the current temperature, so pinned images and the clipboard do not get warmed twice
+- **Beansprout eye care**: display gamma maps pure white across the whole screen to #C7EDCC (Notepad and Word included)
+- **Blue-light filter**: a translucent colour layer over each monitor (the old option — slightly hazy, kept as an alternative)
+- All three are **mutually exclusive**: turning one on turns the other two off, so tints never stack
 
 **Settings (standalone window)**
 - **Language dropdown**: the four languages in their native names, applied immediately
@@ -494,6 +509,7 @@ Quota checks are only allowed in `TodoService`; the UI's only job is to surface 
 - [x] **Quieter startup**: restores only last session's boards/clocks without showing the manager; startup order tuned and instrumented with `[startup]` timings
 - [x] **Tray “pull windows back”**: one click returns every board to the top-right of the current screen; the tray menu now closes on focus loss
 - [x] **Fixes**: recurrence drifting on machines in other time zones, global hotkeys silently failing when the manager is hidden, the weather board needing scrolling, the tray menu staying open
+- [x] **Colour-temperature eye care**: multiplies blue/green channels down by Kelvin (1900–6500K, 3400K default) through the DWM colour matrix so it works on virtual displays and remote desktops too; no tint layer, no haze; exclusive with Beansprout and the blue-light filter; six tray presets; screenshots are divided back so pins are not warmed twice
 
 **M4 extension**
 - [ ] ICS subscription and import/export

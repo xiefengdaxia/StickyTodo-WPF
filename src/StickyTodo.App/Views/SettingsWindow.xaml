@@ -97,12 +97,23 @@
                                                                     Background="{Binding Preview}"
                                                                     BorderBrush="#33000000"
                                                                     BorderThickness="1">
-                                                                <TextBlock Text="Aa"
+                                                                <Grid>
+                                                                    <TextBlock Text="Aa"
                                                                            HorizontalAlignment="Center"
                                                                            VerticalAlignment="Center"
                                                                            FontSize="13"
                                                                            FontWeight="SemiBold"
                                                                            Foreground="{Binding TextPreview}" />
+                                                                    <Border HorizontalAlignment="Right"
+                                                                            VerticalAlignment="Top"
+                                                                            Margin="0,1,2,0"
+                                                                            Padding="3,0.5"
+                                                                            CornerRadius="2"
+                                                                            Background="{DynamicResource Brush.Accent}"
+                                                                            Visibility="{Binding IsEyeCare, Converter={StaticResource BoolToVis}}">
+                                                                        <TextBlock Text="护眼" FontSize="8.5" Foreground="White" />
+                                                                    </Border>
+                                                                </Grid>
                                                             </Border>
                                                             <TextBlock Text="{Binding Name}"
                                                                        FontSize="10.5"
@@ -126,6 +137,116 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ===== 外观：护眼 ===== -->
+                    <Border Style="{StaticResource Card}" Margin="0,0,0,14">
+                        <Border.Resources>
+                            <Style x:Key="EyeSwatch" TargetType="Button">
+                                <Setter Property="Width" Value="22" />
+                                <Setter Property="Height" Value="22" />
+                                <Setter Property="Margin" Value="0,0,8,0" />
+                                <Setter Property="Cursor" Value="Hand" />
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border x:Name="Dot" CornerRadius="11"
+                                                    Background="{TemplateBinding Background}"
+                                                    BorderBrush="#55000000" BorderThickness="1" />
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Dot" Property="BorderBrush" Value="{DynamicResource Brush.Ink}" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </Border.Resources>
+                        <StackPanel>
+                            <CheckBox Style="{StaticResource CheckBox.Labeled}" FontSize="13" FontWeight="SemiBold"
+                                      Content="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.eyeTemp}"
+                                      IsChecked="{Binding EyeTempEnabled, Mode=TwoWay}" />
+                            <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.eyeTempHint}"
+                                       Style="{StaticResource Text.Caption}"
+                                       Margin="24,2,0,10" TextWrapping="Wrap" />
+
+                            <Grid Margin="2,0,0,6">
+                                <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.eyeTempLevel}"
+                                           FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
+                                <TextBlock Text="{Binding EyeTempText}"
+                                           HorizontalAlignment="Right" FontSize="12"
+                                           FontWeight="SemiBold" Foreground="{DynamicResource Brush.Accent}" />
+                            </Grid>
+                            <Slider Style="{StaticResource Slider.Slim}" Margin="2,4,2,0"
+                                    Minimum="1900" Maximum="6500" TickFrequency="100"
+                                    SmallChange="100" LargeChange="500" IsSnapToTickEnabled="True"
+                                    Value="{Binding EyeTempKelvin, Mode=TwoWay}" />
+                            <Grid Margin="2,2,0,0">
+                                <TextBlock Text="1900K" FontSize="10.5" Foreground="{DynamicResource Brush.InkSoft}" />
+                                <TextBlock Text="6500K" HorizontalAlignment="Right" FontSize="10.5"
+                                           Foreground="{DynamicResource Brush.InkSoft}" />
+                            </Grid>
+
+                            <Border Height="1" Background="{DynamicResource Brush.Line}" Margin="0,10" />
+
+                            <CheckBox Style="{StaticResource CheckBox.Labeled}" FontSize="13" FontWeight="SemiBold"
+                                      Content="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.eyeGamma}"
+                                      IsChecked="{Binding EyeGammaEnabled, Mode=TwoWay}" />
+                            <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.eyeGammaHint}"
+                                       Style="{StaticResource Text.Caption}"
+                                       Margin="24,2,0,0" TextWrapping="Wrap" />
+
+                            <Border Height="1" Background="{DynamicResource Brush.Line}" Margin="0,10" />
+
+                            <CheckBox Style="{StaticResource CheckBox.Labeled}" FontSize="13" FontWeight="SemiBold"
+                                      Content="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.eyeFilter}"
+                                      IsChecked="{Binding EyeFilterEnabled, Mode=TwoWay}" />
+                            <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.eyeFilterHint}"
+                                       Style="{StaticResource Text.Caption}"
+                                       Margin="24,2,0,10" TextWrapping="Wrap" />
+
+                            <Grid Margin="2,0,0,6">
+                                <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.eyeFilterColor}"
+                                           FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
+                                <TextBlock Text="{Binding EyePresetText}"
+                                           HorizontalAlignment="Right" FontSize="12"
+                                           FontWeight="SemiBold" Foreground="{DynamicResource Brush.Accent}" />
+                            </Grid>
+                            <StackPanel Orientation="Horizontal">
+                                <Button Style="{StaticResource EyeSwatch}" Background="#FFC98A" Tag="#FFC98A"
+                                        ToolTip="微暖" Click="EyePreset_Click" />
+                                <Button Style="{StaticResource EyeSwatch}" Background="#FF9F45" Tag="#FF9F45"
+                                        ToolTip="暖橙" Click="EyePreset_Click" />
+                                <Button Style="{StaticResource EyeSwatch}" Background="#FF8040" Tag="#FF8040"
+                                        ToolTip="烛光" Click="EyePreset_Click" />
+                                <Button Style="{StaticResource EyeSwatch}" Background="#86C88C" Tag="#86C88C"
+                                        ToolTip="护眼绿" Click="EyePreset_Click" />
+                                <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.eyeCustomColor}"
+                                           VerticalAlignment="Center" Margin="8,0,4,0"
+                                           FontSize="11.5" Foreground="{DynamicResource Brush.InkSoft}" />
+                                <TextBox x:Name="EyeCustomBox" Width="84" FontSize="11.5"
+                                         Text="{Binding EyeFilterColorText, Mode=TwoWay}"
+                                         ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.eyeCustomColorTip}"
+                                         LostFocus="EyeCustomBox_LostFocus" KeyDown="EyeCustomBox_KeyDown" />
+                            </StackPanel>
+
+                            <Grid Margin="2,12,0,0">
+                                <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.eyeStrength}"
+                                           FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
+                                <TextBlock Text="{Binding EyeStrengthText}"
+                                           HorizontalAlignment="Right" FontSize="12"
+                                           FontWeight="SemiBold" Foreground="{DynamicResource Brush.Accent}" />
+                            </Grid>
+                            <Slider Style="{StaticResource Slider.Slim}" Margin="2,4,2,0"
+                                    Minimum="10" Maximum="50" TickFrequency="5"
+                                    SmallChange="5" LargeChange="5" IsSnapToTickEnabled="True"
+                                    Value="{Binding EyeFilterStrength, Mode=TwoWay}" />
+
+                            <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.eyeSproutHint}"
+                                       Style="{StaticResource Text.Caption}"
+                                       Margin="2,12,0,0" TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
 

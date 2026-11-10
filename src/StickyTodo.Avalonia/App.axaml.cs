@@ -163,6 +163,10 @@ public partial class App : Application
 
         desktop.MainWindow = services.Manager;
 
+        // 护眼：滤镜盖回来 / 豆沙绿校色恢复
+        services.EyeCare.ApplyFromSettings();
+        services.EyeGamma.ApplyFromSettings();
+
         // 开机自启拉起：不弹管理面板，只把上次的看板摆出来
         if (!launchedByAutoStart && !demo)
         {

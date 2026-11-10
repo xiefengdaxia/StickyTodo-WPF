@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using StickyTodo.App.Services;
@@ -22,8 +22,11 @@ public partial class SettingsViewModel : ObservableObject
     private readonly WindowManager _windows;
     private readonly AutoStartService _autoStart;
     private readonly LocalizationService _localization;
+    private readonly EyeCareFilter _eyeCare;
+    private readonly EyeGammaService _eyeGamma;
 
     private bool _suppressSync;
+    private bool _suppressEyeSync;
 
     public SettingsViewModel(
         SkinService skin,
@@ -32,7 +35,9 @@ public partial class SettingsViewModel : ObservableObject
         IEntitlementService entitlement,
         WindowManager windows,
         AutoStartService autoStart,
-        LocalizationService localization)
+        LocalizationService localization,
+        EyeCareFilter eyeCare,
+        EyeGammaService eyeGamma)
     {
         _skin = skin;
         _settings = settings;
@@ -41,10 +46,13 @@ public partial class SettingsViewModel : ObservableObject
         _windows = windows;
         _autoStart = autoStart;
         _localization = localization;
+        _eyeCare = eyeCare;
+        _eyeGamma = eyeGamma;
 
         BuildSkinOptions();
         BuildLanguageOptions();
         LoadStartupSettings();
+        LoadEyeFilterSettings();
 
         _suppressSync = true;
         _backgroundOpacity = Math.Round(_skin.Opacity * 100);
@@ -235,6 +243,255 @@ public partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty]
     private string? _errorText;
+
+    // ---------------- 护眼 ----------------
+
+    /// <summary>豆沙绿护眼（显卡 gamma 校色，屏幕纯白 → #C7EDCC）。</summary>
+    [ObservableProperty]
+    private bool _eyeGammaEnabled;
+
+    /// <summary>防蓝光滤镜开关。</summary>
+    [ObservableProperty]
+    private bool _eyeFilterEnabled;
+
+    /// <summary>滤镜强度，10-50 的百分比（滑块绑定）。</summary>
+    [ObservableProperty]
+    private double _eyeFilterStrength;
+
+    /// <summary>自定义颜色输入框的内容（#RRGGBB，回车/失焦提交）。</summary>
+    [ObservableProperty]
+    private string _eyeFilterColorText = AppSettingsService.DefaultEyeFilterColor;
+
+    [ObservableProperty]
+    private string _eyeStrengthText = string.Empty;
+
+    /// <summary>色温护眼：只按色温压通道，不叠色层。</summary>
+    [ObservableProperty]
+    private bool _eyeTempEnabled;
+
+    /// <summary>色温滑块（1900-6500K，100K 一档）。</summary>
+    [ObservableProperty]
+    private double _eyeTempKelvin = AppSettingsService.DefaultEyeTempKelvin;
+
+    [ObservableProperty]
+    private string _eyeTempText = string.Empty;
+
+    /// <summary>三种护眼方式共用整块屏幕，同时开只会互相打架，所以互相排斥。</summary>
+    private enum EyeMode
+    {
+        None,
+        Temp,
+        Gamma,
+        Filter,
+    }
+
+    /// <summary>关掉除 keep 以外的护眼方式，并同步界面勾选。调用前后 _suppressEyeSync 保持原状。</summary>
+    private void TurnOffOtherEyeModes(EyeMode keep)
+    {
+        _suppressEyeSync = true;
+        try
+        {
+            if (keep != EyeMode.Temp)
+            {
+                EyeTempEnabled = false;
+                _settings.EyeTempEnabled = false;
+            }
+
+            if (keep != EyeMode.Gamma)
+            {
+                EyeGammaEnabled = false;
+                _settings.EyeGammaEnabled = false;
+            }
+
+            if (keep != EyeMode.Filter)
+            {
+                EyeFilterEnabled = false;
+                _settings.EyeFilterEnabled = false;
+            }
+        }
+        finally
+        {
+            _suppressEyeSync = false;
+        }
+    }
+
+    /// <summary>右对齐显示当前生效的预设名（跟随 EyeFilterColor）。</summary>
+    public string EyePresetText
+    {
+        get
+        {
+            var color = _settings.EyeFilterColor;
+            var preset = EyeCareFilter.PresetList.FirstOrDefault(p =>
+                string.Equals(p.Hex, color, StringComparison.OrdinalIgnoreCase));
+            return preset.Key is null ? Loc.T("settings.eyeCustomColor") : Loc.T(preset.Key);
+        }
+    }
+
+    private void LoadEyeFilterSettings()
+    {
+        _suppressEyeSync = true;
+        try
+        {
+            EyeGammaEnabled = _settings.EyeGammaEnabled;
+            EyeFilterEnabled = _settings.EyeFilterEnabled;
+            EyeFilterStrength = _settings.EyeFilterStrength;
+            EyeFilterColorText = _settings.EyeFilterColor;
+            EyeStrengthText = $"{EyeFilterStrength}%";
+            EyeTempEnabled = _settings.EyeTempEnabled;
+            EyeTempKelvin = _settings.EyeTempKelvin;
+            EyeTempText = $"{_settings.EyeTempKelvin}K";
+        }
+        finally
+        {
+            _suppressEyeSync = false;
+        }
+    }
+
+    partial void OnEyeGammaEnabledChanged(bool value)
+    {
+        if (_suppressEyeSync)
+        {
+            return;
+        }
+
+        if (value)
+        {
+            TurnOffOtherEyeModes(EyeMode.Gamma);
+            _eyeCare.ApplyFromSettings();
+        }
+
+        _settings.EyeGammaEnabled = value;
+        _eyeGamma.ApplyFromSettings();
+        StatusText = value ? Loc.T("settings.eyeGammaOn") : Loc.T("settings.eyeGammaOff");
+    }
+
+    partial void OnEyeFilterEnabledChanged(bool value)
+    {
+        if (_suppressEyeSync)
+        {
+            return;
+        }
+
+        if (value)
+        {
+            TurnOffOtherEyeModes(EyeMode.Filter);
+            _eyeGamma.ApplyFromSettings();
+        }
+
+        _settings.EyeFilterEnabled = value;
+        _eyeCare.ApplyFromSettings();
+        StatusText = value ? Loc.T("settings.eyeFilterOn") : Loc.T("settings.eyeFilterOff");
+    }
+
+    partial void OnEyeTempEnabledChanged(bool value)
+    {
+        if (_suppressEyeSync)
+        {
+            return;
+        }
+
+        if (value)
+        {
+            TurnOffOtherEyeModes(EyeMode.Temp);
+            _eyeCare.ApplyFromSettings();
+        }
+
+        _settings.EyeTempEnabled = value;
+        _eyeGamma.ApplyFromSettings();
+        StatusText = value
+            ? Loc.T("settings.eyeTempOn")
+            : Loc.T("settings.eyeTempOff");
+    }
+
+    partial void OnEyeTempKelvinChanged(double value)
+    {
+        var kelvin = Math.Clamp(
+            (int)Math.Round(value),
+            AppSettingsService.MinEyeTempKelvin,
+            AppSettingsService.MaxEyeTempKelvin);
+
+        EyeTempText = $"{kelvin}K";
+
+        if (_suppressEyeSync)
+        {
+            return;
+        }
+
+        _settings.EyeTempKelvin = kelvin;
+
+        if (_settings.EyeTempEnabled)
+        {
+            _eyeGamma.ApplyFromSettings();
+        }
+    }
+
+    partial void OnEyeFilterStrengthChanged(double value)
+    {
+        EyeStrengthText = $"{Math.Round(value)}%";
+
+        if (_suppressEyeSync)
+        {
+            return;
+        }
+
+        _settings.EyeFilterStrength = (int)Math.Round(value);
+        _eyeCare.ApplyFromSettings();
+    }
+
+    /// <summary>点了预设色板：写颜色、顺手把滤镜打开。</summary>
+    public void SetEyePreset(string hex)
+    {
+        _settings.EyeFilterColor = hex;
+        _settings.EyeFilterEnabled = true;
+        TurnOffOtherEyeModes(EyeMode.Filter);
+        _eyeGamma.ApplyFromSettings();
+
+        _suppressEyeSync = true;
+        try
+        {
+            EyeFilterColorText = hex;
+            EyeFilterEnabled = true;
+        }
+        finally
+        {
+            _suppressEyeSync = false;
+        }
+
+        OnPropertyChanged(nameof(EyePresetText));
+        _eyeCare.ApplyFromSettings();
+    }
+
+    /// <summary>自定义颜色提交：只认 #RRGGBB，不合法就拨回原值。</summary>
+    public void CommitEyeCustomColor(string? text)
+    {
+        var clean = (text ?? string.Empty).Trim();
+
+        if (!System.Text.RegularExpressions.Regex.IsMatch(clean, "^#[0-9A-Fa-f]{6}$"))
+        {
+            EyeFilterColorText = _settings.EyeFilterColor;
+            OnPropertyChanged(nameof(EyePresetText));
+            return;
+        }
+
+        _settings.EyeFilterColor = clean;
+        _settings.EyeFilterEnabled = true;
+        TurnOffOtherEyeModes(EyeMode.Filter);
+        _eyeGamma.ApplyFromSettings();
+
+        _suppressEyeSync = true;
+        try
+        {
+            EyeFilterColorText = clean;
+            EyeFilterEnabled = true;
+        }
+        finally
+        {
+            _suppressEyeSync = false;
+        }
+
+        OnPropertyChanged(nameof(EyePresetText));
+        _eyeCare.ApplyFromSettings();
+    }
 
     private void BuildSkinOptions()
     {

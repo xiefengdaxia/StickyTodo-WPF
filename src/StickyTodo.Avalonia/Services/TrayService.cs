@@ -92,6 +92,167 @@ public sealed class TrayService : IDisposable
         menu.Add(Item("世界时钟", () => _services.OpenToolWindow(ToolWindowKind.WorldClock)));
         menu.Add(Item("桌面时钟", () => _services.OpenToolWindow(ToolWindowKind.DesktopClock)));
 
+        // 护眼：色温 + 豆沙绿校色 + 防蓝光滤镜，豆沙绿皮肤快捷入口
+        var eyeMenu = new NativeMenu();
+
+        var tempToggle = new NativeMenuItem
+        {
+            Header = Loc.T("menu.eyeTemp"),
+            ToggleType = NativeMenuItemToggleType.CheckBox,
+            IsChecked = _services.Settings.EyeTempEnabled,
+        };
+        tempToggle.Click += (_, _) =>
+        {
+            var enable = !_services.Settings.EyeTempEnabled;
+            _services.Settings.EyeTempEnabled = enable;
+
+            if (enable)
+            {
+                _services.Settings.EyeGammaEnabled = false;
+                _services.Settings.EyeFilterEnabled = false;
+            }
+
+            _services.EyeGamma.ApplyFromSettings();
+            _services.EyeCare.ApplyFromSettings();
+        };
+        eyeMenu.Add(tempToggle);
+
+        var tempLevels = new NativeMenu();
+        foreach (var (kelvin, key) in new[]
+                 {
+                     (6500, "eye.temp.6500"),
+                     (5500, "eye.temp.5500"),
+                     (4500, "eye.temp.4500"),
+                     (3400, "eye.temp.3400"),
+                     (2700, "eye.temp.2700"),
+                     (2000, "eye.temp.2000"),
+                 })
+        {
+            var level = new NativeMenuItem
+            {
+                Header = Loc.T(key),
+                ToggleType = NativeMenuItemToggleType.Radio,
+                IsChecked = _services.Settings.EyeTempEnabled && kelvin == _services.Settings.EyeTempKelvin,
+            };
+            var value = kelvin;
+            level.Click += (_, _) =>
+            {
+                _services.Settings.EyeTempKelvin = value;
+                _services.Settings.EyeTempEnabled = true;
+                _services.Settings.EyeGammaEnabled = false;
+                _services.Settings.EyeFilterEnabled = false;
+                _services.EyeGamma.ApplyFromSettings();
+                _services.EyeCare.ApplyFromSettings();
+            };
+            tempLevels.Add(level);
+        }
+
+        eyeMenu.Add(new NativeMenuItem { Header = Loc.T("menu.eyeTempLevels"), Menu = tempLevels });
+
+        eyeMenu.Add(new NativeMenuItemSeparator());
+
+        var gammaToggle = new NativeMenuItem
+        {
+            Header = Loc.T("menu.eyeGamma"),
+            ToggleType = NativeMenuItemToggleType.CheckBox,
+            IsChecked = _services.Settings.EyeGammaEnabled,
+        };
+        gammaToggle.Click += (_, _) =>
+        {
+            var enable = !_services.Settings.EyeGammaEnabled;
+            _services.Settings.EyeGammaEnabled = enable;
+
+            if (enable)
+            {
+                _services.Settings.EyeTempEnabled = false;
+                _services.Settings.EyeFilterEnabled = false;
+            }
+
+            _services.EyeGamma.ApplyFromSettings();
+            _services.EyeCare.ApplyFromSettings();
+        };
+        eyeMenu.Add(gammaToggle);
+
+        var filterToggle = new NativeMenuItem
+        {
+            Header = Loc.T("settings.eyeFilter"),
+            ToggleType = NativeMenuItemToggleType.CheckBox,
+            IsChecked = _services.Settings.EyeFilterEnabled,
+        };
+        filterToggle.Click += (_, _) =>
+        {
+            var enable = !_services.Settings.EyeFilterEnabled;
+            _services.Settings.EyeFilterEnabled = enable;
+
+            if (enable)
+            {
+                _services.Settings.EyeTempEnabled = false;
+                _services.Settings.EyeGammaEnabled = false;
+            }
+
+            _services.EyeCare.ApplyFromSettings();
+            _services.EyeGamma.ApplyFromSettings();
+        };
+        eyeMenu.Add(filterToggle);
+
+        eyeMenu.Add(new NativeMenuItemSeparator());
+
+        var strength = _services.Settings.EyeFilterStrength;
+        foreach (var (hex, key) in EyeCareFilter.PresetList)
+        {
+            var preset = new NativeMenuItem
+            {
+                Header = Loc.T(key),
+                ToggleType = NativeMenuItemToggleType.Radio,
+                IsChecked = string.Equals(hex, _services.Settings.EyeFilterColor, StringComparison.OrdinalIgnoreCase),
+            };
+            var presetHex = hex;
+            preset.Click += (_, _) =>
+            {
+                _services.Settings.EyeFilterColor = presetHex;
+                _services.Settings.EyeFilterEnabled = true;
+                _services.Settings.EyeTempEnabled = false;
+                _services.Settings.EyeGammaEnabled = false;
+                _services.EyeCare.ApplyFromSettings();
+                _services.EyeGamma.ApplyFromSettings();
+            };
+            eyeMenu.Add(preset);
+        }
+
+        foreach (var (value, key) in new[] { (15, "eye.strength.light"), (25, "eye.strength.medium"), (40, "eye.strength.heavy") })
+        {
+            var strengthItem = new NativeMenuItem
+            {
+                Header = Loc.T(key),
+                ToggleType = NativeMenuItemToggleType.Radio,
+                IsChecked = value == strength
+                    || (value == 15 && strength <= 15)
+                    || (value == 25 && strength is > 15 and < 40)
+                    || (value == 40 && strength >= 40),
+            };
+            var strengthValue = value;
+            strengthItem.Click += (_, _) =>
+            {
+                _services.Settings.EyeFilterStrength = strengthValue;
+                _services.Settings.EyeFilterEnabled = true;
+                _services.Settings.EyeTempEnabled = false;
+                _services.Settings.EyeGammaEnabled = false;
+                _services.EyeCare.ApplyFromSettings();
+                _services.EyeGamma.ApplyFromSettings();
+            };
+            eyeMenu.Add(strengthItem);
+        }
+
+        eyeMenu.Add(new NativeMenuItemSeparator());
+        eyeMenu.Add(Item(Loc.T("menu.eyeSprout"), () =>
+        {
+            _services.Skin.SetSkin(NoteSkins.BeanSprout.Key);
+            _services.Windows.ApplySkin();
+        }));
+        eyeMenu.Add(Item(Loc.T("menu.eyeSettings"), () => _services.ShowSettings()));
+
+        menu.Add(new NativeMenuItem { Header = Loc.T("menu.eye"), Menu = eyeMenu });
+
         _boardsMenu = new NativeMenu();
         menu.Add(new NativeMenuItem { Header = Loc.T("tray.boards"), Menu = _boardsMenu });
 

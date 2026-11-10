@@ -41,6 +41,8 @@ public static class ScreenCaptureService
                 graphics.CopyFromScreen(bounds.Left, bounds.Top, 0, 0, bounds.Size, CopyPixelOperation.SourceCopy);
             }
 
+            NeutralizeTemperatureTint(bitmap);
+
             var handle = bitmap.GetHbitmap();
             try
             {
@@ -57,6 +59,47 @@ public static class ScreenCaptureService
         catch (Exception)
         {
             return null;
+        }
+    }
+
+    /// <summary>
+    /// 色温模式是在 DWM 合成层乘色矩阵的，抓屏会把这份偏色一起抓进来。
+    /// 按当前色温反算回去，贴图/剪贴板里的图才是「原色」，贴到屏幕上只暖一次。
+    /// </summary>
+    private static void NeutralizeTemperatureTint(Bitmap bitmap)
+    {
+        var (r, g, b) = EyeGammaService.CaptureTint;
+
+        if (r > 0.999 && g > 0.999 && b > 0.999)
+        {
+            return;
+        }
+
+        var rect = new Rectangle(0, 0, bitmap.Width, bitmap.Height);
+        var data = bitmap.LockBits(rect, ImageLockMode.ReadWrite, PixelFormat.Format32bppArgb);
+
+        try
+        {
+            var length = Math.Abs(data.Stride) * bitmap.Height;
+            var buffer = new byte[length];
+            System.Runtime.InteropServices.Marshal.Copy(data.Scan0, buffer, 0, length);
+
+            var invR = 1d / Math.Max(0.05, r);
+            var invG = 1d / Math.Max(0.05, g);
+            var invB = 1d / Math.Max(0.05, b);
+
+            for (var i = 0; i + 3 < length; i += 4)
+            {
+                buffer[i] = (byte)Math.Min(255, Math.Round(buffer[i] * invB));
+                buffer[i + 1] = (byte)Math.Min(255, Math.Round(buffer[i + 1] * invG));
+                buffer[i + 2] = (byte)Math.Min(255, Math.Round(buffer[i + 2] * invR));
+            }
+
+            System.Runtime.InteropServices.Marshal.Copy(buffer, 0, data.Scan0, length);
+        }
+        finally
+        {
+            bitmap.UnlockBits(data);
         }
     }
 

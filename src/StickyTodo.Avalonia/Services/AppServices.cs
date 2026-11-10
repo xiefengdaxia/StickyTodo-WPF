@@ -45,10 +45,15 @@ public sealed class AppServices : IDisposable
         Windows = new WindowManager(Todos, Settings, Skin, TokenProvider, Weather, WeatherCache);
         HotKeys = new HotKeyService();
         Reminders = new ReminderPump(Todos);
+        EyeCare = new EyeCareFilter(Settings, () => Manager);
+        EyeGamma = new EyeGammaService(Settings);
         Tray = new TrayService(Todos, Windows, this);
+        // 护眼状态变了就重建托盘菜单，勾选态保持最新
+        EyeCare.Changed += (_, _) => Tray.Rebuild();
+        EyeGamma.Changed += (_, _) => Tray.Rebuild();
 
         ManagerViewModel = new ManagerViewModel(Todos, Entitlement);
-        SettingsViewModel = new SettingsViewModel(Skin, Settings, Todos, Entitlement, Windows, AutoStart, Localization);
+        SettingsViewModel = new SettingsViewModel(Skin, Settings, Todos, Entitlement, Windows, AutoStart, Localization, EyeCare, EyeGamma);
         PomodoroViewModel = new PomodoroViewModel(Settings, PomodoroEngine);
 
         Updates = new GitHubUpdateChecker();
@@ -84,6 +89,10 @@ public sealed class AppServices : IDisposable
     public HotKeyService HotKeys { get; }
 
     public ReminderPump Reminders { get; }
+
+    public EyeCareFilter EyeCare { get; }
+
+    public EyeGammaService EyeGamma { get; }
 
     public TrayService Tray { get; }
 
@@ -277,6 +286,8 @@ public sealed class AppServices : IDisposable
 
         try
         {
+            EyeCare.Dispose();
+            EyeGamma.Dispose();
             HotKeys.Dispose();
             Reminders.Dispose();
         }

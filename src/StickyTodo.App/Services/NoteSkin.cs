@@ -124,6 +124,13 @@ public static class NoteSkins
         Color.FromRgb(0x3B, 0x38, 0x2A), Color.FromRgb(0x7C, 0x74, 0x5E),
         Color.FromRgb(0xB2, 0x7F, 0x0A), false);
 
+    /// <summary>护眼豆沙绿：经典护眼绿纸面，长时间盯屏不刺眼。</summary>
+    public static readonly NoteSkin BeanSprout = new(
+        "beansprout", "豆沙绿",
+        Color.FromRgb(0xD9, 0xF0, 0xDA), Color.FromRgb(0xC7, 0xED, 0xCC),
+        Color.FromRgb(0x2F, 0x42, 0x34), Color.FromRgb(0x5E, 0x73, 0x64),
+        Color.FromRgb(0x3E, 0x7B, 0x4F), false);
+
     public static readonly NoteSkin Mint = new(
         "mint", "薄荷绿",
         Color.FromRgb(0xD8, 0xF5, 0xE0), Color.FromRgb(0xB4, 0xEA, 0xC6),
@@ -182,7 +189,7 @@ public static class NoteSkins
 
     public static readonly IReadOnlyList<NoteSkin> All =
     [
-        ClassicYellow, Paper, Mint, Sky, Violet, Rose, Apricot,
+        ClassicYellow, BeanSprout, Paper, Mint, Sky, Violet, Rose, Apricot,
         Graphite, Midnight, Espresso,
     ];
 

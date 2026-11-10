@@ -67,6 +67,26 @@ public partial class SettingsWindow : Window
         }
     }
 
+    private void EyePreset_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Control { Tag: string hex })
+        {
+            _viewModel.SetEyePreset(hex);
+        }
+    }
+
+    private void EyeCustomBox_LostFocus(object? sender, RoutedEventArgs e) =>
+        _viewModel.CommitEyeCustomColor(EyeCustomBox.Text);
+
+    private void EyeCustomBox_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            e.Handled = true;
+            _viewModel.CommitEyeCustomColor(EyeCustomBox.Text);
+        }
+    }
+
     private void TokenDatabaseBox_LostFocus(object? sender, RoutedEventArgs e) => _viewModel.CommitTokenDatabasePath();
 
     private void TokenDatabaseBox_KeyDown(object? sender, KeyEventArgs e)

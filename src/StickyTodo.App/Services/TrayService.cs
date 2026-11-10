@@ -19,17 +19,27 @@ public sealed class TrayService : IDisposable
     private readonly TodoService _todoService;
     private readonly WindowManager _windows;
     private readonly IServiceProvider _services;
+    private readonly EyeCareFilter _eyeCare;
+    private readonly EyeGammaService _eyeGamma;
 
     private TrayIconHost? _tray;
     private WinForms.ContextMenuStrip? _menu;
     private WinForms.ToolStripMenuItem? _boardsMenu;
     private PomodoroWindow? _pomodoroWindow;
+    private WinForms.ToolStripMenuItem? _eyeFilterToggle;
+    private WinForms.ToolStripMenuItem? _eyeGammaToggle;
+    private WinForms.ToolStripMenuItem? _eyeTempToggle;
+    private readonly List<(WinForms.ToolStripMenuItem Item, string Color)> _eyePresetItems = new();
+    private readonly List<(WinForms.ToolStripMenuItem Item, int Strength)> _eyeStrengthItems = new();
+    private readonly List<(WinForms.ToolStripMenuItem Item, int Kelvin)> _eyeTempItems = new();
 
-    public TrayService(TodoService todoService, WindowManager windows, IServiceProvider services)
+    public TrayService(TodoService todoService, WindowManager windows, IServiceProvider services, EyeCareFilter eyeCare, EyeGammaService eyeGamma)
     {
         _todoService = todoService;
         _windows = windows;
         _services = services;
+        _eyeCare = eyeCare;
+        _eyeGamma = eyeGamma;
     }
 
     /// <summary>打开番茄时钟（已经开着就激活）。</summary>
@@ -124,6 +134,183 @@ public sealed class TrayService : IDisposable
 
         menu.Items.Add(clockOpacity);
 
+        // 护眼：豆沙绿校色 + 防蓝光滤镜，豆沙绿皮肤快捷入口
+        var eye = new WinForms.ToolStripMenuItem(Loc.T("menu.eye"));
+
+        // 色温：只改颜色比例，画面不发灰
+        _eyeTempToggle = new WinForms.ToolStripMenuItem(Loc.T("menu.eyeTemp")) { CheckOnClick = true };
+        _eyeTempToggle.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        {
+            _menu?.Close();
+            var settings = App.Settings;
+            if (settings is null)
+            {
+                return;
+            }
+
+            settings.EyeTempEnabled = _eyeTempToggle.Checked;
+
+            if (_eyeTempToggle.Checked)
+            {
+                settings.EyeGammaEnabled = false;
+                settings.EyeFilterEnabled = false;
+            }
+
+            _eyeGamma.ApplyFromSettings();
+            _eyeCare.ApplyFromSettings();
+        });
+        eye.DropDownItems.Add(_eyeTempToggle);
+
+        var tempLevels = new WinForms.ToolStripMenuItem(Loc.T("menu.eyeTempLevels"));
+        foreach (var (kelvin, key) in new[]
+                 {
+                     (6500, "eye.temp.6500"),
+                     (5500, "eye.temp.5500"),
+                     (4500, "eye.temp.4500"),
+                     (3400, "eye.temp.3400"),
+                     (2700, "eye.temp.2700"),
+                     (2000, "eye.temp.2000"),
+                 })
+        {
+            var tempItem = new WinForms.ToolStripMenuItem(Loc.T(key)) { CheckOnClick = false };
+            tempItem.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+            {
+                _menu?.Close();
+                var settings = App.Settings;
+                if (settings is null)
+                {
+                    return;
+                }
+
+                settings.EyeTempKelvin = kelvin;
+                settings.EyeTempEnabled = true;
+                settings.EyeGammaEnabled = false;
+                settings.EyeFilterEnabled = false;
+                _eyeGamma.ApplyFromSettings();
+                _eyeCare.ApplyFromSettings();
+            });
+            _eyeTempItems.Add((tempItem, kelvin));
+            tempLevels.DropDownItems.Add(tempItem);
+        }
+
+        eye.DropDownItems.Add(tempLevels);
+
+        eye.DropDownItems.Add(new WinForms.ToolStripSeparator());
+
+        _eyeGammaToggle = new WinForms.ToolStripMenuItem(Loc.T("menu.eyeGamma")) { CheckOnClick = true };
+        _eyeGammaToggle.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        {
+            _menu?.Close();
+            var settings = App.Settings;
+            if (settings is null)
+            {
+                return;
+            }
+
+            settings.EyeGammaEnabled = _eyeGammaToggle.Checked;
+
+            if (_eyeGammaToggle.Checked)
+            {
+                settings.EyeTempEnabled = false;
+                settings.EyeFilterEnabled = false;
+            }
+
+            _eyeGamma.ApplyFromSettings();
+            _eyeCare.ApplyFromSettings();
+        });
+        eye.DropDownItems.Add(_eyeGammaToggle);
+
+        _eyeFilterToggle = new WinForms.ToolStripMenuItem(Loc.T("settings.eyeFilter")) { CheckOnClick = true };
+        _eyeFilterToggle.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        {
+            _menu?.Close();
+            var settings = App.Settings;
+            if (settings is null)
+            {
+                return;
+            }
+
+            settings.EyeFilterEnabled = _eyeFilterToggle.Checked;
+
+            if (_eyeFilterToggle.Checked)
+            {
+                settings.EyeTempEnabled = false;
+                settings.EyeGammaEnabled = false;
+            }
+
+            _eyeCare.ApplyFromSettings();
+            _eyeGamma.ApplyFromSettings();
+        });
+        eye.DropDownItems.Add(_eyeFilterToggle);
+
+        eye.DropDownItems.Add(new WinForms.ToolStripSeparator());
+
+        foreach (var (hex, key) in EyeCareFilter.PresetList)
+        {
+            var preset = new WinForms.ToolStripMenuItem(Loc.T(key)) { CheckOnClick = false };
+            preset.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+            {
+                _menu?.Close();
+                var settings = App.Settings;
+                if (settings is null)
+                {
+                    return;
+                }
+
+                settings.EyeFilterColor = hex;
+                settings.EyeFilterEnabled = true;
+                settings.EyeTempEnabled = false;
+                settings.EyeGammaEnabled = false;
+                _eyeCare.ApplyFromSettings();
+                _eyeGamma.ApplyFromSettings();
+            });
+            _eyePresetItems.Add((preset, hex));
+            eye.DropDownItems.Add(preset);
+        }
+
+        foreach (var (strength, key) in new[] { (15, "eye.strength.light"), (25, "eye.strength.medium"), (40, "eye.strength.heavy") })
+        {
+            var strengthItem = new WinForms.ToolStripMenuItem(Loc.T(key)) { CheckOnClick = false };
+            strengthItem.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+            {
+                _menu?.Close();
+                var settings = App.Settings;
+                if (settings is null)
+                {
+                    return;
+                }
+
+                settings.EyeFilterStrength = strength;
+                settings.EyeFilterEnabled = true;
+                settings.EyeTempEnabled = false;
+                settings.EyeGammaEnabled = false;
+                _eyeCare.ApplyFromSettings();
+                _eyeGamma.ApplyFromSettings();
+            });
+            _eyeStrengthItems.Add((strengthItem, strength));
+            eye.DropDownItems.Add(strengthItem);
+        }
+
+        eye.DropDownItems.Add(new WinForms.ToolStripSeparator());
+
+        var eyeSprout = new WinForms.ToolStripMenuItem(Loc.T("menu.eyeSprout"));
+        eyeSprout.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        {
+            _menu?.Close();
+            if (_services.GetService(typeof(SkinService)) is SkinService skin)
+            {
+                skin.SetSkin(NoteSkins.BeanSprout.Key);
+                _windows.ApplySkin();
+            }
+        });
+        eye.DropDownItems.Add(eyeSprout);
+
+        var eyeSettings = new WinForms.ToolStripMenuItem(Loc.T("menu.eyeSettings"));
+        eyeSettings.Click += (_, _) => (System.Windows.Application.Current as App)?.ShowSettings();
+        eye.DropDownItems.Add(eyeSettings);
+
+        menu.Items.Add(eye);
+
         menu.Items.Add(new WinForms.ToolStripSeparator());
 
         // 截图 / 贴图
@@ -206,9 +393,46 @@ public sealed class TrayService : IDisposable
 
         // 用固定 GUID 登记：被杀掉的旧进程留下的图标会被这次登记接管，不再有僵尸图标
         _tray = new TrayIconHost(AppIcon.TrayIcon, "StickyTodo", ShowManager, ShowMenuAtCursor);
+        menu.Opening += (_, _) => RefreshEyeMenuStates();
 
         RebuildBoardsMenu();
         _windows.BoardsChanged += (_, _) => RebuildBoardsMenu();
+    }
+
+    /// <summary>菜单弹出前同步护眼项的勾选态（设置页可能刚改过）。</summary>
+    private void RefreshEyeMenuStates()
+    {
+        if (_eyeFilterToggle is null || _eyeGammaToggle is null || _eyeTempToggle is null)
+        {
+            return;
+        }
+
+        var settings = App.Settings;
+        _eyeGammaToggle.Checked = settings?.EyeGammaEnabled ?? false;
+        _eyeFilterToggle.Checked = settings?.EyeFilterEnabled ?? false;
+        _eyeTempToggle.Checked = settings?.EyeTempEnabled ?? false;
+
+        var kelvin = settings?.EyeTempKelvin ?? AppSettingsService.DefaultEyeTempKelvin;
+        var tempOn = settings?.EyeTempEnabled ?? false;
+        foreach (var (item, value) in _eyeTempItems)
+        {
+            item.Checked = tempOn && value == kelvin;
+        }
+
+        var color = settings?.EyeFilterColor ?? string.Empty;
+        foreach (var (item, hex) in _eyePresetItems)
+        {
+            item.Checked = string.Equals(hex, color, StringComparison.OrdinalIgnoreCase);
+        }
+
+        var strength = settings?.EyeFilterStrength ?? AppSettingsService.DefaultEyeFilterStrength;
+        foreach (var (item, value) in _eyeStrengthItems)
+        {
+            item.Checked = value == strength
+                || (value == 15 && strength <= 15)
+                || (value == 25 && strength is > 15 and < 40)
+                || (value == 40 && strength >= 40);
+        }
     }
 
     private void RebuildBoardsMenu()

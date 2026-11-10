@@ -22,6 +22,9 @@ public partial class SkinOptionViewModel : ObservableObject
 
     public bool IsDark => Skin.IsDark;
 
+    /// <summary>护眼推荐色（豆沙绿）：设置页色卡上挂「护眼」小徽标。</summary>
+    public bool IsEyeCare => string.Equals(Skin.Key, NoteSkins.BeanSprout.Key, StringComparison.OrdinalIgnoreCase);
+
     [ObservableProperty]
     private bool _isSelected;
 }
