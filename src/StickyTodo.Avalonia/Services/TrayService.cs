@@ -149,6 +149,19 @@ public sealed class TrayService : IDisposable
 
         eyeMenu.Add(new NativeMenuItem { Header = Loc.T("menu.eyeTempLevels"), Menu = tempLevels });
 
+        var compositorItem = new NativeMenuItem
+        {
+            Header = Loc.T("menu.eyeTempCompositor"),
+            ToggleType = NativeMenuItemToggleType.CheckBox,
+            IsChecked = _services.Settings.EyeTempCompositor,
+        };
+        compositorItem.Click += (_, _) =>
+        {
+            _services.Settings.EyeTempCompositor = !_services.Settings.EyeTempCompositor;
+            _services.EyeGamma.ApplyFromSettings();
+        };
+        eyeMenu.Add(compositorItem);
+
         eyeMenu.Add(new NativeMenuItemSeparator());
 
         var gammaToggle = new NativeMenuItem

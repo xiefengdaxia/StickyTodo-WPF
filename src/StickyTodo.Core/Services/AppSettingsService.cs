@@ -342,6 +342,12 @@ public sealed class AppSettingsService
 
     public const string EyeTempKelvinKey = "eye.temp.kelvin";
 
+    /// <summary>
+    /// 色温改用 DWM 合成层的乘法色矩阵（默认 false：走显卡 gamma，截图/录屏不带色偏）。
+    /// 有些环境（虚拟显示器、远程桌面、HDR）会「收下 gamma 表但不生效」，那种情况才需要这个。
+    /// </summary>
+    public const string EyeTempCompositorKey = "eye.temp.compositor";
+
     /// <summary>默认色温：3400K（日落档）。</summary>
     public const int DefaultEyeTempKelvin = 3400;
 
@@ -364,6 +370,12 @@ public sealed class AppSettingsService
                 : DefaultEyeTempKelvin;
         }
         set => SetSetting(EyeTempKelvinKey, Math.Clamp(value, MinEyeTempKelvin, MaxEyeTempKelvin).ToString());
+    }
+
+    public bool EyeTempCompositor
+    {
+        get => GetBool(EyeTempCompositorKey, false);
+        set => SetSetting(EyeTempCompositorKey, value ? "1" : "0");
     }
 
     public bool EyeGammaEnabled

@@ -29,6 +29,7 @@ public sealed class TrayService : IDisposable
     private WinForms.ToolStripMenuItem? _eyeFilterToggle;
     private WinForms.ToolStripMenuItem? _eyeGammaToggle;
     private WinForms.ToolStripMenuItem? _eyeTempToggle;
+    private WinForms.ToolStripMenuItem? _eyeTempCompositorItem;
     private readonly List<(WinForms.ToolStripMenuItem Item, string Color)> _eyePresetItems = new();
     private readonly List<(WinForms.ToolStripMenuItem Item, int Strength)> _eyeStrengthItems = new();
     private readonly List<(WinForms.ToolStripMenuItem Item, int Kelvin)> _eyeTempItems = new();
@@ -194,6 +195,21 @@ public sealed class TrayService : IDisposable
         }
 
         eye.DropDownItems.Add(tempLevels);
+
+        _eyeTempCompositorItem = new WinForms.ToolStripMenuItem(Loc.T("menu.eyeTempCompositor")) { CheckOnClick = true };
+        _eyeTempCompositorItem.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        {
+            _menu?.Close();
+            var settings = App.Settings;
+            if (settings is null)
+            {
+                return;
+            }
+
+            settings.EyeTempCompositor = _eyeTempCompositorItem.Checked;
+            _eyeGamma.ApplyFromSettings();
+        });
+        eye.DropDownItems.Add(_eyeTempCompositorItem);
 
         eye.DropDownItems.Add(new WinForms.ToolStripSeparator());
 
@@ -402,7 +418,8 @@ public sealed class TrayService : IDisposable
     /// <summary>菜单弹出前同步护眼项的勾选态（设置页可能刚改过）。</summary>
     private void RefreshEyeMenuStates()
     {
-        if (_eyeFilterToggle is null || _eyeGammaToggle is null || _eyeTempToggle is null)
+        if (_eyeFilterToggle is null || _eyeGammaToggle is null || _eyeTempToggle is null
+            || _eyeTempCompositorItem is null)
         {
             return;
         }
@@ -414,6 +431,7 @@ public sealed class TrayService : IDisposable
 
         var kelvin = settings?.EyeTempKelvin ?? AppSettingsService.DefaultEyeTempKelvin;
         var tempOn = settings?.EyeTempEnabled ?? false;
+        _eyeTempCompositorItem.Checked = settings?.EyeTempCompositor ?? false;
         foreach (var (item, value) in _eyeTempItems)
         {
             item.Checked = tempOn && value == kelvin;

@@ -7,11 +7,13 @@ using WinForms = System.Windows.Forms;
 namespace StickyTodo.App.Services;
 
 /// <summary>
-/// 护眼校色。豆沙绿把整块屏幕的纯白映射成 #C7EDCC（显卡 gamma 表）；色温是按开尔文温度
-/// 的按开尔文温度压 R/G/B，走 DWM 的乘法色矩阵（虚拟显示器 / 远程桌面上的 gamma 会被
-/// 静默忽略，色矩阵不会），两条路都只改颜色比例、不盖色层，所以都没有灰雾。
+/// 护眼校色。豆沙绿把整块屏幕的纯白映射成 #C7EDCC；色温按开尔文温度压 R/G/B。
+/// 两者默认都走显卡 gamma 表（f.lux 的做法）——只改颜色比例、不盖色层，
+/// 既没有灰雾，也不会出现在截图 / 录屏里。
+/// 驱动拒绝 gamma 时，色温退回 DWM 的乘法色矩阵（虚拟显示器 / 远程桌面 / HDR 上仍能变色），
+/// 那条路的色偏会进抓屏，所以截图时按 CaptureTint 反算。
 ///
-/// 每 2 秒重放一次是自愈：别的程序（校色仪、夜间模式）改了 gamma、切了分辨率就抢回来，
+/// 每 2 秒重放一次是自愈：别的程序（校色仪）改了 gamma、切了分辨率就抢回来，
 /// 显示器热插拔后新屏幕也会被盖上。退出时恢复恒等表 / identity 矩阵。
 /// </summary>
 public sealed class EyeGammaService : IDisposable
@@ -27,6 +29,7 @@ public sealed class EyeGammaService : IDisposable
     private bool _magApplied;
     private bool _magUnavailable;
     private bool _magFallbackLogged;
+    private bool _noEffectLogged;
 
     public EyeGammaService(AppSettingsService settings)
     {
@@ -47,20 +50,28 @@ public sealed class EyeGammaService : IDisposable
     /// <summary>按当前设置生效或还原。设置页 / 托盘 / 启动恢复都走这一个入口。</summary>
     public void ApplyFromSettings()
     {
-        // 色温优先：它和豆沙绿都是 gamma，同时开会互相打架
-        if (_settings.EyeTempEnabled)
+        try
         {
-            ApplyTemperature(_settings.EyeTempKelvin);
+            // 色温优先：它和豆沙绿都是 gamma，同时开会互相打架
+            if (_settings.EyeTempEnabled)
+            {
+                ApplyTemperature(_settings.EyeTempKelvin);
+            }
+            else if (_settings.EyeGammaEnabled)
+            {
+                ApplyRamp(BuildRamp(TargetR, TargetG, TargetB));
+                DisableMagColorEffect();
+                CaptureTint = (1, 1, 1);
+            }
+            else
+            {
+                Restore();
+            }
         }
-        else if (_settings.EyeGammaEnabled)
+        catch (Exception ex)
         {
-            ApplyRamp(BuildRamp(TargetR, TargetG, TargetB));
-            DisableMagColorEffect();
-            CaptureTint = (1, 1, 1);
-        }
-        else
-        {
-            Restore();
+            // 校色是锦上添花，别把设置页 / 托盘点崩
+            Log.Error(ex, "[eye] 应用护眼设置失败");
         }
 
         Changed?.Invoke(this, EventArgs.Empty);
@@ -83,33 +94,52 @@ public sealed class EyeGammaService : IDisposable
     }
 
     /// <summary>
-    /// 色温：走 DWM 的全屏乘法色矩阵（Magnification API）——虚拟显示器、远程桌面、
-    /// HDR 下 GDI 的 gamma 表会被「收下但不生效」，只有这条路的颜色一定出现在画面上，
-    /// 而且它同样是按通道做乘法，不是盖一层半透明色，所以也不会有灰雾。
-    /// 万一系统没有 Magnification（极少见），退回逐显示器下发 gamma 的老路。
+    /// 色温：默认走显卡 gamma 表（f.lux 的做法）——色偏只出现在显示器上，
+    /// 截图 / 录屏 / 抓屏都拿不到，所以截图不会变黄。
+    /// 只有驱动明确拒绝 gamma 表时，才退回 DWM 的乘法色矩阵：那条路在虚拟显示器、
+    /// 远程桌面、HDR 上照样能变色，但抓屏会带上色偏，所以抓屏时按 CaptureTint 反算回去。
     /// </summary>
     private void ApplyTemperature(int kelvin)
     {
         var (r, g, b) = TemperatureScale(kelvin);
+        var ramp = BuildRamp(r, g, b);
 
-        ApplyMagColorEffect(r, g, b);
-
-        if (_magApplied)
+        var gammaAccepted = false;
+        foreach (var dc in GetMonitorDcs())
         {
-            ClearRamps();
-            CaptureTint = (r, g, b);
+            if (SetDeviceGammaRamp(dc, ramp))
+            {
+                gammaAccepted = true;
+            }
+
+            ReleaseDc(IntPtr.Zero, dc);
+        }
+
+        if (gammaAccepted && !_settings.EyeTempCompositor)
+        {
+            _rampsApplied = true;
+            DisableMagColorEffect();
+            CaptureTint = (1, 1, 1);
         }
         else
         {
-            ApplyRamp(BuildRamp(r, g, b));
-            CaptureTint = (1, 1, 1);
+            // 之前可能已经下过 gamma：先撤掉，避免和色矩阵叠成两层偏色
+            ResetRamps();
+            ApplyMagColorEffect(r, g, b);
+            CaptureTint = _magApplied ? (r, g, b) : (1, 1, 1);
+
+            if (!_magApplied && !_noEffectLogged)
+            {
+                _noEffectLogged = true;
+                Log.Warning("[eye] 色温没生效：显卡不接受 gamma（gammaAccepted={Gamma}），DWM 色矩阵也不可用", gammaAccepted);
+            }
         }
 
         StartReapplyTimer();
     }
 
-    /// <summary>把已经下发的 gamma 表恢复成恒等（切到色温时用，避免两种偏色叠在一起）。</summary>
-    private void ClearRamps()
+    /// <summary>把已经下发的校色表恢复成恒等（没下过就什么都不做，别冲掉用户的显示器校色）。</summary>
+    private void ResetRamps()
     {
         if (!_rampsApplied)
         {
@@ -259,21 +289,7 @@ public sealed class EyeGammaService : IDisposable
 
         DisableMagColorEffect();
         CaptureTint = (1, 1, 1);
-
-        // 没下过校色表就别写恒等表：那会冲掉用户自己的显示器校色配置
-        if (!_rampsApplied)
-        {
-            return;
-        }
-
-        _rampsApplied = false;
-
-        var identity = BuildRamp(1.0, 1.0, 1.0);
-        foreach (var dc in GetMonitorDcs())
-        {
-            _ = SetDeviceGammaRamp(dc, identity);
-            ReleaseDc(IntPtr.Zero, dc);
-        }
+        ResetRamps();
     }
 
     private DispatcherTimer CreateReapplyTimer()
@@ -341,13 +357,13 @@ public sealed class EyeGammaService : IDisposable
     [DllImport("gdi32.dll", SetLastError = true)]
     private static extern bool SetDeviceGammaRamp(IntPtr hdc, ushort[] ramp);
 
-    [DllImport("gdi32.dll", CharSet = CharSet.Unicode)]
+    [DllImport("gdi32.dll", CharSet = CharSet.Unicode, EntryPoint = "CreateDCW")]
     private static extern IntPtr CreateDc(string? lpszDriver, string? lpszDevice, string? lpszOutput, IntPtr lpInitData);
 
-    [DllImport("user32.dll")]
+    [DllImport("user32.dll", EntryPoint = "GetDC")]
     private static extern IntPtr GetDc(IntPtr hWnd);
 
-    [DllImport("user32.dll")]
+    [DllImport("user32.dll", EntryPoint = "ReleaseDC")]
     private static extern int ReleaseDc(IntPtr hWnd, IntPtr hDc);
 
     /// <summary>DWM 全屏色矩阵，行优先 5×5。</summary>

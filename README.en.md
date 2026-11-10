@@ -262,9 +262,9 @@ Dependency direction: `App -> Infrastructure -> Core`. Core knows nothing about 
 
 **Eye care (three options, mutually exclusive)**
 - **Colour temperature (recommended)**: a 1900K–6500K slider (3400K by default) that **multiplies** the blue/green channels down to the chosen Kelvin — no tint layer, so the screen gets *warmer*, not hazier, and contrast stays
-  - It runs on the DWM compositor's multiply colour matrix (Magnification API), so it also works where GDI gamma tables are silently ignored (remote desktop, virtual displays, HDR); if Magnification is unavailable it falls back to per-monitor gamma
+  - It uses the **display gamma table** by default, so the tint exists only on the monitor: screenshots and recordings stay neutral (just like f.lux)
+  - If the driver rejects gamma it falls back to the DWM compositor's multiply colour matrix, which also works on virtual displays, remote desktops and HDR; “Compositor matrix mode” in the tray Eye care menu forces it (screenshots then carry the tint, and the snip tool divides it back out so pins are not warmed twice)
   - The tray “Eye care” menu has six presets: 6500 / 5500 / 4500 / 3400 / 2700 / 2000K
-  - Screenshots are **divided back** by the current temperature, so pinned images and the clipboard do not get warmed twice
 - **Beansprout eye care**: display gamma maps pure white across the whole screen to #C7EDCC (Notepad and Word included)
 - **Blue-light filter**: a translucent colour layer over each monitor (the old option — slightly hazy, kept as an alternative)
 - All three are **mutually exclusive**: turning one on turns the other two off, so tints never stack
@@ -509,7 +509,7 @@ Quota checks are only allowed in `TodoService`; the UI's only job is to surface 
 - [x] **Quieter startup**: restores only last session's boards/clocks without showing the manager; startup order tuned and instrumented with `[startup]` timings
 - [x] **Tray “pull windows back”**: one click returns every board to the top-right of the current screen; the tray menu now closes on focus loss
 - [x] **Fixes**: recurrence drifting on machines in other time zones, global hotkeys silently failing when the manager is hidden, the weather board needing scrolling, the tray menu staying open
-- [x] **Colour-temperature eye care**: multiplies blue/green channels down by Kelvin (1900–6500K, 3400K default) through the DWM colour matrix so it works on virtual displays and remote desktops too; no tint layer, no haze; exclusive with Beansprout and the blue-light filter; six tray presets; screenshots are divided back so pins are not warmed twice
+- [x] **Colour-temperature eye care**: multiplies blue/green channels down by Kelvin (1900–6500K, 3400K default) using the display gamma table by default so screenshots and recordings stay neutral; falls back to the DWM colour matrix when the driver rejects gamma (or via “Compositor matrix mode” in the tray); no tint layer, no haze; exclusive with Beansprout and the blue-light filter; six tray presets; the snip tool divides the tint out in compositor mode so pins are not warmed twice
 
 **M4 extension**
 - [ ] ICS subscription and import/export

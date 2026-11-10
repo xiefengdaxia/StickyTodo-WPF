@@ -79,30 +79,43 @@ public sealed class EyeGammaService : IDisposable
     }
 
     /// <summary>
-    /// 色温：走 DWM 的全屏乘法色矩阵（Magnification API）。虚拟显示器、远程桌面、HDR 下
-    /// GDI 的 gamma 表会被「收下但不生效」，只有这条路的颜色一定出现在画面上。
-    /// 系统没有 Magnification 时退回逐显示器下发 gamma。
+    /// 色温：默认走显卡 gamma 表（f.lux 的做法）——色偏只出现在显示器上，
+    /// 截图 / 录屏都拿不到，所以截图不会变黄。
+    /// 只有驱动拒绝 gamma，或用户在托盘里开了「合成矩阵模式」时，才用 DWM 乘法色矩阵。
     /// </summary>
     private void ApplyTemperature(int kelvin)
     {
         var (r, g, b) = TemperatureScale(kelvin);
+        var ramp = BuildRamp(r, g, b);
 
-        ApplyMagColorEffect(r, g, b);
-
-        if (_magApplied)
+        var gammaAccepted = false;
+        foreach (var dc in GetMonitorDcs())
         {
-            ClearRamps();
+            if (SetDeviceGammaRamp(dc, ramp))
+            {
+                gammaAccepted = true;
+            }
+
+            ReleaseDc(IntPtr.Zero, dc);
+        }
+
+        if (gammaAccepted && !_settings.EyeTempCompositor)
+        {
+            _rampsApplied = true;
+            DisableMagColorEffect();
         }
         else
         {
-            ApplyRamp(BuildRamp(r, g, b));
+            // 之前可能已经下过 gamma：先撤掉，避免和色矩阵叠成两层偏色
+            ResetRamps();
+            ApplyMagColorEffect(r, g, b);
         }
 
         StartReapplyTimer();
     }
 
-    /// <summary>把已经下发的 gamma 表恢复成恒等（切到色温时用，避免两种偏色叠在一起）。</summary>
-    private void ClearRamps()
+    /// <summary>把已经下发的校色表恢复成恒等（没下过就什么都不做）。</summary>
+    private void ResetRamps()
     {
         if (!_rampsApplied)
         {
@@ -237,21 +250,7 @@ public sealed class EyeGammaService : IDisposable
         _reapplyTimer?.Stop();
 
         DisableMagColorEffect();
-
-        // 没下过校色表就别写恒等表：那会冲掉用户自己的显示器校色配置
-        if (!_rampsApplied)
-        {
-            return;
-        }
-
-        _rampsApplied = false;
-
-        var identity = BuildRamp(1.0, 1.0, 1.0);
-        foreach (var dc in GetMonitorDcs())
-        {
-            _ = SetDeviceGammaRamp(dc, identity);
-            ReleaseDc(IntPtr.Zero, dc);
-        }
+        ResetRamps();
     }
 
     private DispatcherTimer CreateReapplyTimer()
@@ -332,13 +331,13 @@ public sealed class EyeGammaService : IDisposable
     [DllImport("gdi32.dll", SetLastError = true)]
     private static extern bool SetDeviceGammaRamp(IntPtr hdc, ushort[] ramp);
 
-    [DllImport("gdi32.dll", CharSet = CharSet.Unicode)]
+    [DllImport("gdi32.dll", CharSet = CharSet.Unicode, EntryPoint = "CreateDCW")]
     private static extern IntPtr CreateDc(string? lpszDriver, string? lpszDevice, string? lpszOutput, IntPtr lpInitData);
 
-    [DllImport("user32.dll")]
+    [DllImport("user32.dll", EntryPoint = "GetDC")]
     private static extern IntPtr GetDc(IntPtr hWnd);
 
-    [DllImport("user32.dll")]
+    [DllImport("user32.dll", EntryPoint = "ReleaseDC")]
     private static extern int ReleaseDc(IntPtr hWnd, IntPtr hDc);
 
     /// <summary>DWM 全屏色矩阵，行优先 5×5。</summary>
