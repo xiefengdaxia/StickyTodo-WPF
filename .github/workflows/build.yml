@@ -92,15 +92,21 @@ jobs:
 
       # 无界面冒烟 + 回归：真启动一次应用、建库、跑断言。
       # 带超时：演示入口如果卡住，不要拖到 job 默认的 6 小时。
+      # --recurrence-demo 只在 Debug 构建里编进去（发布版不带演示代码），
+      # 所以额外编一份 Debug 给它用；--selftest / --portable-check 走发布版
+      - name: Build demo (Debug)
+        if: matrix.name == 'wpf'
+        run: dotnet build src/StickyTodo.App/StickyTodo.App.csproj -c Debug --nologo --no-restore
+
       - name: Headless checks
         if: matrix.name == 'wpf'
         shell: pwsh
         run: |
-          function Invoke-Demo([string]$flag, [int]$timeoutSec = 120) {
-            $exe = "src/StickyTodo.App/bin/Release/net8.0-windows/StickyTodo.exe"
+          function Invoke-Demo([string]$flag, [string]$config = 'Release', [int]$timeoutSec = 120) {
+            $exe = "src/StickyTodo.App/bin/$config/net8.0-windows/StickyTodo.exe"
             $env:STICKYTODO_DATA_DIR = Join-Path $env:RUNNER_TEMP ("demo-" + ($flag -replace '[^a-z]', ''))
 
-            Write-Host "==> $flag"
+            Write-Host "==> $flag ($config)"
             $p = Start-Process $exe -ArgumentList $flag -PassThru
             if (-not $p.WaitForExit($timeoutSec * 1000)) {
               $p.Kill()
@@ -112,7 +118,7 @@ jobs:
           }
 
           Invoke-Demo '--selftest'
-          Invoke-Demo '--recurrence-demo'
+          Invoke-Demo '--recurrence-demo' -config Debug
           Invoke-Demo '--portable-check'
 
   # 需要真实桌面的那 20 多个 --xxx-demo（截图、拖拽、置顶窗口）
