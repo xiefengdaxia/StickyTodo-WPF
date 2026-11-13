@@ -1418,6 +1418,11 @@ public partial class App : System.Windows.Application
             var todoWindow = windows.OpenBoard(board);
             MainWindow = todoWindow;
 
+            // 日历看板也要测：它的 RefreshAppearance 曾经把「单独设的整窗透明度」抹成全局值
+            var calendarBoard = service.GetBoards().FirstOrDefault(b => b.Kind == BoardKind.Calendar)
+                ?? service.CreateBoard("日历", BoardKind.Calendar);
+            var calendarWindow = windows.OpenBoard(calendarBoard);
+
             var steps = new Queue<(string Name, double Value, bool PerBoard)>();
             steps.Enqueue(("op100", 1.0, false));
             steps.Enqueue(("op60", 0.60, false));
@@ -1437,10 +1442,20 @@ public partial class App : System.Windows.Application
                 var (name, value, perBoard) = steps.Dequeue();
 
                 // 全局：设置页 ViewModel → SkinService → 窗口
-                // 单个看板：🎨 菜单 → BoardViewModel.SetWindowOpacity → 窗口
-                if (perBoard && todoWindow.DataContext is BoardViewModel boardVm)
+                // 单个看板：🎨 菜单 → ViewModel.SetWindowOpacity → ApplySkin 刷新（菜单点击后真实走的那条）
+                if (perBoard)
                 {
-                    boardVm.SetWindowOpacity(value);
+                    if (todoWindow.DataContext is BoardViewModel boardVm)
+                    {
+                        boardVm.SetWindowOpacity(value);
+                    }
+
+                    if (calendarWindow.DataContext is CalendarViewModel calendarVm)
+                    {
+                        calendarVm.SetWindowOpacity(value);
+                    }
+
+                    windows.ApplySkin();
                 }
                 else
                 {
@@ -1448,8 +1463,12 @@ public partial class App : System.Windows.Application
                 }
 
                 var actual = todoWindow.Opacity;
-                Log.Information("[winop] {Step} 设置={Target:0.00} 窗口实际 Opacity={Actual:0.00} 一致={Match}",
-                    name, value, actual, Math.Abs(actual - value) < 0.01);
+                var calendarActual = calendarWindow.Opacity;
+                var match = Math.Abs(actual - value) < 0.01 && Math.Abs(calendarActual - value) < 0.01;
+
+                Log.Information(
+                    "[winop] {Step} 设置={Target:0.00} 待办实际={Actual:0.00} 日历实际={Calendar:0.00} 一致={Match}",
+                    name, value, actual, calendarActual, match);
 
                 if (shotDirectory is not null)
                 {

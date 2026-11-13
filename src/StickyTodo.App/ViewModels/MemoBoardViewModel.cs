@@ -172,6 +172,8 @@ public partial class MemoBoardViewModel : ObservableObject, IAppearanceHost, ISe
         OnPropertyChanged(nameof(CurrentSkinKey));
         OnPropertyChanged(nameof(CurrentOpacity));
         OnPropertyChanged(nameof(CurrentWindowOpacity));
-        WindowOpacity = _skin.WindowOpacity;
+
+        // 单独设过就用这个看板自己的值，否则跟随全局
+        WindowOpacity = _settings.GetWindowOpacity(AppearanceKey);
     }
 }

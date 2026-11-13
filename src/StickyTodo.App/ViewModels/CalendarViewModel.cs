@@ -424,6 +424,9 @@ public partial class CalendarViewModel : ObservableObject, IAppearanceHost, ISes
         OnPropertyChanged(nameof(CurrentSkinKey));
         OnPropertyChanged(nameof(CurrentOpacity));
         OnPropertyChanged(nameof(CurrentWindowOpacity));
-        WindowOpacity = _skin.WindowOpacity;
+
+        // 这个看板单独设过就用它自己的，否则才跟随全局——
+        // 直接写 _skin.WindowOpacity 会把 🎨 里刚设的整窗透明度当场抹掉
+        WindowOpacity = _settings.GetWindowOpacity(AppearanceKey);
     }
 }
