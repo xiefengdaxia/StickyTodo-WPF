@@ -48,8 +48,30 @@ internal static class DesktopEmbed
         }
     }
 
-    private static nint FindWorkerW()
+    /// <summary>
+    /// 把窗口压到所有普通窗口下面（不抢焦点、不动位置）。
+    /// 开机自启后希望看板像桌面挂件一样待在底层时用。
+    /// </summary>
+    public static void SendToBottom(System.Windows.Window window)
     {
+        try
+        {
+            var handle = new System.Windows.Interop.WindowInteropHelper(window).Handle;
+            if (handle == nint.Zero)
+            {
+                return;
+            }
+
+            _ = SetWindowPos(handle, HwndBottom, 0, 0, 0, 0,
+                SwpNomove | SwpNosize | SwpNoactivate);
+        }
+        catch (Exception)
+        {
+            // 压不到底层不影响使用
+        }
+    }
+
+    private static nint FindWorkerW()    {
         // 桌面层进程活着就不会变：缓存起来，避免每次嵌入都给 Progman 发消息（可能卡 UI）
         if (_cachedWorker != nint.Zero && IsWindow(_cachedWorker))
         {
@@ -104,6 +126,9 @@ internal static class DesktopEmbed
 
     /// <summary>退出置顶带（否则 Z 序操作无效，窗口永远盖在所有程序上面）。</summary>
     private static readonly nint HwndNotopmost = new(-2);
+
+    /// <summary>所有普通窗口的最下面。</summary>
+    private static readonly nint HwndBottom = new(1);
 
     private delegate bool EnumWindowsProc(nint hwnd, nint lParam);
 

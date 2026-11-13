@@ -348,6 +348,16 @@
                             <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.restoreSessionHint}"
                                        Style="{StaticResource Text.Caption}"
                                        Margin="24,5,0,0" />
+
+                            <Border Height="1" Background="{DynamicResource Brush.Line}" Margin="0,11" />
+
+                            <CheckBox Style="{StaticResource CheckBox.Labeled}"
+                                      Content="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.desktopLevel}"
+                                      FontSize="12.5"
+                                      IsChecked="{Binding StartupDesktopLevel, Mode=TwoWay}" />
+                            <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.desktopLevelHint}"
+                                       Style="{StaticResource Text.Caption}"
+                                       Margin="24,5,0,0" />
                         </StackPanel>
                     </Border>
 

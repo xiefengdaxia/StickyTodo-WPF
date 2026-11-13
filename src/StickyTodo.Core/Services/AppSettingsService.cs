@@ -55,6 +55,9 @@ public sealed class AppSettingsService
     /// <summary>启动时是否恢复上次会话。</summary>
     public const string RestoreSessionKey = "session.restore";
 
+    /// <summary>开机自启时把看板/时钟沉到桌面底层（不压着别的窗口）。</summary>
+    public const string StartupDesktopLevelKey = "startup.desktopLevel";
+
 
     /// <summary>Token 数据源（opencode 数据库）的自定义路径，空=默认位置。</summary>
     public const string TokenDatabasePathKey = "token.databasePath";
@@ -200,6 +203,16 @@ public sealed class AppSettingsService
     {
         get => GetBool(RestoreSessionKey, true);
         set => SetSetting(RestoreSessionKey, value ? "1" : "0");
+    }
+
+    /// <summary>
+    /// 开机自启时把恢复出来的看板/时钟沉到桌面底层（默认开）：
+    /// 开机后它们不压着别的窗口，也不抢焦点；手动启动时保持原来的置顶设置。
+    /// </summary>
+    public bool StartupDesktopLevel
+    {
+        get => GetBool(StartupDesktopLevelKey, true);
+        set => SetSetting(StartupDesktopLevelKey, value ? "1" : "0");
     }
 
     /// <summary>

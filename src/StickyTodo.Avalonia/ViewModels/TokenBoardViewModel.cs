@@ -67,7 +67,7 @@ public sealed partial class TokenAgentOption : ObservableObject
 /// <summary>
 /// Token 用量看板：定时/手动读本机 opencode 数据库，展示汇总、趋势和按模型明细。
 /// </summary>
-public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, IRefreshLocalized, IDisposable
+public partial class TokenBoardViewModel : ObservableObject, IAppearanceHost, IRefreshLocalized, IDisposable, ISessionTopmost
 {
     private readonly ITokenStatsProvider _provider;
     private readonly TodoService _service;

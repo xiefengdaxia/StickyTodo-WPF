@@ -145,6 +145,26 @@ public partial class App : System.Windows.Application
                 manager.Show();
             }
 
+            // 开机自启：把恢复出来的看板/时钟压到桌面底层，别一开机就盖住别的程序。
+            // 等窗口真正显示出来再动 Z 序，否则句柄还没建好。
+            if (launchedByAutoStart && restored > 0 && (Settings?.StartupDesktopLevel ?? true))
+            {
+                Dispatcher.BeginInvoke(
+                    System.Windows.Threading.DispatcherPriority.ApplicationIdle,
+                    new Action(() =>
+                    {
+                        try
+                        {
+                            var count = _host.Services.GetRequiredService<WindowManager>().SendBoardsToDesktopLevel();
+                            Log.Information("[startup] 开机自启：{Count} 个窗口已沉到桌面底层", count);
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Warning(ex, "[startup] 沉到桌面底层失败");
+                        }
+                    }));
+            }
+
             Log.Information("[startup] 恢复窗口={Restored} 显示主窗体={ShowManager}（开机自启={AutoStart}）用时 {Ms} ms",
                 restored, showManager, launchedByAutoStart, startupWatch.ElapsedMilliseconds);
 

@@ -10,7 +10,7 @@ namespace StickyTodo.App.ViewModels;
 /// <summary>
 /// 便签/随笔看板：整块区域就是一张白纸，边写边自动保存。
 /// </summary>
-public partial class MemoBoardViewModel : ObservableObject, IAppearanceHost
+public partial class MemoBoardViewModel : ObservableObject, IAppearanceHost, ISessionTopmost
 {
     private readonly TodoService _service;
     private readonly AppSettingsService _settings;

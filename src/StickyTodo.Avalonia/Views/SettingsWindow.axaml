@@ -225,6 +225,13 @@
                         Content="{loc:Loc settings.restoreSession}"
                         IsChecked="{Binding RestoreSession, Mode=TwoWay}" />
               <TextBlock Text="{loc:Loc settings.restoreSessionHint}" Classes="caption" Margin="24,5,0,0" />
+
+              <Border Classes="divider" Margin="0,11" />
+
+              <CheckBox Classes="labeled" FontSize="12.5"
+                        Content="{loc:Loc settings.desktopLevel}"
+                        IsChecked="{Binding StartupDesktopLevel, Mode=TwoWay}" />
+              <TextBlock Text="{loc:Loc settings.desktopLevelHint}" Classes="caption" Margin="24,5,0,0" />
             </StackPanel>
           </Border>
 

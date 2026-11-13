@@ -393,6 +393,29 @@ public sealed class WindowManager
         return restored;
     }
 
+    /// <summary>
+    /// 开机自启时把恢复出来的看板/时钟压到所有普通窗口下面：不置顶、不抢焦点，
+    /// 也不写回设置——下次手动启动还是用户原来选的置顶状态。
+    /// </summary>
+    /// <returns>处理了多少个窗口。</returns>
+    public int SendBoardsToDesktopLevel()
+    {
+        var count = 0;
+
+        foreach (var window in _windows.Values)
+        {
+            if (window.DataContext is ISessionTopmost host)
+            {
+                host.IsTopmost = false;
+            }
+
+            DesktopZOrder.SendToBottom(window);
+            count++;
+        }
+
+        return count;
+    }
+
     public void CloseBoard(string boardId)
     {
         if (_windows.TryGetValue(boardId, out var window))

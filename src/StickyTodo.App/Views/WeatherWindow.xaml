@@ -256,6 +256,16 @@
 
                 <!-- 实时天气 -->
                 <StackPanel Grid.Row="3" Margin="2,0,2,16">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Style.Triggers>
+                                <!-- 加载 / 失败时只占位置不显示内容，背景保持半透明，不会像盖了块不透明的纸 -->
+                                <DataTrigger Binding="{Binding IsBusyOverlayVisible}" Value="True">
+                                    <Setter Property="Visibility" Value="Hidden" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
                     <TextBlock Text="实时天气" Style="{StaticResource Text.Section}" Margin="0,0,0,10" />
                     <Grid VerticalAlignment="Center">
                         <Grid.ColumnDefinitions>
@@ -310,6 +320,15 @@
 
                 <!-- 预报 -->
                 <Grid Grid.Row="4" Margin="0,0,0,0">
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsBusyOverlayVisible}" Value="True">
+                                    <Setter Property="Visibility" Value="Hidden" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
@@ -383,7 +402,7 @@
 
 
                 <!-- 加载中 / 获取失败：只盖天气内容区（第 3~4 行），城市栏仍可点击切换 -->
-                <Border Grid.Row="3" Grid.RowSpan="2" Background="{DynamicResource Brush.PaperOpaque}"
+                <Border Grid.Row="3" Grid.RowSpan="2" Background="Transparent"
                         Visibility="{Binding IsBusyOverlayVisible, Converter={StaticResource BoolToVis}}">
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                         <TextBlock Text="{Binding BusyText}" FontSize="15" MaxWidth="520"

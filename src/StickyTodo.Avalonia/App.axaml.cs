@@ -193,6 +193,24 @@ public partial class App : Application
                 services.ShowManager();
             }
 
+            // 开机自启：把恢复出来的看板/时钟压到桌面底层，别一登录就盖住别的程序。
+            // 等窗口真正显示出来再动 Z 序，否则句柄还没建好。
+            if (launchedByAutoStart && restored > 0 && services.Settings.StartupDesktopLevel)
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    try
+                    {
+                        var count = services.Windows.SendBoardsToDesktopLevel();
+                        Log.Info($"[startup] 开机自启：{count} 个窗口已沉到桌面底层");
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warn($"[startup] 沉到桌面底层失败：{ex.Message}");
+                    }
+                }, Avalonia.Threading.DispatcherPriority.ApplicationIdle);
+            }
+
             // 检查更新回归：--update-demo 弹假的新版本，--update-demo --fail 弹假的失败态
             if (HasFlag(args, "--update-demo"))
             {

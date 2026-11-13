@@ -186,7 +186,7 @@
           </StackPanel>
         </Grid>
 
-        <StackPanel Grid.Row="3" Margin="2,0,2,16">
+        <StackPanel Grid.Row="3" Margin="2,0,2,16" IsVisible="{Binding !IsBusyOverlayVisible}">
           <TextBlock Text="实时天气" Classes="h2" Margin="0,0,0,10" />
           <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
             <TextBlock Text="{Binding CurrentIcon}" FontSize="46" VerticalAlignment="Center"
@@ -231,7 +231,7 @@
           </Grid>
         </StackPanel>
 
-        <Grid Grid.Row="4" RowDefinitions="Auto,*">
+        <Grid Grid.Row="4" RowDefinitions="Auto,*" IsVisible="{Binding !IsBusyOverlayVisible}">
           <TextBlock Grid.Row="0" Text="天气预报" Classes="h2" Margin="0,0,0,6" />
 
           <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
@@ -287,7 +287,7 @@
           </ScrollViewer>
         </Grid>
         <!-- 天气内容区（第 3~4 行）：加载中 / 失败时盖一层，城市栏仍可点击 -->
-        <Border Grid.Row="3" Grid.RowSpan="2" Background="{DynamicResource Brush.PaperOpaque}"
+        <Border Grid.Row="3" Grid.RowSpan="2" Background="Transparent"
                 IsVisible="{Binding IsBusyOverlayVisible}">
           <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
             <TextBlock Text="{Binding BusyText}" FontSize="15" MaxWidth="520" TextWrapping="Wrap"

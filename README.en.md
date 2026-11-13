@@ -273,7 +273,7 @@ Dependency direction: `App -> Infrastructure -> Core`. Core knows nothing about 
 - **Language dropdown**: the four languages in their native names, applied immediately
 - The 11 themes are shown as a **color-card grid** (six per row); one click applies everywhere instantly, no restart
 - Two opacity sliders with live preview and instant saving
-- A list of the three global hotkeys
+- **Startup**: when launched at sign-in, boards and clocks sit at the desktop level (behind other windows, no focus stealing); last session still restores
 - Data section: membership status, content statistics (boards / to-dos / done / tags), local storage path
 - Entry points: the Settings button at the bottom left of the manager, and the Settings item in the tray menu
 

@@ -12,7 +12,7 @@ namespace StickyTodo.Notes.ViewModels;
 /// 日历看板：月视图 + 当日日程列表。
 /// 数据来源是所有看板的待办（按目标日期投影，重复待办会展开成多次）。
 /// </summary>
-public partial class CalendarViewModel : ObservableObject, IAppearanceHost, IRefreshLocalized
+public partial class CalendarViewModel : ObservableObject, IAppearanceHost, IRefreshLocalized, ISessionTopmost
 {
     private readonly TodoService _service;
     private readonly AppSettingsService _settings;

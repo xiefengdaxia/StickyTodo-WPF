@@ -10,7 +10,7 @@ using StickyTodo.Notes.Services;
 namespace StickyTodo.Notes.ViewModels;
 
 /// <summary>一个看板窗口背后的 ViewModel。所有写操作都走 TodoService。</summary>
-public partial class BoardViewModel : ObservableObject, IAppearanceHost, IRefreshLocalized
+public partial class BoardViewModel : ObservableObject, IAppearanceHost, IRefreshLocalized, ISessionTopmost
 {
     private readonly TodoService _service;
     private readonly AppSettingsService _settings;

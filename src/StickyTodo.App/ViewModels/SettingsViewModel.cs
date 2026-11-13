@@ -152,6 +152,10 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _restoreSession = true;
 
+    /// <summary>开机自启时把看板/时钟沉到桌面底层，不压着别的窗口。</summary>
+    [ObservableProperty]
+    private bool _startupDesktopLevel = true;
+
     /// <summary>Token 看板要读的 opencode 数据库路径（空=默认位置）。</summary>
     [ObservableProperty]
     private string _tokenDatabasePath = string.Empty;
@@ -167,6 +171,7 @@ public partial class SettingsViewModel : ObservableObject
             // 以注册表实际状态为准：用户可能在别处删过启动项
             LaunchAtStartup = _autoStart.IsEnabled();
             RestoreSession = _settings.RestoreSession;
+            StartupDesktopLevel = _settings.StartupDesktopLevel;
             TokenDatabasePath = _settings.TokenDatabasePath;
             _settings.AutoStart = LaunchAtStartup;
         }
@@ -210,6 +215,17 @@ public partial class SettingsViewModel : ObservableObject
 
         _settings.RestoreSession = value;
         StatusText = value ? Loc.T("settings.restoreOn") : Loc.T("settings.restoreOff");
+    }
+
+    partial void OnStartupDesktopLevelChanged(bool value)
+    {
+        if (_suppressStartupSync)
+        {
+            return;
+        }
+
+        _settings.StartupDesktopLevel = value;
+        StatusText = value ? Loc.T("settings.desktopLevelOn") : Loc.T("settings.desktopLevelOff");
     }
 
     /// <summary>路径失焦/回车时保存；留空表示回到默认位置。</summary>
