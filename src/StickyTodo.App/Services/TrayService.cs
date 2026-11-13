@@ -135,6 +135,27 @@ public sealed class TrayService : IDisposable
 
         menu.Items.Add(clockOpacity);
 
+        // 背景透明度（纸色 alpha，全局共用）：桌面时钟没有自己的 🎨 菜单，和整窗透明度放一起方便调
+        var clockBackground = new WinForms.ToolStripMenuItem(
+            Loc.F("menu.bgOpacity", Math.Round((App.Settings?.Opacity ?? 0.92) * 100)));
+        foreach (var percent in new[] { 10, 20, 30, 40, 50, 60, 70, 80, 90, 100 })
+        {
+            var value = percent / 100d;
+            var item = new WinForms.ToolStripMenuItem($"{percent}%");
+            item.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+            {
+                _menu?.Close();
+
+                if (_services.GetService(typeof(SkinService)) is SkinService skin)
+                {
+                    skin.SetOpacity(value);
+                }
+            });
+            clockBackground.DropDownItems.Add(item);
+        }
+
+        menu.Items.Add(clockBackground);
+
         // 护眼：豆沙绿校色 + 防蓝光滤镜，豆沙绿皮肤快捷入口
         var eye = new WinForms.ToolStripMenuItem(Loc.T("menu.eye"));
 

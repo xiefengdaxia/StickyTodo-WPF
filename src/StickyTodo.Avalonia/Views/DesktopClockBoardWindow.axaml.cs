@@ -27,6 +27,12 @@ public partial class DesktopClockBoardWindow : Window
         // 首次布局后：有记录就摆回上次的位置，没记录才贴右下角；然后嵌入桌面层
         Opened += (_, _) =>
         {
+            // 桌面时钟的整窗透明度也按窗口类型存（tool.desktopclock），跟 WPF 端一致
+            if (App.Services is { } services)
+            {
+                ToolWindowOpacity.Apply(this, services.Settings);
+            }
+
             if (_geometry.Restore())
             {
                 // 上次的位置在库里有记录：别再自动贴右下角

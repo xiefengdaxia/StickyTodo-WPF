@@ -11,7 +11,7 @@ internal static class WeatherMenuBuilder
     {
         var menu = new ContextMenu();
 
-        var skinMenu = new MenuItem { Header = "皮肤" };
+        var skinMenu = new MenuItem { Header = StickyTodo.Core.Localization.Loc.T("menu.skin") };
         foreach (var s in NoteSkins.All)
         {
             var item = new MenuItem
@@ -31,10 +31,31 @@ internal static class WeatherMenuBuilder
 
         menu.Items.Add(skinMenu);
 
+        // 背景透明度：调纸色 alpha（全局共用），和看板 🎨 菜单里的那一项一致
+        var bgMenu = new MenuItem { Header = StickyTodo.Core.Localization.Loc.F("menu.bgOpacity", Math.Round(skin.Opacity * 100)) };
+        for (var percent = 10; percent <= 100; percent += 10)
+        {
+            var value = percent / 100d;
+            var item = new MenuItem
+            {
+                Header = $"{percent}%",
+                ToggleType = MenuItemToggleType.CheckBox,
+                IsChecked = Math.Abs(skin.Opacity - value) < 0.005,
+            };
+            item.Click += (_, _) =>
+            {
+                skin.SetOpacity(value);
+                onChanged();
+            };
+            bgMenu.Items.Add(item);
+        }
+
+        menu.Items.Add(bgMenu);
+
         // 整窗透明度按窗口类型各存各的（tool.weather 等），不再动全局设置
         var windowKey = ToolWindowOpacity.KeyFor(window);
         var current = settings.GetWindowOpacity(windowKey);
-        var winMenu = new MenuItem { Header = $"整窗透明度（{Math.Round(current * 100)}%）" };
+        var winMenu = new MenuItem { Header = StickyTodo.Core.Localization.Loc.F("menu.winOpacity", Math.Round(current * 100)) };
         for (var percent = 10; percent <= 100; percent += 10)
         {
             var value = percent / 100d;
@@ -56,7 +77,7 @@ internal static class WeatherMenuBuilder
 
         var followGlobal = new MenuItem
         {
-            Header = "跟随全局设置",
+            Header = StickyTodo.Core.Localization.Loc.T("menu.opacityFollowGlobal"),
             ToggleType = MenuItemToggleType.CheckBox,
             IsChecked = !settings.HasWindowOpacity(windowKey),
         };
@@ -69,7 +90,7 @@ internal static class WeatherMenuBuilder
 
         menu.Items.Add(winMenu);
         menu.Items.Add(new Separator());
-        menu.Items.Add(new MenuItem { Header = "提示：改动立即生效", IsEnabled = false });
+        menu.Items.Add(new MenuItem { Header = StickyTodo.Core.Localization.Loc.T("menu.opacityHint"), IsEnabled = false });
 
         return menu;
     }

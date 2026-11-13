@@ -18,6 +18,7 @@ public static class ToolWindowOpacity
         WorldClockBoardWindow => "tool.worldclock",
         NetworkSpeedBoardWindow => "tool.networkspeed",
         PerformanceBoardWindow => "tool.performance",
+        DesktopClockBoardWindow => "tool.desktopclock",
         _ => "tool." + window.GetType().Name,
     };
 
