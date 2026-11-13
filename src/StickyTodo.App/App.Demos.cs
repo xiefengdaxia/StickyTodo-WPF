@@ -1418,10 +1418,11 @@ public partial class App : System.Windows.Application
             var todoWindow = windows.OpenBoard(board);
             MainWindow = todoWindow;
 
-            var steps = new Queue<(string Name, double Value)>();
-            steps.Enqueue(("op100", 1.0));
-            steps.Enqueue(("op60", 0.60));
-            steps.Enqueue(("op40", 0.40));
+            var steps = new Queue<(string Name, double Value, bool PerBoard)>();
+            steps.Enqueue(("op100", 1.0, false));
+            steps.Enqueue(("op60", 0.60, false));
+            steps.Enqueue(("op40", 0.40, false));
+            steps.Enqueue(("board55", 0.55, true));
 
             var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(900) };
             timer.Tick += (_, _) =>
@@ -1433,14 +1434,22 @@ public partial class App : System.Windows.Application
                     return;
                 }
 
-                var (name, value) = steps.Dequeue();
+                var (name, value, perBoard) = steps.Dequeue();
 
-                // 走界面实际使用的那条路：设置页 ViewModel → SkinService → 窗口
-                settings.WindowOpacity = value * 100;
+                // 全局：设置页 ViewModel → SkinService → 窗口
+                // 单个看板：🎨 菜单 → BoardViewModel.SetWindowOpacity → 窗口
+                if (perBoard && todoWindow.DataContext is BoardViewModel boardVm)
+                {
+                    boardVm.SetWindowOpacity(value);
+                }
+                else
+                {
+                    settings.WindowOpacity = value * 100;
+                }
 
                 var actual = todoWindow.Opacity;
-                Log.Information("[winop] 设置={Target:0.00} 窗口实际 Opacity={Actual:0.00} 一致={Match}",
-                    value, actual, Math.Abs(actual - value) < 0.01);
+                Log.Information("[winop] {Step} 设置={Target:0.00} 窗口实际 Opacity={Actual:0.00} 一致={Match}",
+                    name, value, actual, Math.Abs(actual - value) < 0.01);
 
                 if (shotDirectory is not null)
                 {

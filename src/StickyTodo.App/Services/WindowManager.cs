@@ -517,6 +517,14 @@ public sealed class WindowManager
                 case CalendarWindow calendar:
                     calendar.RefreshAppearance();
                     break;
+                case TokenBoardWindow token:
+                    token.RefreshAppearance();
+                    break;
+                default:
+                    // 工具窗（天气 / 世界时钟 / 网速 / 性能 / 桌面时钟）没有看板 VM，
+                    // 按窗口 key 重套一次整窗透明度：单独设过的用自己的，否则跟随全局
+                    ToolWindowAppearance.Apply(window, _settings);
+                    break;
             }
         }
     }
