@@ -6,6 +6,20 @@
 
 > 借鉴了同类工具的产品形态（多看板、一板一窗、重复任务、日历），但**代码、UI、文案、配色全部为原创实现**，没有复制任何第三方程序的反编译产物、资源文件或私有接口。
 
+## ✨ 亮点：AI 自定义看板（MCP 接入）
+
+**让 AI 把数据画在你的桌面上。** 应用内置 MCP 服务端（设置页一键开启，只监听 127.0.0.1 + 令牌鉴权），AI 客户端可以创建/关闭看板、增删待办、控制番茄钟、查天气与 Token 用量、改设置、截屏——共 **30 个工具**；还能创建 **UI 完全由 AI 编写的 HTML 看板**，配一个 AI 写的采集脚本定时去网站/服务器抓数据回填（跑在 Jint 沙盒里，只放行 HTTP）。下面 6 块看板全部由 AI 生成——点桌宠它会冒爱心：
+
+| 桌宠（点它会冒爱心） | 灵动时钟 |
+|---|---|
+| ![桌宠](artifacts/custom-pet.gif) | ![灵动时钟](artifacts/custom-clock.gif) |
+| **今日进度**（每 60 秒自动算） | **汇率速览**（真实汇率，每 10 分钟） |
+| ![今日进度](artifacts/custom-progress.gif) | ![汇率速览](artifacts/custom-exchange.gif) |
+| **GitHub 星标**（真实仓库数据） | **每日一言**（hitokoto 接口） |
+| ![GitHub 星标](artifacts/custom-github.gif) | ![每日一言](artifacts/custom-quote.gif) |
+
+示例源码：`artifacts/custom-board-examples/` · MCP 工具清单与接入方法见下文「**MCP 接入（AI 客户端控制本应用）**」
+
 | 便签（默认 92% 背景） | 背景 55%（看得见桌面） | 石墨夜色皮肤 |
 |---|---|---|
 | ![便签](artifacts/board-default.png) | ![半透明](artifacts/board-translucent.png) | ![暗色](artifacts/board-dark.png) |
@@ -61,18 +75,6 @@ Token 用量看板与番茄时钟：
 日历的黄历面板（点某一天就显示宜忌）与农历标记：
 
 ![黄历](artifacts/calendar-lunar.png)
-
-**MCP 接入 + AI 自定义看板**（AI 通过 MCP 创建/控制看板；看板 UI 是 AI 写的 HTML，数据由 AI 写的采集脚本定时抓取——沙盒只放行 HTTP）：
-
-| 桌宠（点它会冒爱心） | 灵动时钟 | 今日进度 |
-|---|---|---|
-| ![桌宠](artifacts/custom-pet.gif) | ![灵动时钟](artifacts/custom-clock.gif) | ![今日进度](artifacts/custom-progress.gif) |
-
-| 汇率速览（真实汇率，每 10 分钟） | GitHub 星标（真实仓库数据） | AI 模型费用统计（真实用例） |
-|---|---|---|
-| ![汇率](artifacts/custom-exchange.png) | ![GitHub](artifacts/custom-github.png) | ![费用](artifacts/custom-expense.png) |
-
-示例源码在 `artifacts/custom-board-examples/`（桌宠 / 时钟 / 进度 / 汇率 / GitHub / 一言）。
 
 带目标日期、提醒、重复规则的待办列表：`artifacts/board-work.png`
 

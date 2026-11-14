@@ -6,6 +6,20 @@
 
 > 유사 도구의 제품 형태(다중 보드, 보드당 창 하나, 반복 작업, 캘린더)는 참고했지만 **코드, UI, 문구, 색상은 모두 이 프로젝트의 독자 구현**입니다. 다른 프로그램의 디컴파일 산출물, 리소스 파일, 비공개 API는 전혀 복제하지 않았습니다.
 
+## ✨ 하이라이트: AI 커스텀 보드(MCP 연결)
+
+**AI가 데이터를 바탕화면에 그리도록 하세요.** 앱에는 MCP 서버가 내장되어 있고(설정에서 한 번에 활성화, 127.0.0.1 전용 + 토큰 인증), AI 클라이언트는 보드 생성/닫기, 할 일 관리, 뽀모도로 제어, 날씨·Token 사용량 조회, 설정 변경, 스크린샷 — 총 **30개 도구**를 사용할 수 있습니다. 나아가 **UI 자체를 AI가 작성한 HTML 보드**를 만들 수 있고, AI가 작성한 수집 스크립트가 사이트/서버에서 주기적으로 데이터를 가져와 반영합니다(Jint 샌드박스, HTTP만 허용). 아래 6개 보드는 모두 AI가 생성했습니다 — 펫을 클릭하면 하트를 보냅니다:
+
+| 데스크톱 펫(클릭하면 하트) | 애니메이션 시계 |
+|---|---|
+| ![펫](artifacts/custom-pet.gif) | ![시계](artifacts/custom-clock.gif) |
+| **오늘 진행률**(60초마다 자동 계산) | **환율**(실시간, 10분마다) |
+| ![진행률](artifacts/custom-progress.gif) | ![환율](artifacts/custom-exchange.gif) |
+| **GitHub 스타**(실제 저장소 데이터) | **오늘의 한마디**(hitokoto API) |
+| ![GitHub](artifacts/custom-github.gif) | ![한마디](artifacts/custom-quote.gif) |
+
+예제 소스: `artifacts/custom-board-examples/` · 도구 목록과 연결 방법은 아래 **MCP 연결** 섹션 참고.
+
 | 스티키 노트(기본 배경 92%) | 배경 55%(바탕화면이 보임) | 그래파이트 나이트 테마 |
 |---|---|---|
 | ![노트](artifacts/board-default.png) | ![반투명](artifacts/board-translucent.png) | ![다크](artifacts/board-dark.png) |
@@ -63,17 +77,6 @@ Token 사용량 보드와 뽀모도로 타이머:
 
 ![길흉](artifacts/calendar-lunar.png)
 
-**MCP 연결 + AI 커스텀 보드**(AI가 MCP로 보드를 만들고 조작합니다. UI는 AI가 작성한 HTML, 데이터는 AI가 작성한 수집 스크립트가 주기적으로 가져옵니다 — 샌드박스는 HTTP만 허용):
-
-| 데스크톱 펫(클릭하면 하트) | 애니메이션 시계 | 오늘 진행률 |
-|---|---|---|
-| ![펫](artifacts/custom-pet.gif) | ![시계](artifacts/custom-clock.gif) | ![진행률](artifacts/custom-progress.gif) |
-
-| 환율(실시간, 10분마다) | GitHub 스타 | AI 비용 통계(실사용 사례) |
-|---|---|---|
-| ![환율](artifacts/custom-exchange.png) | ![GitHub](artifacts/custom-github.png) | ![비용](artifacts/custom-expense.png) |
-
-예제 소스는 `artifacts/custom-board-examples/`.
 
 마감일·알림·반복 규칙이 있는 할 일 목록: `artifacts/board-work.png`
 

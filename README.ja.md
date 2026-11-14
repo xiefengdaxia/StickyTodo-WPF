@@ -6,6 +6,20 @@
 
 > 同種ツールの製品形態（複数ボード、1 ボード 1 ウィンドウ、繰り返しタスク、カレンダー）は参考にしていますが、**コード・UI・文言・配色はすべて本プロジェクトのオリジナル実装**です。他社プログラムの逆コンパイル成果物、リソースファイル、非公開 API は一切コピーしていません。
 
+## ✨ ハイライト：AI カスタムボード（MCP 接続）
+
+**AI がデータをデスクトップに描く。** アプリ内蔵の MCP サーバー（設定でワンクリック有効化、127.0.0.1 のみ + トークン認証）により、AI クライアントはボードの作成・削除、タスク操作、ポモドーロ、天気と Token 用量の照会、設定変更、スクリーンショット — 計 **30 ツール**を操作できます。さらに **UI そのものを AI が書いた HTML ボード**も作成でき、AI が書いた収集スクリプトがサイト/サーバーから定期的にデータを取得して反映します（Jint サンドボックス内で HTTP のみ許可）。以下の 6 枚のボードはすべて AI が生成 — ペットをクリックするとハートを送ります：
+
+| デスクトップペット（クリックでハート） | 動く時計 |
+|---|---|
+| ![ペット](artifacts/custom-pet.gif) | ![時計](artifacts/custom-clock.gif) |
+| **今日の進捗**（60 秒ごとに自動計算） | **為替レート**（実データ・10 分ごと） |
+| ![進捗](artifacts/custom-progress.gif) | ![為替](artifacts/custom-exchange.gif) |
+| **GitHub スター**（実リポジトリデータ） | **今日のひとこと**（hitokoto API） |
+| ![GitHub](artifacts/custom-github.gif) | ![ひとこと](artifacts/custom-quote.gif) |
+
+サンプルソース：`artifacts/custom-board-examples/` · ツール一覧と接続方法は下記「**MCP 接続**」セクション参照。
+
 | 付箋（既定 92% 背景） | 背景 55%（デスクトップが見える） | グラファイト夜テーマ |
 |---|---|---|
 | ![付箋](artifacts/board-default.png) | ![半透明](artifacts/board-translucent.png) | ![ダーク](artifacts/board-dark.png) |
@@ -63,17 +77,6 @@ Token 使用量ボードとポモドーロタイマー：
 
 ![吉凶](artifacts/calendar-lunar.png)
 
-**MCP 接続 + AI カスタムボード**（AI が MCP でボードを作成・操作。UI は AI が書いた HTML、データは AI が書いた収集スクリプトが定时取得 — サンドボックスは HTTP のみ許可）：
-
-| デスクトップペット（クリックでハート） | 動く時計 | 今日の進捗 |
-|---|---|---|
-| ![ペット](artifacts/custom-pet.gif) | ![時計](artifacts/custom-clock.gif) | ![進捗](artifacts/custom-progress.gif) |
-
-| 為替レート（実データ・10分ごと） | GitHub スター | AI コスト統計（実用例） |
-|---|---|---|
-| ![為替](artifacts/custom-exchange.png) | ![GitHub](artifacts/custom-github.png) | ![費用](artifacts/custom-expense.png) |
-
-サンプルソースは `artifacts/custom-board-examples/`。
 
 期限・リマインダー・繰り返しルール付きの ToDo 一覧：`artifacts/board-work.png`
 
