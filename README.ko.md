@@ -63,6 +63,18 @@ Token 사용량 보드와 뽀모도로 타이머:
 
 ![길흉](artifacts/calendar-lunar.png)
 
+**MCP 연결 + AI 커스텀 보드**(AI가 MCP로 보드를 만들고 조작합니다. UI는 AI가 작성한 HTML, 데이터는 AI가 작성한 수집 스크립트가 주기적으로 가져옵니다 — 샌드박스는 HTTP만 허용):
+
+| 데스크톱 펫(클릭하면 하트) | 애니메이션 시계 | 오늘 진행률 |
+|---|---|---|
+| ![펫](artifacts/custom-pet.gif) | ![시계](artifacts/custom-clock.gif) | ![진행률](artifacts/custom-progress.gif) |
+
+| 환율(실시간, 10분마다) | GitHub 스타 | AI 비용 통계(실사용 사례) |
+|---|---|---|
+| ![환율](artifacts/custom-exchange.png) | ![GitHub](artifacts/custom-github.png) | ![비용](artifacts/custom-expense.png) |
+
+예제 소스는 `artifacts/custom-board-examples/`.
+
 마감일·알림·반복 규칙이 있는 할 일 목록: `artifacts/board-work.png`
 
 TODO / Done 보기 전환:
@@ -485,6 +497,12 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 - [x] **트레이 「창을 이 화면 오른쪽 위로 되돌리기」**: 모니터를 바꾼 뒤에도 한 번에 복귀. 트레이 메뉴는 포커스를 잃으면 닫힘
 - [x] **수정**: 시간대가 다른 환경에서 반복 규칙이 밀리는 문제, 관리 패널이 숨겨졌을 때 전역 단축키가 조용히 실패하는 문제, 날씨 보드 스크롤 필요, 트레이 메뉴가 닫히지 않는 문제
 - [x] **색온도 눈 보호**: 켈빈 온도에 맞춰 파랑·초록 채널을 곱셈으로 낮춤(1900–6500K, 기본 3400K). 기본은 디스플레이 감마 테이블이라 스크린샷·녹화에 색이 남지 않습니다. 드라이버가 감마를 거부하면 DWM 곱셈 색 행렬로 전환(트레이 「합성 행렬 모드」 선택 가능), 색을 덧대지 않아 뿌옇지 않습니다. 豆沙绿·블루라이트 필터와 상호 배타, 트레이 프리셋 6가지, 합성 행렬 모드에서는 캡처 시 역산해 붙인 이미지가 두 번 따뜻해지지 않습니다
+
+**M12(완료)**
+- [x] **MCP 연결**: 로컬 서버(127.0.0.1 전용 + Bearer 토큰, TcpListener로 최소 HTTP 직접 구현) + Streamable HTTP와 stdio 브리지 이중 전송(브리지는 앱이 꺼져 있으면 자동 실행); 보드 / 할 일 / 메모 / 태그 / 뽀모도로 / 날씨 / Token / 스크린샷 / 알림 / 설정 변경 등 30개 도구. MCP가 데이터를 바꾸면 열려 있는 보드가 자동 새로고침
+- [x] **AI 커스텀 보드**: 새 보드 유형 — UI는 AI가 작성한 완전한 HTML(WebView2 렌더링, 런타임 부재 시 텍스트 표시), 데이터는 AI가 작성한 JS 수집 스크립트가 주기적으로 가져옴. 스크립트는 Jint 샌드박스(http_get/http_post/http만 허용, 메모리/문장/시간 제한); `push_custom_data`로 바로Push
+- [x] **배경 투명도 보드별 독립**: 🎨 메뉴의 배경·창 투명도는 현재 보드에만 적용(각각 "전역 따르기" 제공); 커스텀 보드 창도 같은 메뉴 사용
+- [x] DB 스키마 v8(board.custom_html / custom_script / custom_interval)
 
 **M4 예정**
 - [ ] 보드 내 검색, 여러 태그 동시 필터링

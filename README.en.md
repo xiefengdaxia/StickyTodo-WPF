@@ -63,6 +63,18 @@ The almanac panel (click any day to see auspicious/inauspicious activities) and 
 
 ![Almanac](artifacts/calendar-lunar.png)
 
+**MCP access + AI custom boards** (AI creates and drives boards over MCP; the board UI is HTML written by the AI, and data comes from AI-written collector scripts on a timer — the sandbox only allows HTTP):
+
+| Desktop pet (click it!) | Animated clock | Day progress |
+|---|---|---|
+| ![Pet](artifacts/custom-pet.gif) | ![Clock](artifacts/custom-clock.gif) | ![Progress](artifacts/custom-progress.gif) |
+
+| Exchange rates (live, every 10 min) | GitHub stars | AI cost tracker (real-world board) |
+|---|---|---|
+| ![Exchange](artifacts/custom-exchange.png) | ![GitHub](artifacts/custom-github.png) | ![Expense](artifacts/custom-expense.png) |
+
+Example sources live in `artifacts/custom-board-examples/`.
+
 To-do list with due dates, reminders and recurrence rules: `artifacts/board-work.png`
 
 TODO / Done view switch:
@@ -510,6 +522,12 @@ Quota checks are only allowed in `TodoService`; the UI's only job is to surface 
 - [x] **Tray “pull windows back”**: one click returns every board to the top-right of the current screen; the tray menu now closes on focus loss
 - [x] **Fixes**: recurrence drifting on machines in other time zones, global hotkeys silently failing when the manager is hidden, the weather board needing scrolling, the tray menu staying open
 - [x] **Colour-temperature eye care**: multiplies blue/green channels down by Kelvin (1900–6500K, 3400K default) using the display gamma table by default so screenshots and recordings stay neutral; falls back to the DWM colour matrix when the driver rejects gamma (or via “Compositor matrix mode” in the tray); no tint layer, no haze; exclusive with Beansprout and the blue-light filter; six tray presets; the snip tool divides the tint out in compositor mode so pins are not warmed twice
+
+**M12 (done)**
+- [x] **MCP access**: local server (127.0.0.1 only + Bearer token; minimal HTTP hand-written over TcpListener) with both Streamable HTTP and a stdio bridge (the bridge auto-launches the app when it is not running); 30 tools covering boards / todos / notes / tags / pomodoro / weather / token usage / screenshot / notifications / settings; boards auto-refresh after MCP writes
+- [x] **AI custom boards**: a new board kind — UI is a full HTML document written by AI (rendered with WebView2, falls back to text when the runtime is missing), fed by AI-written JS collector scripts on a timer; scripts run in a Jint sandbox that only exposes http_get/http_post/http with memory/statement/time limits; `push_custom_data` pushes data without any network
+- [x] **Per-board background opacity**: the 🎨 menu applies background and window opacity to the current board only (each with "follow global"); custom board windows join the same menu
+- [x] Database schema v8 (`board.custom_html` / `custom_script` / `custom_interval`)
 
 **M4 extension**
 - [ ] ICS subscription and import/export

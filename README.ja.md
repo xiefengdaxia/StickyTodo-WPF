@@ -63,6 +63,18 @@ Token 使用量ボードとポモドーロタイマー：
 
 ![吉凶](artifacts/calendar-lunar.png)
 
+**MCP 接続 + AI カスタムボード**（AI が MCP でボードを作成・操作。UI は AI が書いた HTML、データは AI が書いた収集スクリプトが定时取得 — サンドボックスは HTTP のみ許可）：
+
+| デスクトップペット（クリックでハート） | 動く時計 | 今日の進捗 |
+|---|---|---|
+| ![ペット](artifacts/custom-pet.gif) | ![時計](artifacts/custom-clock.gif) | ![進捗](artifacts/custom-progress.gif) |
+
+| 為替レート（実データ・10分ごと） | GitHub スター | AI コスト統計（実用例） |
+|---|---|---|
+| ![為替](artifacts/custom-exchange.png) | ![GitHub](artifacts/custom-github.png) | ![費用](artifacts/custom-expense.png) |
+
+サンプルソースは `artifacts/custom-board-examples/`。
+
 期限・リマインダー・繰り返しルール付きの ToDo 一覧：`artifacts/board-work.png`
 
 TODO / Done ビュー切り替え：
@@ -509,6 +521,12 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 - [x] **トレイの「ウィンドウをこの画面の右上に戻す」**：モニターを変えた後でも一発で復帰。トレイメニューはフォーカスを失うと閉じるように
 - [x] **修正**：タイムゾーンが違う環境で繰り返しルールがずれる／管理パネル非表示時にグローバルショートカットが無効になる／天気ボードがスクロールを要する／トレイメニューが閉じない
 - [x] **色温度の目の保護**：ケルビン温度に応じて青・緑チャンネルを乗算で弱めます（1900–6500K、既定 3400K）。既定はディスプレイのガンマテーブルなのでスクショ・録画に色が付きません。ドライバがガンマを拒否したときは DWM の乗算色マトリクスに切替（トレイで「合成マトリクスモード」も選べます）、色を重ねないので白っぽくなりません。豆沙緑・ブルーライトフィルターとは排他、トレイに 6 プリセット、合成マトリクスモードでは抓屏時に逆算して貼り付け画像が二重に暖かくならないようにしています
+
+**M12（完了）**
+- [x] **MCP 接続**：ローカルサーバー（127.0.0.1 のみ + Bearer トークン、TcpListener で最小 HTTP を自前実装）＋ Streamable HTTP と stdio ブリッジの両伝送（ブリッジはアプリ未起動なら自動起動）；ボード / タスク / メモ / タグ / ポモドーロ / 天気 / Token / スクリーンショット / 通知 / 設定変更の 30 ツール。MCP がデータを変えると開いているボードは自動で再読込
+- [x] **AI カスタムボード**：新しいボード種別 — UI は AI が書いた完全な HTML（WebView2 で描画、ランタイム欠如時はテキスト表示）、データは AI が書いた JS 収集スクリプトが定时取得。スクリプトは Jint サンドボックス（http_get / http_post / http のみ許可、メモリ / 文 / 時間制限）；`push_custom_data` で直接Push
+- [x] **背景透明度をボードごとに**：🎨 メニューの背景・ウィンドウ透明度は現在のボードだけに効く（各「グローバルに従う」付き）；カスタムボードも同じメニューに対応
+- [x] DB スキーマ v8（board.custom_html / custom_script / custom_interval）
 
 **M4 外延**
 - [ ] ICS サブスクリプションと入出力
