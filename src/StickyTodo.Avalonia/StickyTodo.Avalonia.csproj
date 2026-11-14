@@ -6,7 +6,7 @@
          本应用只跑 Windows，故用 net6.0-windows：平台分析器不再对 Windows 专属 API
          （性能计数器等）报 CA1416，也不影响 Win7 路线 -->
     <TargetFramework>net6.0-windows</TargetFramework>
-    <Version>1.7.9</Version>
+    <Version>1.7.10</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
