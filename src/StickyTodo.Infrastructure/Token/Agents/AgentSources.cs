@@ -6,8 +6,13 @@ namespace StickyTodo.Infrastructure.Token.Agents;
 
 /// <summary>
 /// ZCode：~/.zcode/cli/db/db.sqlite → model_usage 表。
-/// 每行是一次真实模型请求（attempt_index &gt; 0 是重试，也计入真实计费口径）。
-/// 时间戳毫秒。缓存字段：cache_read_input_tokens（读）/ cache_creation_input_tokens（写）。
+/// 每行是一次真实模型请求（attempt_index &gt; 0 是重试，也计入真实计费口径）。时间戳毫秒。
+/// 缓存字段：cache_read_input_tokens（读）/ cache_creation_input_tokens（写）。
+/// <para>
+/// <b>口径</b>：input_tokens 是「整段提示词」，缓存读/写已经包含在里面
+/// （raw_usage_json 里 totalTokens = inputTokens + outputTokens）。所以这里必须把缓存扣出来，
+/// 否则「输入」会大一倍、Total 还会把缓存重复加一次。
+/// </para>
 /// </summary>
 internal sealed class ZcodeAgentSource : FileAgentTokenSource
 {
@@ -72,11 +77,17 @@ internal sealed class ZcodeAgentSource : FileAgentTokenSource
                 continue;
             }
 
+            // ZCode 的 input_tokens 是「整段提示词」，缓存读/写已经包含在里面
+            // （raw_usage_json 里 totalTokens = inputTokens + outputTokens，且 inputTokens ≥ cacheRead）。
+            // 直接当成独立桶会既把输入算大一倍、又在 Total 里把缓存重复加一次。
+            var cacheTotal = cacheRead + cacheWrite;
+            var freshInput = input >= cacheTotal ? input - cacheTotal : 0;
+
             yield return new AgentUsageEntry(
                 DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(0)).ToLocalTime(),
                 reader.GetString(1),
                 reader.GetString(2),
-                new TokenUsage(input, output, reasoning, cacheRead, cacheWrite));
+                new TokenUsage(freshInput, output, reasoning, cacheRead, cacheWrite));
         }
     }
 }
