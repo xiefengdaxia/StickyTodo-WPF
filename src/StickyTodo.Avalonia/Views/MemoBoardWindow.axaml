@@ -15,7 +15,14 @@
         FontFamily="Microsoft YaHei UI, Segoe UI"
         UseLayoutRounding="True">
 
-  <Window.Styles>
+    <Window.Styles>
+    <Style Selector="Border#NoteRoot">
+      <Setter Property="Background" Value="{Binding PaperBrush}" />
+    </Style>
+    <Style Selector="Border.header">
+      <Setter Property="Background" Value="{Binding PaperDeepBrush}" />
+    </Style>
+
     <Style Selector="TextBlock.pin">
       <Setter Property="Opacity" Value="0.35" />
     </Style>

@@ -9,9 +9,12 @@ using StickyTodo.Notes.ViewModels;
 namespace StickyTodo.Notes.Views;
 
 /// <summary>便签/随笔看板：整块区域就是一张白纸，边写边自动保存。</summary>
-public partial class MemoBoardWindow : StickyWindowBase
+public partial class MemoBoardWindow : StickyWindowBase, IBoardDataRefresh
 {
     private readonly MemoBoardViewModel _viewModel;
+
+    /// <summary>MCP 改了数据后让窗口重读一遍（IBoardDataRefresh）。</summary>
+    public Task ReloadDataAsync() => _viewModel.LoadAsync();
     private readonly DispatcherTimer _saveTimer;
     private bool _loading;
 

@@ -30,6 +30,7 @@ public sealed class TrayService : IDisposable
     private WinForms.ToolStripMenuItem? _eyeGammaToggle;
     private WinForms.ToolStripMenuItem? _eyeTempToggle;
     private WinForms.ToolStripMenuItem? _eyeTempCompositorItem;
+    private WinForms.ToolStripMenuItem? _mcpToggle;
     private readonly List<(WinForms.ToolStripMenuItem Item, string Color)> _eyePresetItems = new();
     private readonly List<(WinForms.ToolStripMenuItem Item, int Strength)> _eyeStrengthItems = new();
     private readonly List<(WinForms.ToolStripMenuItem Item, int Kelvin)> _eyeTempItems = new();
@@ -350,6 +351,41 @@ public sealed class TrayService : IDisposable
 
         menu.Items.Add(new WinForms.ToolStripSeparator());
 
+        // MCP 接入：开关 + 复制接入配置（给 AI 客户端用）
+        _mcpToggle = new WinForms.ToolStripMenuItem(Loc.T("menu.mcp")) { CheckOnClick = true };
+        _mcpToggle.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        {
+            _menu?.Close();
+            var settings = App.Settings;
+            if (settings is null)
+            {
+                return;
+            }
+
+            settings.McpEnabled = _mcpToggle.Checked;
+            _services.GetRequiredService<StickyTodo.Mcp.McpService>().ApplyFromSettings();
+            Notify(_mcpToggle.Checked ? Loc.T("settings.mcpOn") : Loc.T("settings.mcpOff"), "StickyTodo");
+        });
+        menu.Items.Add(_mcpToggle);
+
+        var mcpCopyConfig = new WinForms.ToolStripMenuItem(Loc.T("menu.mcpCopyConfig"));
+        mcpCopyConfig.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        {
+            _menu?.Close();
+            try
+            {
+                System.Windows.Clipboard.SetText(_services.GetRequiredService<StickyTodo.Mcp.McpService>().BuildClientConfigSnippet());
+                Notify(Loc.T("settings.mcpCopied"), "StickyTodo");
+            }
+            catch (Exception ex)
+            {
+                Notify("复制失败：" + ex.Message, "StickyTodo");
+            }
+        });
+        menu.Items.Add(mcpCopyConfig);
+
+        menu.Items.Add(new WinForms.ToolStripSeparator());
+
         // 截图 / 贴图
         var pins = _services.GetRequiredService<PinManager>();
 
@@ -471,6 +507,12 @@ public sealed class TrayService : IDisposable
                 || (value == 15 && strength <= 15)
                 || (value == 25 && strength is > 15 and < 40)
                 || (value == 40 && strength >= 40);
+        }
+
+        // MCP 勾选态也跟着设置走
+        if (_mcpToggle is not null)
+        {
+            _mcpToggle.Checked = settings?.McpEnabled ?? false;
         }
     }
 

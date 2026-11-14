@@ -20,4 +20,15 @@ public sealed class Board
 
     /// <summary>上次关闭时的窗口位置与大小，没记录过则为 null。</summary>
     public BoardWindowState? Window { get; set; }
+
+    // ---------- 自定义看板（AI 通过 MCP 创建，仅 Kind = Custom 时有意义） ----------
+
+    /// <summary>看板 HTML（WebView2 渲染），为空时用内置默认模板。</summary>
+    public string? CustomHtml { get; set; }
+
+    /// <summary>采集脚本（JS，须定义 collect()），为空表示没有采集器。</summary>
+    public string? CustomScript { get; set; }
+
+    /// <summary>采集间隔（秒），为空时用默认值。</summary>
+    public int? CustomIntervalSeconds { get; set; }
 }

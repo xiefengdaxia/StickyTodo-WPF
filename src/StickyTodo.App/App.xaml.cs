@@ -56,6 +56,19 @@ public partial class App : System.Windows.Application
             return;
         }
 
+        // MCP stdio 桥：--mcp 以管道模式运行（不建 UI、不占单实例互斥量）。
+        // 桥不读数据库：端口/令牌全部来自 mcp.endpoint / mcp.token 文件。
+        if (StickyTodo.Mcp.McpStdioBridge.HasFlag(e.Args))
+        {
+            var bridgeExitCode = StickyTodo.Mcp.McpStdioBridge.Run(
+                AppPaths.McpEndpointPath,
+                AppSettingsService.DefaultMcpPort,
+                AppPaths.McpTokenPath,
+                Environment.ProcessPath);
+            Shutdown(bridgeExitCode);
+            return;
+        }
+
         _mutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var isFirstInstance);
         if (!isFirstInstance)
         {
@@ -86,6 +99,13 @@ public partial class App : System.Windows.Application
             // 回归/演示路径也要跟随设置里的语言
             ApplyLanguageForCurrentRun();
             _host.Services.GetRequiredService<TodoService>().EnsureDefaultBoard();
+
+            // MCP：先注入采集器再启动接入服务。必须在 RestoreSession 之前——
+            // 恢复出来的自定义看板窗口要能拿到采集器订阅数据变化。
+            var mcpService = _host.Services.GetRequiredService<StickyTodo.Mcp.McpService>();
+            _host.Services.GetRequiredService<WindowManager>().CollectorProvider = () => mcpService.Collector;
+            mcpService.StartCollector();
+            mcpService.ApplyFromSettings();
 
             // 命令行覆盖（演示/截图回归用）：--skin mint --opacity 0.6 --window-opacity 0.9
             var skinService = _host.Services.GetRequiredService<SkinService>();
@@ -405,6 +425,24 @@ public partial class App : System.Windows.Application
                 services.AddTransient<WeatherWindow>();
                 services.AddTransient<WorldClockWindow>();
                 services.AddTransient<DesktopClockWindow>();
+
+                // MCP 接入：工具层在 StickyTodo.Mcp，窗口/托盘动作经 IMcpUiHost 回到本进程
+                services.AddSingleton<StickyTodo.Mcp.IMcpUiHost>(sp => new Services.McpUiHost(
+                    sp.GetRequiredService<WindowManager>(),
+                    sp.GetRequiredService<TodoService>(),
+                    sp.GetRequiredService<EyeCareFilter>(),
+                    sp.GetRequiredService<EyeGammaService>(),
+                    () => sp.GetRequiredService<TrayService>()));
+                services.AddSingleton(sp => new StickyTodo.Mcp.McpService(
+                    sp.GetRequiredService<StickyTodo.Mcp.IMcpUiHost>(),
+                    sp.GetRequiredService<TodoService>(),
+                    sp.GetRequiredService<AppSettingsService>(),
+                    sp.GetRequiredService<Core.Pomodoro.PomodoroEngine>(),
+                    sp.GetRequiredService<Weather.WeatherService>(),
+                    sp.GetRequiredService<Core.Abstractions.ITokenStatsProvider>(),
+                    AppPaths.McpTokenPath,
+                    AppPaths.McpEndpointPath,
+                    message => Log.Information("[mcp] {Message}", message)));
             })
             .Build();
     }
@@ -618,6 +656,7 @@ public partial class App : System.Windows.Application
             if (_host is not null)
             {
                 _host.Services.GetService<WindowManager>()?.CloseAll();
+                _host.Services.GetService<StickyTodo.Mcp.McpService>()?.Dispose();
                 _host.Services.GetService<TrayService>()?.Dispose();
                 _host.Services.GetService<EyeCareFilter>()?.Dispose();
                 _host.Services.GetService<EyeGammaService>()?.Dispose();

@@ -76,10 +76,42 @@ public sealed class TodoService
         }
     }
 
+    /// <summary>自定义看板的最短采集间隔（秒）：太密了对目标站点和本机都不友好。</summary>
+    public const int MinCustomIntervalSeconds = 15;
+
+    public const int MaxCustomIntervalSeconds = 86400;
+
+    public const int DefaultCustomIntervalSeconds = 60;
+
+    /// <summary>
+    /// 保存自定义看板内容（HTML/采集脚本/采集间隔）。仅接受 Kind = Custom 的看板。
+    /// </summary>
+    public void SaveCustomBoard(string boardId, string? html, string? script, int? intervalSeconds)
+    {
+        var board = GetBoard(boardId) ?? throw new InvalidOperationException("看板不存在。");
+        if (board.Kind != BoardKind.Custom)
+        {
+            throw new InvalidOperationException("只有自定义看板才能保存 HTML/采集脚本。");
+        }
+
+        _repository.SaveCustomContent(
+            boardId,
+            string.IsNullOrWhiteSpace(html) ? null : html,
+            string.IsNullOrWhiteSpace(script) ? null : script,
+            ClampCustomInterval(intervalSeconds));
+    }
+
+    /// <summary>把采集间隔夹到合法范围（null 原样返回 = 用默认值）。</summary>
+    public static int? ClampCustomInterval(int? seconds) => seconds is null
+        ? null
+        : Math.Clamp(Math.Max(1, seconds.Value), MinCustomIntervalSeconds, MaxCustomIntervalSeconds);
+
     // ---------- 待办 ----------
 
     public IReadOnlyList<TodoItem> GetTodos(string boardId, bool includeDone = true) =>
         _repository.GetTodos(boardId, includeDone);
+
+    public TodoItem? GetTodo(string id) => _repository.GetTodo(id);
 
     public TodoItem AddTodo(string boardId, string title, DateTimeOffset? dueAt = null) =>
         _repository.AddTodo(boardId, Require(title, "待办内容"), dueAt);

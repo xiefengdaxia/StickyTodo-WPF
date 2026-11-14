@@ -13,12 +13,15 @@ using StickyTodo.Notes.ViewModels;
 namespace StickyTodo.Notes.Views;
 
 /// <summary>待办看板窗口：标签筛选 + 行内编辑 + 拖拽排序 + 右键菜单 + 位置吸附。</summary>
-public partial class BoardWindow : StickyWindowBase
+public partial class BoardWindow : StickyWindowBase, IBoardDataRefresh
 {
     /// <summary>指针移动超过这个距离（逻辑像素）才算开始拖拽。</summary>
     private const double DragThreshold = 4;
 
     private readonly BoardViewModel _viewModel;
+
+    /// <summary>MCP 改了数据后让窗口重读一遍（IBoardDataRefresh）。</summary>
+    public Task ReloadDataAsync() => _viewModel.LoadAsync();
     private TodoRowViewModel? _dragCandidate;
     private Avalonia.Point _dragStart;
     private bool _dragArmed;

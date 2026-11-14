@@ -16,6 +16,17 @@ internal static class Program
             return SelfTest.Run();
         }
 
+        // MCP stdio 桥：--mcp 以管道模式运行（不建 UI、不占单实例互斥量）。
+        // 桥不读数据库：端口/令牌全部来自 mcp.endpoint / mcp.token 文件。
+        if (StickyTodo.Mcp.McpStdioBridge.HasFlag(args))
+        {
+            return StickyTodo.Mcp.McpStdioBridge.Run(
+                StickyTodo.Infrastructure.AppPaths.McpEndpointPath,
+                StickyTodo.Core.Services.AppSettingsService.DefaultMcpPort,
+                StickyTodo.Infrastructure.AppPaths.McpTokenPath,
+                Environment.ProcessPath);
+        }
+
         // 单实例：重复启动只提示一次，然后把已有窗口叫到前面
         using var mutex = new Mutex(initiallyOwned: true, MutexName, out var isFirstInstance);
         if (!isFirstInstance)

@@ -18,6 +18,12 @@ public interface ITodoRepository
 
     void SaveBoardWindow(string boardId, BoardWindowState state);
 
+    /// <summary>
+    /// 保存自定义看板内容（HTML/采集脚本/采集间隔）。
+    /// 仅对 Kind = Custom 的看板有意义；传 null 的字段会被清空。
+    /// </summary>
+    void SaveCustomContent(string boardId, string? html, string? script, int? intervalSeconds);
+
     // ---- 待办 ----
     IReadOnlyList<TodoItem> GetTodos(string boardId, bool includeDone = true);
 

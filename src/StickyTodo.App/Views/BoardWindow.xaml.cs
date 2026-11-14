@@ -18,7 +18,7 @@ namespace StickyTodo.App.Views;
 /// <summary>
 /// 一个看板一个窗口：位置/大小会被记住，拖到边缘或其它便签旁边会自动吸附。
 /// </summary>
-public partial class BoardWindow : Window, IStickyWindow
+public partial class BoardWindow : Window, IStickyWindow, IBoardDataRefresh
 {
     /// <summary>便签外圈留给阴影的空白，吸附时要把它排除掉，否则纸面离屏幕边缘差 10px。</summary>
     private const double ShadowMargin = 10d;
@@ -42,6 +42,9 @@ public partial class BoardWindow : Window, IStickyWindow
     private readonly BoardViewModel _viewModel;
     private readonly WindowManager _windows;
     private readonly DispatcherTimer _saveTimer;
+
+    /// <summary>MCP 改了数据后让窗口重读一遍（IBoardDataRefresh）。</summary>
+    public Task ReloadDataAsync() => _viewModel.LoadAsync();
 
     private bool _isSnapping;
     private bool _geometryRestored;

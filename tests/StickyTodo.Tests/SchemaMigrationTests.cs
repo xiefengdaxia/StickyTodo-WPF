@@ -83,7 +83,54 @@ public sealed class SchemaMigrationTests : IDisposable
             Assert.Single(indexes);
         }
 
-        Assert.Equal(7L, ReadSchemaVersion());
+        Assert.Equal(8L, ReadSchemaVersion());
+    }
+
+    [Fact]
+    public void V8Migration_CustomBoardColumns_AvailableAndRoundTrip()
+    {
+        CreateLegacyV1Database();
+
+        var repository = new SqliteTodoRepository(_databasePath);
+        repository.Initialize();
+
+        // v8：自定义看板三列存在
+        using (var check = new SqliteConnection(
+                   new SqliteConnectionStringBuilder { DataSource = _databasePath }.ToString()))
+        {
+            check.Open();
+            var columns = new List<string>();
+            using (var command = check.CreateCommand())
+            {
+                command.CommandText = "PRAGMA table_info(board);";
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    columns.Add(reader.GetString(1));
+                }
+            }
+
+            Assert.Contains("custom_html", columns);
+            Assert.Contains("custom_script", columns);
+            Assert.Contains("custom_interval", columns);
+        }
+
+        // 自定义看板内容读写往返
+        var board = repository.AddBoard("AI 面板", BoardKind.Custom);
+        repository.SaveCustomContent(board.Id, "<html>hi</html>", "function collect() {}", 120);
+
+        var loaded = Assert.Single(repository.GetBoards(), b => b.Id == board.Id);
+        Assert.Equal(BoardKind.Custom, loaded.Kind);
+        Assert.Equal("<html>hi</html>", loaded.CustomHtml);
+        Assert.Equal("function collect() {}", loaded.CustomScript);
+        Assert.Equal(120, loaded.CustomIntervalSeconds);
+
+        // 清空内容（null）也走得通
+        repository.SaveCustomContent(board.Id, null, null, null);
+        var cleared = Assert.Single(repository.GetBoards(), b => b.Id == board.Id);
+        Assert.Null(cleared.CustomHtml);
+        Assert.Null(cleared.CustomScript);
+        Assert.Null(cleared.CustomIntervalSeconds);
     }
 
     private long ReadSchemaVersion()

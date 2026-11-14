@@ -32,6 +32,15 @@ public static class AppPaths
 
     public static string LogDirectory => Path.Combine(DataDirectory, "logs");
 
+    /// <summary>MCP 接入令牌文件（首次启用 MCP 时生成，stdio 桥进程也读这里）。</summary>
+    public static string McpTokenPath => Path.Combine(DataDirectory, "mcp.token");
+
+    /// <summary>MCP 实际监听地址（host:port）。端口顺延后与设置值可能不同，桥进程据此连接。</summary>
+    public static string McpEndpointPath => Path.Combine(DataDirectory, "mcp.endpoint");
+
+    /// <summary>WebView2 用户数据目录（自定义看板的浏览器缓存，独立于数据库和日志）。</summary>
+    public static string WebView2DataDirectory => Path.Combine(DataDirectory, "webview2");
+
     /// <summary>当前是否运行在便携模式（数据跟着 exe 走）。</summary>
     public static bool IsPortable => State.Value.IsPortable;
 

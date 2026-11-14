@@ -401,7 +401,17 @@ public partial class CalendarViewModel : ObservableObject, IAppearanceHost, IRef
 
     public string CurrentSkinKey => _skin.Current.Key;
 
-    public double CurrentOpacity => _skin.Opacity;
+    /// <summary>本看板的纸面透明度：单独设过用看板的，否则跟随全局滑块。</summary>
+    public double CurrentOpacity => _settings.GetBoardBgOpacity(AppearanceKey, _skin.Opacity);
+
+    /// <summary>纸面背景（按本看板的背景透明度重建；窗口样式绑定它替代全局 Brush.Paper）。</summary>
+    public Avalonia.Media.IBrush PaperBrush => _skin.Current.CreateBackground(CurrentOpacity);
+
+    /// <summary>标题栏浅色覆盖，跟纸面同一档透明度。</summary>
+    public Avalonia.Media.IBrush PaperDeepBrush => _skin.Current.CreateHeaderOverlay(CurrentOpacity);
+
+    /// <summary>这个看板有没有单独设过背景透明度（false = 跟随全局）。</summary>
+    public bool HasOwnOpacity => _settings.HasBoardBgOpacity(AppearanceKey);
 
     /// <summary>本看板自己的整窗透明度（没单独设过就跟随全局）。</summary>
     public double CurrentWindowOpacity => _settings.GetWindowOpacity(AppearanceKey);
@@ -416,12 +426,26 @@ public partial class CalendarViewModel : ObservableObject, IAppearanceHost, IRef
     {
         _skin.SetSkin(skinKey);
         OnPropertyChanged(nameof(CurrentSkinKey));
+        OnPropertyChanged(nameof(PaperBrush));
+        OnPropertyChanged(nameof(PaperDeepBrush));
     }
 
     public void SetOpacity(double opacity)
     {
-        _skin.SetOpacity(opacity);
+        // 只改这个看板的纸面透明度，其它看板和全局滑块都不受影响
+        _settings.SetBoardBgOpacity(AppearanceKey, opacity);
         OnPropertyChanged(nameof(CurrentOpacity));
+        OnPropertyChanged(nameof(PaperBrush));
+        OnPropertyChanged(nameof(PaperDeepBrush));
+    }
+
+    /// <summary>取消背景透明度的单独设置，回到跟随全局。</summary>
+    public void ResetOpacity()
+    {
+        _settings.ClearBoardBgOpacity(AppearanceKey);
+        OnPropertyChanged(nameof(CurrentOpacity));
+        OnPropertyChanged(nameof(PaperBrush));
+        OnPropertyChanged(nameof(PaperDeepBrush));
     }
 
     public void SetWindowOpacity(double opacity)
@@ -444,6 +468,8 @@ public partial class CalendarViewModel : ObservableObject, IAppearanceHost, IRef
     {
         OnPropertyChanged(nameof(CurrentSkinKey));
         OnPropertyChanged(nameof(CurrentOpacity));
+        OnPropertyChanged(nameof(PaperBrush));
+        OnPropertyChanged(nameof(PaperDeepBrush));
         OnPropertyChanged(nameof(CurrentWindowOpacity));
         WindowOpacity = _settings.GetWindowOpacity(AppearanceKey);
     }

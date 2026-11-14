@@ -9,9 +9,12 @@ using StickyTodo.Notes.ViewModels;
 namespace StickyTodo.Notes.Views;
 
 /// <summary>Token 用量看板：范围切换 + 自动刷新 + 趋势图 + 按模型明细。</summary>
-public partial class TokenBoardWindow : StickyWindowBase
+public partial class TokenBoardWindow : StickyWindowBase, IBoardDataRefresh
 {
     private readonly TokenBoardViewModel _viewModel;
+
+    /// <summary>MCP 改了数据后让窗口重读一遍（IBoardDataRefresh）。</summary>
+    public Task ReloadDataAsync() => _viewModel.LoadAsync();
 
     public TokenBoardWindow(TokenBoardViewModel viewModel, WindowManager windows)
         : base(windows, App.Services!.Settings)

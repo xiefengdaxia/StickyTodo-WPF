@@ -12,7 +12,7 @@ namespace StickyTodo.App.Views;
 /// Token 用量看板：按设定的间隔自动向上游面板取数，也可以手动点刷新。
 /// 这是全程序唯一需要联网的界面，其它看板照旧完全本地。
 /// </summary>
-public partial class TokenBoardWindow : Window, IStickyWindow
+public partial class TokenBoardWindow : Window, IStickyWindow, IBoardDataRefresh
 {
     private const double ResizeBorder = 8d;
     private const int CascadeStep = 28;
@@ -21,6 +21,9 @@ public partial class TokenBoardWindow : Window, IStickyWindow
     private readonly WindowManager _windows;
     private bool _geometryRestored;
     private bool _isFullScreen;
+
+    /// <summary>MCP 改了数据后让窗口重读一遍（IBoardDataRefresh）。</summary>
+    public Task ReloadDataAsync() => _viewModel.LoadAsync();
 
     public TokenBoardWindow(TokenBoardViewModel viewModel, WindowManager windows)
     {

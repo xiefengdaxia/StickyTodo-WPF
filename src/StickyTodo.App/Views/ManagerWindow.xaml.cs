@@ -346,6 +346,9 @@ public partial class ManagerWindow : Window
     private async void CreatePerformance_Click(object sender, RoutedEventArgs e) =>
         await CreateBoardAsync(BoardKind.Performance);
 
+    private async void CreateCustom_Click(object sender, RoutedEventArgs e) =>
+        await CreateBoardAsync(BoardKind.Custom);
+
     private async Task CreateBoardAsync(BoardKind kind)
     {
         var (title, initial) = kind switch
@@ -358,6 +361,7 @@ public partial class ManagerWindow : Window
             BoardKind.DesktopClock => (Loc.T("manager.newBoardTitle") + " · " + Loc.T("manager.kindDesktopClock"), Loc.T("manager.newDesktopClockDefault")),
             BoardKind.NetworkSpeed => (Loc.T("manager.newBoardTitle") + " · " + Loc.T("manager.kindNetworkSpeed"), Loc.T("manager.newNetworkSpeedDefault")),
             BoardKind.Performance => (Loc.T("manager.newBoardTitle") + " · " + Loc.T("manager.kindPerformance"), Loc.T("manager.newPerformanceDefault")),
+            BoardKind.Custom => (Loc.T("manager.newBoardTitle") + " · " + Loc.T("manager.kindCustom"), Loc.T("manager.newCustomDefault")),
             _ => (Loc.T("manager.newBoardTitle") + " · " + Loc.T("manager.kindTodo"), Loc.T("board.untitled")),
         };
 

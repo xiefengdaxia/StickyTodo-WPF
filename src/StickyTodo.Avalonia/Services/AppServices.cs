@@ -52,8 +52,20 @@ public sealed class AppServices : IDisposable
         EyeCare.Changed += (_, _) => Tray.Rebuild();
         EyeGamma.Changed += (_, _) => Tray.Rebuild();
 
+        // MCP 接入：先建（要挂在 Tray 通知上），再注入采集器并按设置启停服务。
+        // 必须在 RestoreSession 之前完成——恢复出来的自定义看板窗口要能拿到采集器。
+        Mcp = new StickyTodo.Mcp.McpService(
+            new McpUiHost(Windows, Todos, EyeCare, EyeGamma, () => Tray),
+            Todos, Settings, PomodoroEngine, Weather, TokenProvider,
+            Infrastructure.AppPaths.McpTokenPath,
+            Infrastructure.AppPaths.McpEndpointPath,
+            message => Log.Info("[mcp] " + message));
+        Windows.CollectorProvider = () => Mcp.Collector;
+        Mcp.StartCollector();
+        Mcp.ApplyFromSettings();
+
         ManagerViewModel = new ManagerViewModel(Todos, Entitlement);
-        SettingsViewModel = new SettingsViewModel(Skin, Settings, Todos, Entitlement, Windows, AutoStart, Localization, EyeCare, EyeGamma);
+        SettingsViewModel = new SettingsViewModel(Skin, Settings, Todos, Entitlement, Windows, AutoStart, Localization, EyeCare, EyeGamma, Mcp);
         PomodoroViewModel = new PomodoroViewModel(Settings, PomodoroEngine);
 
         Updates = new GitHubUpdateChecker();
@@ -93,6 +105,9 @@ public sealed class AppServices : IDisposable
     public EyeCareFilter EyeCare { get; }
 
     public EyeGammaService EyeGamma { get; }
+
+    /// <summary>MCP 接入（协议 + HTTP 服务端 + 采集器）。</summary>
+    public StickyTodo.Mcp.McpService Mcp { get; }
 
     public TrayService Tray { get; }
 
@@ -286,6 +301,7 @@ public sealed class AppServices : IDisposable
 
         try
         {
+            Mcp.Dispose();
             EyeCare.Dispose();
             EyeGamma.Dispose();
             HotKeys.Dispose();

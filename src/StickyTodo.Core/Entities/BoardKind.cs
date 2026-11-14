@@ -12,6 +12,7 @@ public enum BoardKind
     DesktopClock = 6,
     NetworkSpeed = 7,
     Performance = 8,
+    Custom = 9,
 }
 
 public static class BoardKinds
@@ -25,6 +26,7 @@ public static class BoardKinds
     public const string DesktopClock = "desktopclock";
     public const string NetworkSpeed = "networkspeed";
     public const string Performance = "performance";
+    public const string Custom = "custom";
 
     public static string ToStorage(BoardKind kind) => kind switch
     {
@@ -36,6 +38,7 @@ public static class BoardKinds
         BoardKind.DesktopClock => DesktopClock,
         BoardKind.NetworkSpeed => NetworkSpeed,
         BoardKind.Performance => Performance,
+        BoardKind.Custom => Custom,
         _ => Todo,
     };
 
@@ -49,6 +52,7 @@ public static class BoardKinds
         DesktopClock => BoardKind.DesktopClock,
         NetworkSpeed => BoardKind.NetworkSpeed,
         Performance => BoardKind.Performance,
+        Custom => BoardKind.Custom,
         _ => BoardKind.Todo,
     };
 
@@ -62,6 +66,7 @@ public static class BoardKinds
         BoardKind.DesktopClock => "桌面时钟",
         BoardKind.NetworkSpeed => "网速",
         BoardKind.Performance => "性能",
+        BoardKind.Custom => "自定义看板",
         _ => "待办看板",
     };
 

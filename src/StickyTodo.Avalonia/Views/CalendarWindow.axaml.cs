@@ -10,11 +10,14 @@ using StickyTodo.Notes.ViewModels;
 namespace StickyTodo.Notes.Views;
 
 /// <summary>日历看板：月视图 + 农历/节气/节假日 + 当日日程 + 黄历。</summary>
-public partial class CalendarWindow : StickyWindowBase
+public partial class CalendarWindow : StickyWindowBase, IBoardDataRefresh
 {
     private const string DragFormat = "stickytodo/todo-id";
 
     private readonly CalendarViewModel _viewModel;
+
+    /// <summary>MCP 改了数据后让窗口重读一遍（IBoardDataRefresh）。</summary>
+    public Task ReloadDataAsync() => _viewModel.LoadAsync();
     private bool _suppressSelection;
 
     public CalendarWindow(CalendarViewModel viewModel, WindowManager windows)

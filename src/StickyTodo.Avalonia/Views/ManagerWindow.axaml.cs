@@ -149,6 +149,9 @@ public partial class ManagerWindow : Window
     private async void CreatePerformance_Click(object? sender, RoutedEventArgs e) =>
         await CreateBoardAsync(BoardKind.Performance, Loc.T("manager.newPerformance"), Loc.T("manager.newPerformanceDefault"));
 
+    private async void CreateCustom_Click(object? sender, RoutedEventArgs e) =>
+        await CreateBoardAsync(BoardKind.Custom, Loc.T("manager.newCustom"), Loc.T("manager.newCustomDefault"));
+
     private async Task CreateBoardAsync(BoardKind kind, string title, string initial)
     {
         var name = await PromptWindow.PromptAsync(this, title, Loc.T("manager.boardName"), initial);

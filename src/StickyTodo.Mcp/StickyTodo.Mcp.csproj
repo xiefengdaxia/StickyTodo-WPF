@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- 与 Core 相同的多目标：WPF 版跑 net8，Win7 版跑 net6 -->
+    <TargetFrameworks>net8.0;net6.0</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>StickyTodo.Mcp</RootNamespace>
+    <!-- serverInfo.version 显示用；发布脚本 -p:Version 也会覆盖 -->
+    <Version>1.7.11</Version>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Jint" Version="4.2.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\StickyTodo.Core\StickyTodo.Core.csproj" />
+    <ProjectReference Include="..\StickyTodo.Weather\StickyTodo.Weather.csproj" />
+  </ItemGroup>
+
+</Project>

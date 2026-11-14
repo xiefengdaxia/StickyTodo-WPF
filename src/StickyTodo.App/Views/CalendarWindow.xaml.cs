@@ -11,7 +11,7 @@ using StickyTodo.Core.Localization;
 namespace StickyTodo.App.Views;
 
 /// <summary>日历看板：月视图 + 当日日程，支持把日程拖到别的日期改期。</summary>
-public partial class CalendarWindow : Window, IStickyWindow
+public partial class CalendarWindow : Window, IStickyWindow, IBoardDataRefresh
 {
     private const double ResizeBorder = 8d;
     private const int CascadeStep = 28;
@@ -20,6 +20,9 @@ public partial class CalendarWindow : Window, IStickyWindow
     private readonly WindowManager _windows;
     private bool _geometryRestored;
     private bool _isFullScreen;
+
+    /// <summary>MCP 改了数据后让窗口重读一遍（IBoardDataRefresh）。</summary>
+    public Task ReloadDataAsync() => _viewModel.LoadAsync();
 
     /// <summary>首次加载完成前，下拉框的 SelectionChanged 不该触发跳转。</summary>
     private bool _loaded;

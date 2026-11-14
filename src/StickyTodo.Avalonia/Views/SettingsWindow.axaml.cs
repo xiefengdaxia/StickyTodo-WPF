@@ -23,8 +23,23 @@ public partial class SettingsWindow : Window
         {
             await _viewModel.RefreshStatsAsync();
             SkinList.ItemsSource = _viewModel.Skins;
+            // MCP 服务的实际状态（端口顺延/令牌）在每次打开设置页时重算一遍
+            _viewModel.RefreshMcpState();
         };
         Chrome.Apply(this, Shell, 14, 12);
+    }
+
+    /// <summary>MCP 端口框失焦时提交。</summary>
+    private void McpPortBox_LostFocus(object? sender, RoutedEventArgs e) => _viewModel.CommitMcpPort();
+
+    /// <summary>回车也当提交。</summary>
+    private void McpPortBox_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            e.Handled = true;
+            _viewModel.CommitMcpPort();
+        }
     }
 
     public void ShowAndActivate()

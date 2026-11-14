@@ -1,0 +1,89 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:StickyTodo.Notes.Localization"
+        xmlns:services="using:StickyTodo.Notes.Services"
+        x:Class="StickyTodo.Notes.Views.CustomBoardWindow"
+        Title="自定义看板"
+        Opacity="{Binding WindowOpacity, Mode=OneWay}"
+        Width="620" Height="520"
+        MinWidth="340" MinHeight="240"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent"
+        CanResize="True"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterScreen"
+        FontFamily="Microsoft YaHei UI, Segoe UI"
+        UseLayoutRounding="True">
+
+  <Window.Styles>
+    <Style Selector="Border#NoteRoot">
+      <Setter Property="Background" Value="{Binding PaperBrush}" />
+    </Style>
+    <Style Selector="Border.header">
+      <Setter Property="Background" Value="{Binding PaperDeepBrush}" />
+    </Style>
+    <Style Selector="Button.chrome">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
+      <Setter Property="Padding" Value="8,2" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="Root" CornerRadius="4" Background="{TemplateBinding Background}">
+            <ContentPresenter Name="PART_ContentPresenter"
+                              Content="{TemplateBinding Content}"
+                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                              Margin="{TemplateBinding Padding}" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="Button.chrome:pointerover /template/ Border#Root">
+      <Setter Property="Background" Value="{DynamicResource Brush.ChipIdle}" />
+    </Style>
+    <Style Selector="TextBlock.status">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.InkSoft}" />
+    </Style>
+  </Window.Styles>
+
+  <Border Name="NoteRoot" Classes="note">
+    <Grid RowDefinitions="Auto,*,Auto">
+
+      <Border Name="TitleBar" Classes="header" CornerRadius="11,11,0,0" Padding="12,8"
+              PointerPressed="TitleBar_PointerPressed">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="✨" FontSize="12" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding BoardName}" Classes="title" Margin="6,0,0,0"
+                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+            <Button Classes="chrome" Content="🎨" FontSize="11" ToolTip.Tip="外观：皮肤 / 透明度"
+                    Click="Appearance_Click" />
+            <Button Classes="chrome" Content="刷新数据" FontSize="11"
+                    ToolTip.Tip="让采集器立刻跑一次" Click="Refresh_Click" x:Name="RefreshButton" />
+            <Button Classes="chrome" Content="✕" FontSize="11" Click="Close_Click" />
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <!-- 内容：WebView2 优先，起不来时文本兜底 -->
+      <Panel Grid.Row="1">
+        <services:WebView2Host x:Name="Web" IsVisible="{Binding !WebViewFailed}" />
+        <ScrollViewer IsVisible="{Binding WebViewFailed}" VerticalScrollBarVisibility="Auto">
+          <TextBlock Text="{Binding FallbackText}"
+                     Margin="14,10" TextWrapping="Wrap"
+                     FontFamily="Consolas, monospace" FontSize="12" />
+        </ScrollViewer>
+      </Panel>
+
+      <!-- 状态条 -->
+      <Border Grid.Row="2" Classes="header" CornerRadius="0,0,11,11" Padding="12,4">
+        <TextBlock Text="{Binding StatusText}" Classes="status" TextTrimming="CharacterEllipsis" />
+      </Border>
+    </Grid>
+  </Border>
+</Window>

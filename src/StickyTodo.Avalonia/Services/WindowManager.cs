@@ -22,6 +22,15 @@ public interface IStickyWindow
 }
 
 /// <summary>
+/// 数据看板窗口的可刷新能力：MCP 在后台改了数据之后，
+/// 让打开着的窗口立刻重读一遍（否则屏幕上的列表是旧的，用户会困惑）。
+/// </summary>
+public interface IBoardDataRefresh
+{
+    Task ReloadDataAsync();
+}
+
+/// <summary>
 /// 便签窗口的生命周期：一个看板最多一个窗口，重复打开就激活已有窗口。
 /// 同时给吸附算法提供其它窗口的矩形，并记住最后活跃的看板（给全局快捷键用）。
 /// </summary>
@@ -100,6 +109,7 @@ public sealed class WindowManager
                 this),
             BoardKind.NetworkSpeed => new NetworkSpeedBoardWindow(new NetworkSpeedViewModel(), board, this),
             BoardKind.Performance => new PerformanceBoardWindow(new PerformanceViewModel(), board, this),
+            BoardKind.Custom => CreateCustomBoardWindow(board),
             _ => new BoardWindow(new BoardViewModel(_todoService, board, _settings, _skinService), this),
         };
 
@@ -424,6 +434,56 @@ public sealed class WindowManager
         }
     }
 
+    /// <summary>当前打开的看板窗口 id（MCP 工具和托盘菜单都用得到）。</summary>
+    public IReadOnlyList<string> OpenBoardIds => _windows.Keys.ToList();
+
+    /// <summary>
+    /// 刷新所有打开着的数据看板（MCP 写操作后调用；在 UI 线程上调用）。
+    /// 各窗口自己决定怎么重读，失败只记日志不中断。
+    /// </summary>
+    public void RefreshOpenBoards()
+    {
+        foreach (var window in _windows.Values.OfType<IBoardDataRefresh>().ToArray())
+        {
+            _ = SafeReloadAsync(window);
+        }
+    }
+
+    private static async Task SafeReloadAsync(IBoardDataRefresh window)
+    {
+        try
+        {
+            await window.ReloadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Debug("[mcp] 刷新看板窗口失败：" + ex.Message);
+        }
+    }
+
+    /// <summary>自定义看板内容（HTML/脚本）被 MCP 改过：让窗口重新加载（在 UI 线程上调用）。</summary>
+    public void ReloadCustomBoard(string boardId)
+    {
+        if (_windows.TryGetValue(boardId, out var window) && window is CustomBoardWindow custom)
+        {
+            custom.ReloadContent();
+        }
+    }
+
+    /// <summary>
+    /// MCP 采集器注入点：AppServices 组装完 McpService 后设置。
+    /// 自定义看板窗口创建时用它拿到采集器订阅数据变化。
+    /// </summary>
+    internal Func<StickyTodo.Mcp.CollectorHost?>? CollectorProvider { get; set; }
+
+    private Window CreateCustomBoardWindow(Board board)
+    {
+        var window = new CustomBoardWindow(
+            new CustomBoardViewModel(board, _todoService, _skinService, _settings, this), board, this);
+        window.AttachCollector(CollectorProvider?.Invoke());
+        return window;
+    }
+
     public void CloseAll()
     {
         // 退出程序时把"当时开着哪些"留在记录里，下次启动才能恢复
@@ -488,7 +548,11 @@ public sealed class WindowManager
     {
         foreach (var window in _windows.Values)
         {
-            if (window is IStickyWindow sticky)
+            if (window is CustomBoardWindow custom)
+            {
+                custom.RefreshAppearance();
+            }
+            else if (window is IStickyWindow sticky)
             {
                 sticky.RefreshAppearance();
             }

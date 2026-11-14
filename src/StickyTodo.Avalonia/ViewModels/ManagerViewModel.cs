@@ -32,6 +32,7 @@ public sealed class BoardRowViewModel : ObservableObject
         BoardKind.DesktopClock => "manager.kindDesktopClock",
         BoardKind.NetworkSpeed => "manager.kindNetworkSpeed",
         BoardKind.Performance => "manager.kindPerformance",
+        BoardKind.Custom => "manager.kindCustom",
         _ => "manager.kindTodo",
     });
 
@@ -46,6 +47,7 @@ public sealed class BoardRowViewModel : ObservableObject
         BoardKind.DesktopClock => "🕔",
         BoardKind.NetworkSpeed => "📶",
         BoardKind.Performance => "📈",
+        BoardKind.Custom => "✨",
         _ => "✓",
     };
 

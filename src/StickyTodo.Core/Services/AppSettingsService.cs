@@ -181,6 +181,39 @@ public sealed class AppSettingsService
     public void ClearWindowOpacity(string windowKey) =>
         SetSetting(WindowOpacityKeyFor(windowKey), string.Empty);
 
+    // ---------------- 每个看板自己的背景透明度 ----------------
+    /// <summary>某个看板单独的背景透明度存在这个 key 下（纸面颜色深浅，不影响整窗）。</summary>
+    public static string BoardBgOpacityKey(string boardId) => $"board.{boardId}.bgOpacity";
+
+    /// <summary>
+    /// 取某个看板的背景透明度：单独设过就用它自己的，否则用调用方给的回退值
+    /// （一般是全局滑块的值）。取值范围同全局（0.10 - 1.00）。
+    /// </summary>
+    public double GetBoardBgOpacity(string boardId, double fallback)
+    {
+        var raw = GetString(BoardBgOpacityKey(boardId), null);
+        if (string.IsNullOrWhiteSpace(raw)
+            || !double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+        {
+            return fallback;
+        }
+
+        return ClampOpacity(value);
+    }
+
+    /// <summary>这个看板有没有单独设过背景透明度（false = 跟随全局）。</summary>
+    public bool HasBoardBgOpacity(string boardId) =>
+        !string.IsNullOrWhiteSpace(GetString(BoardBgOpacityKey(boardId), null));
+
+    public void SetBoardBgOpacity(string boardId, double value) =>
+        SetSetting(
+            BoardBgOpacityKey(boardId),
+            ClampOpacity(value).ToString("0.###", CultureInfo.InvariantCulture));
+
+    /// <summary>清除单独设置，回到跟随全局。</summary>
+    public void ClearBoardBgOpacity(string boardId) =>
+        SetSetting(BoardBgOpacityKey(boardId), string.Empty);
+
     /// <summary>便签默认置顶，符合“贴纸感”。</summary>
     public bool GetBoardTopmost(string boardId) => GetBool(BoardTopmostKey(boardId), true);
     public void SetBoardTopmost(string boardId, bool value) =>
@@ -423,6 +456,38 @@ public sealed class AppSettingsService
                 : DefaultEyeFilterStrength;
         }
         set => SetSetting(EyeFilterStrengthKey, ((int)Math.Clamp(Math.Round(value / 5d) * 5, 10, 50)).ToString());
+    }
+
+    // ---------------- MCP 接入（AI 客户端通过 MCP 控制本应用） ----------------
+
+    /// <summary>MCP 服务开关。默认关闭，用户在设置页显式打开。</summary>
+    public const string McpEnabledKey = "mcp.enabled";
+
+    public const string McpPortKey = "mcp.port";
+
+    public const int DefaultMcpPort = 52700;
+
+    public const int MinMcpPort = 1024;
+
+    public const int MaxMcpPort = 65535;
+
+    public bool McpEnabled
+    {
+        get => GetBool(McpEnabledKey, false);
+        set => SetSetting(McpEnabledKey, value ? "1" : "0");
+    }
+
+    /// <summary>MCP 本地端口。只绑 127.0.0.1；被占用时服务端会顺延端口并回报实际值。</summary>
+    public int McpPort
+    {
+        get
+        {
+            var raw = GetString(McpPortKey, null);
+            return int.TryParse(raw, out var value)
+                ? Math.Clamp(value, MinMcpPort, MaxMcpPort)
+                : DefaultMcpPort;
+        }
+        set => SetSetting(McpPortKey, Math.Clamp(value, MinMcpPort, MaxMcpPort).ToString());
     }
 
     /// <summary>

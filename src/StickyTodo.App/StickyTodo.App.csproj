@@ -5,7 +5,7 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <!-- 版本号：发布脚本会用 -p:Version 覆盖；这里写死是为了本地跑的构建也有正确版本，
          否则「检查更新」拿不到 1.0.0 以外的信息 -->
-    <Version>1.7.10</Version>
+    <Version>1.7.11</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
@@ -42,8 +42,18 @@
   <ItemGroup>
     <ProjectReference Include="..\StickyTodo.Core\StickyTodo.Core.csproj" />
     <ProjectReference Include="..\StickyTodo.Infrastructure\StickyTodo.Infrastructure.csproj" />
+    <ProjectReference Include="..\StickyTodo.Mcp\StickyTodo.Mcp.csproj" />
     <ProjectReference Include="..\StickyTodo.Weather\StickyTodo.Weather.csproj" />
     <ProjectReference Include="..\StickyTodo.Updates\StickyTodo.Updates.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="8.0.0" />
+    <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
   </ItemGroup>
 
   <ItemGroup>

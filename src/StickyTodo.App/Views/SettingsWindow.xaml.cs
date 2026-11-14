@@ -19,8 +19,26 @@ public partial class SettingsWindow : Window
         Loaded += async (_, _) =>
         {
             await _viewModel.RefreshStatsAsync();
+            // MCP 服务的实际状态（端口顺延/令牌）在每次打开设置页时重算一遍
+            _viewModel.RefreshMcpState();
             Motion.FadeInWindow(this);
         };
+    }
+
+    /// <summary>MCP 端口框失焦时提交。</summary>
+    private void McpPortBox_LostFocus(object sender, RoutedEventArgs e) => _viewModel.CommitMcpPort();
+
+    /// <summary>回车也当提交，顺便把焦点移开。</summary>
+    private void McpPortBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+        {
+            return;
+        }
+
+        _viewModel.CommitMcpPort();
+        Keyboard.ClearFocus();
+        e.Handled = true;
     }
 
     private void Skin_Click(object sender, RoutedEventArgs e)

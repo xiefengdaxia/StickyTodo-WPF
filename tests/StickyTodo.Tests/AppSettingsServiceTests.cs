@@ -153,4 +153,26 @@ public sealed class AppSettingsServiceTests : DatabaseTestBase
         Assert.Null(settings.WeatherDefaultCity);
         Assert.Equal("长沙", settings.EffectiveWeatherDefaultCity);
     }
+
+    [Fact]
+    public void BoardBgOpacity_FallbackRoundTripAndClear()
+    {
+        var settings = CreateService();
+
+        // 没单独设过：返回回退值（全局滑块）
+        Assert.Equal(0.92, settings.GetBoardBgOpacity("b1", 0.92), 3);
+        Assert.False(settings.HasBoardBgOpacity("b1"));
+
+        // 设置并夹取到 0.10 - 1.00
+        settings.SetBoardBgOpacity("b1", 0.35);
+        Assert.True(settings.HasBoardBgOpacity("b1"));
+        Assert.Equal(0.35, settings.GetBoardBgOpacity("b1", 0.92), 3);
+        settings.SetBoardBgOpacity("b1", 5);
+        Assert.Equal(1.0, settings.GetBoardBgOpacity("b1", 0.92), 3);
+
+        // 清除后回到回退值
+        settings.ClearBoardBgOpacity("b1");
+        Assert.False(settings.HasBoardBgOpacity("b1"));
+        Assert.Equal(0.92, settings.GetBoardBgOpacity("b1", 0.92), 3);
+    }
 }

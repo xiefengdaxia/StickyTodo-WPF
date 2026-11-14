@@ -82,24 +82,29 @@ internal static class AppearanceMenu
             root.Items.Add(item);
         }
 
-        if (!isBackground)
-        {
-            // 每个窗口单独设的透明度可以取消，回到跟随全局设置
-            root.Items.Add(new Separator());
+        // 背景和整窗透明度都可以取消单独设置，回到跟随全局
+        root.Items.Add(new Separator());
 
-            var followGlobal = new MenuItem
+        var followGlobal = new MenuItem
+        {
+            Header = Loc.T("menu.opacityFollowGlobal"),
+            ToggleType = MenuItemToggleType.CheckBox,
+            IsChecked = isBackground ? !host.HasOwnOpacity : !host.HasOwnWindowOpacity,
+        };
+        followGlobal.Click += (_, _) =>
+        {
+            if (isBackground)
             {
-                Header = Loc.T("menu.opacityFollowGlobal"),
-                ToggleType = MenuItemToggleType.CheckBox,
-                IsChecked = !host.HasOwnWindowOpacity,
-            };
-            followGlobal.Click += (_, _) =>
+                host.ResetOpacity();
+            }
+            else
             {
                 host.ResetWindowOpacity();
-                windows.ApplySkin();
-            };
-            root.Items.Add(followGlobal);
-        }
+            }
+
+            windows.ApplySkin();
+        };
+        root.Items.Add(followGlobal);
 
         return root;
     }

@@ -24,7 +24,14 @@
     <conv:HexToBrushConverter x:Key="HexToBrush" />
   </Window.Resources>
 
-  <Window.Styles>
+    <Window.Styles>
+    <Style Selector="Border#NoteRoot">
+      <Setter Property="Background" Value="{Binding PaperBrush}" />
+    </Style>
+    <Style Selector="Border.header">
+      <Setter Property="Background" Value="{Binding PaperDeepBrush}" />
+    </Style>
+
     <!-- 四象限：格子与卡片 -->
     <Style Selector="Border.quadrant">
       <Setter Property="Margin" Value="3" />

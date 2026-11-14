@@ -19,6 +19,12 @@ public interface IAppearanceHost
     /// <summary>这个窗口有没有单独设过透明度（false = 跟随全局）。</summary>
     bool HasOwnWindowOpacity { get; }
 
+    /// <summary>这个看板有没有单独设过背景透明度（false = 跟随全局）。</summary>
+    bool HasOwnOpacity { get; }
+
+    /// <summary>取消背景透明度的单独设置，回到跟随全局。</summary>
+    void ResetOpacity();
+
     void SetSkin(string skinKey);
 
     void SetOpacity(double opacity);

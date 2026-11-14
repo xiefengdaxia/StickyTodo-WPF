@@ -24,9 +24,11 @@ public partial class SettingsViewModel : ObservableObject
     private readonly LocalizationService _localization;
     private readonly EyeCareFilter _eyeCare;
     private readonly EyeGammaService _eyeGamma;
+    private readonly StickyTodo.Mcp.McpService _mcp;
 
     private bool _suppressSync;
     private bool _suppressEyeSync;
+    private bool _suppressMcpSync;
 
     public SettingsViewModel(
         SkinService skin,
@@ -37,7 +39,8 @@ public partial class SettingsViewModel : ObservableObject
         AutoStartService autoStart,
         LocalizationService localization,
         EyeCareFilter eyeCare,
-        EyeGammaService eyeGamma)
+        EyeGammaService eyeGamma,
+        StickyTodo.Mcp.McpService mcp)
     {
         _skin = skin;
         _settings = settings;
@@ -48,11 +51,13 @@ public partial class SettingsViewModel : ObservableObject
         _localization = localization;
         _eyeCare = eyeCare;
         _eyeGamma = eyeGamma;
+        _mcp = mcp;
 
         BuildSkinOptions();
         BuildLanguageOptions();
         LoadStartupSettings();
         LoadEyeFilterSettings();
+        LoadMcpSettings();
 
         _suppressSync = true;
         _backgroundOpacity = Math.Round(_skin.Opacity * 100);
@@ -593,5 +598,109 @@ public partial class SettingsViewModel : ObservableObject
         });
 
         StatsText = Loc.F("settings.statsLine", boards, pending, done, tags);
+    }
+
+    // ---------------- MCP 接入 ----------------
+
+    [ObservableProperty]
+    private bool _mcpEnabled;
+
+    /// <summary>端口文本框的原始内容（失焦/回车时提交，见 CommitMcpPort）。</summary>
+    [ObservableProperty]
+    private string _mcpPortText = string.Empty;
+
+    [ObservableProperty]
+    private string _mcpTokenText = string.Empty;
+
+    /// <summary>实际监听地址（端口被占会顺延）。</summary>
+    [ObservableProperty]
+    private string _mcpEndpointText = string.Empty;
+
+    /// <summary>可直接复制给 AI 客户端的接入配置片段。</summary>
+    [ObservableProperty]
+    private string _mcpConfigText = string.Empty;
+
+    private void LoadMcpSettings()
+    {
+        _suppressMcpSync = true;
+        try
+        {
+            McpEnabled = _settings.McpEnabled;
+            McpPortText = _settings.McpPort.ToString();
+        }
+        finally
+        {
+            _suppressMcpSync = false;
+        }
+
+        RefreshMcpState();
+    }
+
+    /// <summary>服务状态/令牌/配置片段重算（窗口打开、启停、改端口后都调）。</summary>
+    public void RefreshMcpState()
+    {
+        McpEndpointText = _mcp.Server.Endpoint ?? Loc.T("settings.mcpOff");
+
+        var token = _mcp.PeekToken() ?? string.Empty;
+        McpTokenText = token;
+
+        McpConfigText = BuildMcpConfigSnippet(token);
+    }
+
+    private string BuildMcpConfigSnippet(string token) => _mcp.BuildClientConfigSnippet();
+
+    /// <summary>启用开关：写设置并同步启停 MCP 服务。</summary>
+    partial void OnMcpEnabledChanged(bool value)
+    {
+        if (_suppressMcpSync)
+        {
+            return;
+        }
+
+        _settings.McpEnabled = value;
+        _mcp.ApplyFromSettings();
+        RefreshMcpState();
+        StatusText = value ? Loc.T("settings.mcpOn") : Loc.T("settings.mcpOff");
+    }
+
+    /// <summary>端口文本框提交（代码后置在 LostFocus/回车时调）。</summary>
+    public void CommitMcpPort()
+    {
+        if (_suppressMcpSync)
+        {
+            return;
+        }
+
+        if (!int.TryParse(McpPortText?.Trim(), out var port))
+        {
+            McpPortText = _settings.McpPort.ToString();
+            return;
+        }
+
+        _settings.McpPort = port;
+        _mcp.ApplyFromSettings();
+        RefreshMcpState();
+        StatusText = _mcp.Server.IsRunning ? Loc.T("settings.mcpOn") : Loc.T("settings.mcpOff");
+    }
+
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void CopyMcpToken()
+    {
+        if (_mcp.PeekToken() is not { } token)
+        {
+            // 还没启用过就点复制：顺手生成一个令牌落盘
+            token = _mcp.EnsureToken();
+            RefreshMcpState();
+        }
+
+        System.Windows.Clipboard.SetText(token);
+        StatusText = Loc.T("settings.mcpCopied");
+    }
+
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void CopyMcpConfig()
+    {
+        System.Windows.Clipboard.SetText(McpConfigText);
+        StatusText = Loc.T("settings.mcpCopied");
     }
 }

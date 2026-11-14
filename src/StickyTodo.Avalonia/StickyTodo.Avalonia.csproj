@@ -6,7 +6,7 @@
          本应用只跑 Windows，故用 net6.0-windows：平台分析器不再对 Windows 专属 API
          （性能计数器等）报 CA1416，也不影响 Win7 路线 -->
     <TargetFramework>net6.0-windows</TargetFramework>
-    <Version>1.7.10</Version>
+    <Version>1.7.11</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
@@ -27,11 +27,15 @@
     <PackageReference Include="Avalonia.Desktop" Version="11.3.22" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.22" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
+    <!-- MCP 的 take_screenshot 工具走 GDI 抓屏；Avalonia 版没开 UseWindowsForms，这里单独引 -->
+    <PackageReference Include="System.Drawing.Common" Version="6.0.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\StickyTodo.Core\StickyTodo.Core.csproj" />
     <ProjectReference Include="..\StickyTodo.Infrastructure\StickyTodo.Infrastructure.csproj" />
+    <ProjectReference Include="..\StickyTodo.Mcp\StickyTodo.Mcp.csproj" />
     <ProjectReference Include="..\StickyTodo.Weather\StickyTodo.Weather.csproj" />
     <ProjectReference Include="..\StickyTodo.Updates\StickyTodo.Updates.csproj" />
   </ItemGroup>

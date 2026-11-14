@@ -12,7 +12,7 @@ namespace StickyTodo.App.Views;
 /// <summary>
 /// 便签/随笔窗口：无边框半透明 + 一整块可写的纸，停止输入 800ms 后自动保存。
 /// </summary>
-public partial class MemoBoardWindow : Window, IStickyWindow
+public partial class MemoBoardWindow : Window, IStickyWindow, IBoardDataRefresh
 {
     private const double ShadowMargin = 10d;
     private const double ResizeBorder = 8d;
@@ -21,6 +21,9 @@ public partial class MemoBoardWindow : Window, IStickyWindow
     private readonly MemoBoardViewModel _viewModel;
     private readonly WindowManager _windows;
     private readonly DispatcherTimer _saveTimer;
+
+    /// <summary>MCP 改了数据后让窗口重读一遍（IBoardDataRefresh）。</summary>
+    public Task ReloadDataAsync() => _viewModel.LoadAsync();
     private bool _geometryRestored;
     private bool _isFullScreen;
 

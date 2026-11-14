@@ -12,7 +12,7 @@ namespace StickyTodo.Infrastructure.Persistence;
 /// </summary>
 public sealed class SqliteTodoRepository : ITodoRepository
 {
-    private const int CurrentSchemaVersion = 7;
+    private const int CurrentSchemaVersion = 8;
 
     private readonly string _connectionString;
 
@@ -81,6 +81,11 @@ public sealed class SqliteTodoRepository : ITodoRepository
         if (version < 7)
         {
             connection.Execute(SchemaV7, transaction: tx);
+        }
+
+        if (version < 8)
+        {
+            connection.Execute(SchemaV8, transaction: tx);
         }
 
         connection.Execute($"PRAGMA user_version={CurrentSchemaVersion};", transaction: tx);
@@ -189,6 +194,13 @@ public sealed class SqliteTodoRepository : ITodoRepository
         CREATE INDEX IF NOT EXISTS ix_todo_due ON todo (due_at);
         """;
 
+    /// <summary>v8：自定义看板（AI 通过 MCP 创建）的 HTML/采集脚本/采集间隔。</summary>
+    private const string SchemaV8 = """
+        ALTER TABLE board ADD COLUMN custom_html     TEXT NULL;
+        ALTER TABLE board ADD COLUMN custom_script   TEXT NULL;
+        ALTER TABLE board ADD COLUMN custom_interval INTEGER NULL;
+        """;
+
     private const string SchemaV5 = """
         -- 重复规则（RFC 5545 RRULE），NULL = 不重复
         ALTER TABLE todo ADD COLUMN recurrence TEXT NULL;
@@ -213,7 +225,8 @@ public sealed class SqliteTodoRepository : ITodoRepository
         return connection.Query<BoardRow>(
                 """
                 SELECT id, name, sort, is_default, kind, created_at,
-                       win_left, win_top, win_width, win_height
+                       win_left, win_top, win_width, win_height,
+                       custom_html, custom_script, custom_interval
                   FROM board
                  ORDER BY sort, created_at;
                 """)
@@ -276,6 +289,18 @@ public sealed class SqliteTodoRepository : ITodoRepository
              WHERE id = @boardId;
             """,
             new { boardId, state.Left, state.Top, state.Width, state.Height });
+    }
+
+    public void SaveCustomContent(string boardId, string? html, string? script, int? intervalSeconds)
+    {
+        using var connection = Open();
+        connection.Execute(
+            """
+            UPDATE board
+               SET custom_html = @html, custom_script = @script, custom_interval = @interval
+             WHERE id = @boardId;
+            """,
+            new { boardId, html, script, interval = intervalSeconds });
     }
 
     // ---------------- 待办 ----------------
@@ -686,6 +711,9 @@ public sealed class SqliteTodoRepository : ITodoRepository
             Kind = BoardKinds.Parse(row.kind),
             CreatedAt = FromUnix(row.created_at),
             Window = window,
+            CustomHtml = row.custom_html,
+            CustomScript = row.custom_script,
+            CustomIntervalSeconds = row.custom_interval,
         };
     }
 
@@ -720,6 +748,9 @@ public sealed class SqliteTodoRepository : ITodoRepository
         public double? win_top { get; set; }
         public double? win_width { get; set; }
         public double? win_height { get; set; }
+        public string? custom_html { get; set; }
+        public string? custom_script { get; set; }
+        public int? custom_interval { get; set; }
     }
 
     private sealed class TodoRow

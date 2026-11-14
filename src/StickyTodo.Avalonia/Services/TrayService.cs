@@ -266,6 +266,38 @@ public sealed class TrayService : IDisposable
 
         menu.Add(new NativeMenuItem { Header = Loc.T("menu.eye"), Menu = eyeMenu });
 
+        menu.Add(new NativeMenuItemSeparator());
+
+        // MCP 接入：开关 + 复制接入配置（给 AI 客户端用）。整份菜单会 Rebuild，勾选态天然最新
+        var mcpToggle = new NativeMenuItem(Loc.T("menu.mcp"))
+        {
+            ToggleType = NativeMenuItemToggleType.CheckBox,
+            IsChecked = _services.Settings.McpEnabled,
+        };
+        mcpToggle.Click += (_, _) =>
+        {
+            _services.Settings.McpEnabled = mcpToggle.IsChecked;
+            _services.Mcp.ApplyFromSettings();
+            Notify(mcpToggle.IsChecked ? Loc.T("settings.mcpOn") : Loc.T("settings.mcpOff"), "StickyTodo");
+            Rebuild();
+        };
+        menu.Add(mcpToggle);
+
+        menu.Add(Item(Loc.T("menu.mcpCopyConfig"), () =>
+        {
+            try
+            {
+                CopyToClipboard(_services.Mcp.BuildClientConfigSnippet());
+                Notify(Loc.T("settings.mcpCopied"), "StickyTodo");
+            }
+            catch (Exception ex)
+            {
+                Notify("复制失败：" + ex.Message, "StickyTodo");
+            }
+        }));
+
+        menu.Add(new NativeMenuItemSeparator());
+
         _boardsMenu = new NativeMenu();
         menu.Add(new NativeMenuItem { Header = Loc.T("tray.boards"), Menu = _boardsMenu });
 
@@ -287,6 +319,14 @@ public sealed class TrayService : IDisposable
         var item = new NativeMenuItem { Header = header };
         item.Click += (_, _) => action();
         return item;
+    }
+
+    /// <summary>从常驻的管理面板窗口拿 Clipboard 写文本（Avalonia 必须经窗口拿剪贴板）。</summary>
+    private void CopyToClipboard(string text)
+    {
+        var owner = _services.Manager;
+        var clipboard = owner is null ? null : TopLevel.GetTopLevel(owner)?.Clipboard;
+        _ = clipboard?.SetTextAsync(text);
     }
 
     private void RebuildBoardsMenu()
