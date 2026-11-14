@@ -41,6 +41,11 @@ public sealed class CollectorHost : IDisposable
     private const int DefaultTimeoutMs = 10000;
     private const int MaxTimeoutMs = 30000;
 
+    /// <summary>单次脚本运行的沙盒限额：内存 64MB、墙钟 30 秒（语句数另见 MaxStatements）。</summary>
+    private const int ScriptMemoryBytes = 64 * 1024 * 1024;
+
+    private const int ScriptTimeoutSeconds = 30;
+
     private static readonly HttpClient SharedHttp = CreateClient();
 
     private readonly TodoService _todos;
@@ -406,8 +411,8 @@ public sealed class CollectorHost : IDisposable
     {
         using var engine = new Engine(options =>
         {
-            options.LimitMemory(8 * 1024 * 1024);
-            options.TimeoutInterval(TimeSpan.FromSeconds(15));
+            options.LimitMemory(ScriptMemoryBytes);
+            options.TimeoutInterval(TimeSpan.FromSeconds(ScriptTimeoutSeconds));
             options.MaxStatements(200_000);
         });
 
