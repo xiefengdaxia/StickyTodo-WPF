@@ -13,19 +13,53 @@
         ResizeMode="CanResize"
         WindowStartupLocation="CenterScreen"
         ShowInTaskbar="False"
+        Topmost="{Binding IsTopmost, Mode=OneWay}"
         FontFamily="Microsoft YaHei UI"
         UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Display">
 
+    <Window.Resources>
+        <!-- 隐形缩放热区：模板里只放一个透明 Border，保证不画出任何边线/底色 -->
+        <Style x:Key="ResizeHit" TargetType="Thumb">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border Background="Transparent" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 标题栏图标按钮：无边框、无底色，只在悬停时给一点极淡的反馈 -->
+        <Style x:Key="TitleGlyphButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="5,2" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bg" Background="Transparent" CornerRadius="5" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bg" Property="Background" Value="#1FFFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
     <Border x:Name="NoteRoot"
             Margin="10"
             CornerRadius="12"
-            Background="{DynamicResource Brush.Paper}"
+            Background="{Binding PaperBrush}"
             BorderBrush="#59FFFFFF"
             BorderThickness="1">
-        <Border.Effect>
-            <DropShadowEffect BlurRadius="18" ShadowDepth="3" Opacity="0.30" Color="#FF000000" Direction="270" />
-        </Border.Effect>
 
         <Grid>
             <Grid.RowDefinitions>
@@ -36,7 +70,7 @@
 
             <!-- 标题栏 -->
             <Border Grid.Row="0"
-                    Background="{DynamicResource Brush.PaperDeep}"
+                    Background="{Binding PaperDeepBrush}"
                     CornerRadius="11,11,0,0"
                     Padding="12,8"
                     MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
@@ -51,16 +85,48 @@
                                    Margin="6,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Button Content="🎨" Click="Appearance_Click" ToolTip="外观：皮肤 / 透明度"
-                                Background="{DynamicResource Brush.ChipIdle}" BorderThickness="0"
-                                Margin="0,0,6,0" Cursor="Hand" />
-                        <Button x:Name="RefreshButton" Content="刷新数据" Click="Refresh_Click"
-                                ToolTip="让采集器立刻跑一次"
-                                Background="{DynamicResource Brush.ChipIdle}" BorderThickness="0"
-                                Padding="8,3" Cursor="Hand" />
-                        <Button Content="✕" Click="Close_Click"
-                                Background="Transparent" BorderThickness="0"
-                                Margin="8,0,0,0" FontWeight="Bold" Cursor="Hand" />
+                        <Button x:Name="RefreshButton" Style="{StaticResource TitleGlyphButton}" Click="Refresh_Click"
+                                ToolTip="立刻重跑一次采集器">
+                            <TextBlock Text="↻" FontSize="12" />
+                        </Button>
+                        <Button x:Name="PinButton" Style="{StaticResource TitleGlyphButton}" Click="ToggleTopmost_Click"
+                                ToolTip="置顶（其它窗口不会盖住它）">
+                            <TextBlock FontSize="11">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value="📌" />
+                                        <Setter Property="Opacity" Value="0.45" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsTopmost}" Value="True">
+                                                <Setter Property="Opacity" Value="1" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Button>
+                        <Button x:Name="LockButton" Style="{StaticResource TitleGlyphButton}" Click="ToggleLock_Click"
+                                ToolTip="锁定穿透（锁定后点不到，用右上角小锁或 Ctrl+Alt+L 解锁）">
+                            <TextBlock FontSize="11">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value="🔓" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsLocked}" Value="True">
+                                                <Setter Property="Text" Value="🔒" />
+                                            <Setter Property="Opacity" Value="0" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Button>
+                        <Button Style="{StaticResource TitleGlyphButton}" Click="Appearance_Click" ToolTip="外观：皮肤 / 透明度">
+                            <TextBlock Text="🎨" FontSize="11" />
+                        </Button>
+                        <Button Style="{StaticResource TitleGlyphButton}" Click="Close_Click" ToolTip="关闭">
+                            <TextBlock Text="✕" FontSize="12" FontWeight="Bold" />
+                        </Button>
                     </StackPanel>
                 </Grid>
             </Border>
@@ -80,13 +146,12 @@
 
             <!-- 状态条 -->
             <Border Grid.Row="2"
-                    Background="{DynamicResource Brush.PaperDeep}"
+                    Background="{Binding PaperDeepBrush}"
                     CornerRadius="0,0,11,11"
                     Padding="12,4">
                 <TextBlock Text="{Binding StatusText}"
                            FontSize="11" TextTrimming="CharacterEllipsis"
                            Foreground="{DynamicResource Brush.InkSoft}" />
-            </Border>
-        </Grid>
+            </Border></Grid>
     </Border>
 </Window>

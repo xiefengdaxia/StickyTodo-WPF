@@ -17,14 +17,12 @@
         TextOptions.TextFormattingMode="Display">
 
     <Border x:Name="NoteRoot"
+            Effect="{Binding CurrentOpacity, Converter={StaticResource PaperShadow}}"
             Margin="10"
             CornerRadius="12"
-            Background="{DynamicResource Brush.Paper}"
+            Background="{Binding PaperBrush}"
             BorderBrush="#59FFFFFF"
             BorderThickness="1">
-        <Border.Effect>
-            <DropShadowEffect BlurRadius="18" ShadowDepth="3" Opacity="0.30" Color="#FF000000" Direction="270" />
-        </Border.Effect>
 
         <Grid>
             <Grid.RowDefinitions>
@@ -36,7 +34,7 @@
 
             <!-- 标题栏 -->
             <Border Grid.Row="0"
-                    Background="{DynamicResource Brush.PaperDeep}"
+                    Background="{Binding PaperDeepBrush}"
                     CornerRadius="11,11,0,0"
                     Padding="12,8"
                     MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">

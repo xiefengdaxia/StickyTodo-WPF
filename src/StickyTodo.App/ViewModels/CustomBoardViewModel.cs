@@ -30,6 +30,8 @@ public partial class CustomBoardViewModel : ObservableObject, IAppearanceHost
         Windows = windows;
         BoardName = board.Name;
         _windowOpacity = settings.GetWindowOpacity(board.Id);
+        _isTopmost = settings.GetBoardTopmost(board.Id);
+        _isLocked = settings.GetBoardLocked(board.Id);
     }
 
     public WindowManager Windows { get; }
@@ -60,6 +62,26 @@ public partial class CustomBoardViewModel : ObservableObject, IAppearanceHost
     /// <summary>整窗不透明度（连文字一起），绑定到 Window.Opacity。</summary>
     [ObservableProperty]
     private double _windowOpacity = 1.0;
+
+    /// <summary>置顶（绑定 Window.Topmost），按看板 id 存。</summary>
+    [ObservableProperty]
+    private bool _isTopmost;
+
+    /// <summary>锁定穿透（WebView 点不到 + 窗口鼠标穿透），按看板 id 存。</summary>
+    [ObservableProperty]
+    private bool _isLocked;
+
+    public void ToggleTopmost()
+    {
+        IsTopmost = !IsTopmost;
+        _settings.SetBoardTopmost(BoardId, IsTopmost);
+    }
+
+    public void ToggleLock()
+    {
+        IsLocked = !IsLocked;
+        _settings.SetBoardLocked(BoardId, IsLocked);
+    }
 
     /// <summary>重读看板行（MCP 改过内容后 WindowManager 调）。返回 HTML 是否有变化。</summary>
     public bool RefreshFromBoard()

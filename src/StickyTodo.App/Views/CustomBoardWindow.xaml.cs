@@ -39,7 +39,11 @@ public partial class CustomBoardWindow : Window
             _geometry.Arm();
         };
 
-        Loaded += async (_, _) => await InitializeWebAsync();
+        Loaded += async (_, _) =>
+        {
+            await InitializeWebAsync();
+            ApplyLockInteraction();
+        };
         Closed += (_, _) => DetachCollector();
     }
 
@@ -93,6 +97,12 @@ public partial class CustomBoardWindow : Window
             var environment = await Microsoft.Web.WebView2.Core.CoreWebView2Environment.CreateAsync(
                 userDataFolder: AppPaths.WebView2DataDirectory);
             await Web.EnsureCoreWebView2Async(environment);
+
+            // 页面保存不了状态（opaque origin 下 localStorage 会被拒），改由宿主落盘
+            Web.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
+
+            // WebView2 是独立的合成表面，Window.Opacity 管不到它 —— 整窗透明度得靠页面自己
+            _viewModel.PropertyChanged += OnViewModelPropertyChanged;
 
             // 看板是「展示面板」不是浏览器：弹窗和下载一律拦下
             Web.CoreWebView2.NewWindowRequested += (_, e) => e.Handled = true;
@@ -151,7 +161,7 @@ public partial class CustomBoardWindow : Window
         PushDataToWeb();
     }
 
-    /// <summary>把当前快照发给页面：board 元信息 + data/error 二选一。</summary>
+    /// <summary>把当前快照发给页面：board 元信息 + 页面界面状态 + data/error 二选一。</summary>
     private void PushDataToWeb()
     {
         if (!_webReady || Web.CoreWebView2 is null)
@@ -167,6 +177,10 @@ public partial class CustomBoardWindow : Window
                 ["type"] = "board",
                 ["name"] = _viewModel.BoardName,
             }.ToJsonString());
+
+            PushUiState();
+            ApplyWebOpacity();
+            ApplyWebBackground();
 
             if (snapshot is null)
             {
@@ -199,6 +213,232 @@ public partial class CustomBoardWindow : Window
         }
     }
 
+    /// <summary>整窗不透明度变化时同步给网页（HwndHost 内容不参与 WPF 的 Opacity）。</summary>
+    private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(CustomBoardViewModel.WindowOpacity))
+        {
+            Dispatcher.BeginInvoke(ApplyWebOpacity);
+        }
+        else if (e.PropertyName == nameof(CustomBoardViewModel.CurrentOpacity))
+        {
+            Dispatcher.BeginInvoke(ApplyWebBackground);
+        }
+    }
+
+    private void ApplyWebOpacity()
+    {
+        if (!_webReady || Web.CoreWebView2 is null)
+        {
+            return;
+        }
+
+        var alpha = Math.Clamp(_viewModel.WindowOpacity, 0.2, 1.0).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+        try
+        {
+            _ = Web.CoreWebView2.ExecuteScriptAsync("document.documentElement.style.opacity='" + alpha + "'");
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Debug(ex, "[custom] 同步网页透明度失败");
+        }
+    }
+
+    /// <summary>看板「背景」透明度变化时同步给网页（网页自己画的卡片底，WPF 的纸面被它盖住了）。</summary>
+    private void ApplyWebBackground()
+    {
+        if (!_webReady || Web.CoreWebView2 is null)
+        {
+            return;
+        }
+
+        var alpha = Math.Clamp(_viewModel.CurrentOpacity, 0.15, 1.0);
+        var color = BrushColor(_viewModel.PaperBrush);
+        try
+        {
+            // 只给页面一个 alpha 变量，由页面自己画圆角卡片。
+            // 注意：不要再给 <html> 铺底色 —— WebView 是矩形 HWND，
+            // 铺了底色就会盖住卡片圆角，看起来像"白色粗边框"。
+            var script = string.Format(
+                System.Globalization.CultureInfo.InvariantCulture,
+                "document.documentElement.style.setProperty('--paper-alpha','{0:0.###}');",
+                alpha);
+            _ = Web.CoreWebView2.ExecuteScriptAsync(script);
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Debug(ex, "[custom] 同步网页背景透明度失败");
+        }
+    }
+
+    /// <summary>把画笔压成纯色（渐变取第一段），背景只关心色相。</summary>
+    private static System.Windows.Media.Color BrushColor(System.Windows.Media.Brush? brush) => brush switch
+    {
+        System.Windows.Media.SolidColorBrush solid => solid.Color,
+        System.Windows.Media.GradientBrush gradient when gradient.GradientStops.Count > 0 => gradient.GradientStops[0].Color,
+        _ => System.Windows.Media.Colors.White,
+    };
+
+    private void PushUiState()
+    {
+        var saved = BoardUiStateStore.Load(_viewModel.BoardId);
+        if (string.IsNullOrWhiteSpace(saved) || Web.CoreWebView2 is null)
+        {
+            return;
+        }
+
+        try
+        {
+            Web.CoreWebView2.PostWebMessageAsJson(new JsonObject
+            {
+                ["type"] = "ui",
+                ["state"] = JsonNode.Parse(saved),
+            }.ToJsonString());
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Debug(ex, "[custom] 推送看板界面状态失败");
+        }
+    }
+
+    /// <summary>页面把界面状态（区间、勾选…）交回来，宿主落盘，下次打开再推回去。</summary>
+    private void OnWebMessageReceived(object? sender, Microsoft.Web.WebView2.Core.CoreWebView2WebMessageReceivedEventArgs e)
+    {
+        try
+        {
+            var text = e.TryGetWebMessageAsString();
+            if (string.IsNullOrWhiteSpace(text) || text.Length > BoardUiStateStore.MaxBytes)
+            {
+                return;
+            }
+
+            using var document = System.Text.Json.JsonDocument.Parse(text);
+            var root = document.RootElement;
+            if (root.ValueKind != System.Text.Json.JsonValueKind.Object ||
+                !root.TryGetProperty("type", out var type) ||
+                type.GetString() != "ui.state" ||
+                !root.TryGetProperty("state", out var state))
+            {
+                return;
+            }
+
+            BoardUiStateStore.Save(_viewModel.BoardId, state.GetRawText());
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Debug(ex, "[custom] 保存看板界面状态失败");
+        }
+    }
+
+    private UnlockChipWindow? _unlockChip;
+
+    /// <summary>
+    /// 免控件的缩放：拦截 <c>WM_NCHITTEST</c>，光标贴近窗口边缘时直接告诉系统
+    /// “这里是左/右/上/下边框”，由 Windows 自己完成拖拽缩放。
+    ///
+    /// 这样做不往界面上画任何东西（之前那套隐形 Thumb 必须占一圈纸面，结果就是白边），
+    /// 也不会被 WebView2 的 HWND 挡住——命中测试发生在父窗口的窗口过程里。
+    /// </summary>
+    private const int WmNcHitTest = 0x0084;
+    private const int ResizeGripDip = 14;
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        if (PresentationSource.FromVisual(this) is System.Windows.Interop.HwndSource source)
+        {
+            source.AddHook(NcHitTestHook);
+        }
+    }
+
+    private IntPtr NcHitTestHook(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (message != WmNcHitTest || WindowState != WindowState.Normal || ResizeMode == ResizeMode.NoResize || _viewModel.IsLocked)
+        {
+            return IntPtr.Zero;
+        }
+
+        try
+        {
+            // lParam = 屏幕坐标（低 16 位 x，高 16 位 y）
+            var packed = lParam.ToInt64();
+            var screenX = (short)(packed & 0xFFFF);
+            var screenY = (short)((packed >> 16) & 0xFFFF);
+            var point = PointFromScreen(new Point(screenX, screenY));
+
+            const double grip = ResizeGripDip;
+            var left = point.X <= grip;
+            var right = point.X >= ActualWidth - grip;
+            var top = point.Y <= grip;
+            var bottom = point.Y >= ActualHeight - grip;
+
+            int? hit = (left, right, top, bottom) switch
+            {
+                (true, _, true, _) => 13,   // HTTOPLEFT
+                (_, true, true, _) => 14,   // HTTOPRIGHT
+                (true, _, _, true) => 16,   // HTBOTTOMLEFT
+                (_, true, _, true) => 17,   // HTBOTTOMRIGHT
+                (true, _, _, _) => 10,      // HTLEFT
+                (_, true, _, _) => 11,      // HTRIGHT
+                (_, _, true, _) => 12,      // HTTOP
+                (_, _, _, true) => 15,      // HTBOTTOM
+                _ => (int?)null,
+            };
+
+            if (hit is null)
+            {
+                return IntPtr.Zero;
+            }
+
+            handled = true;
+            return new IntPtr(hit.Value);
+        }
+        catch (Exception)
+        {
+            return IntPtr.Zero;
+        }
+    }
+
+    /// <summary>八个隐形热区拖边改大小（WindowStyle=None 的窗口没有系统边框）。</summary>
+    private void ResizeThumb_DragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
+    {
+        if (WindowState != WindowState.Normal || sender is not FrameworkElement thumb)
+        {
+            return;
+        }
+
+        var tag = thumb.Tag as string ?? string.Empty;
+        var dx = e.HorizontalChange;
+        var dy = e.VerticalChange;
+        var width = ActualWidth;
+        var height = ActualHeight;
+        var left = Left;
+        var top = Top;
+
+        if (tag.Contains('L')) { width -= dx; left += dx; }
+        if (tag.Contains('R')) { width += dx; }
+        if (tag.Contains('T')) { height -= dy; top += dy; }
+        if (tag.Contains('B')) { height += dy; }
+
+        if (width < MinWidth)
+        {
+            if (tag.Contains('L')) { left -= MinWidth - width; }
+            width = MinWidth;
+        }
+
+        if (height < MinHeight)
+        {
+            if (tag.Contains('T')) { top -= MinHeight - height; }
+            height = MinHeight;
+        }
+
+        Width = width;
+        Height = height;
+        if (tag.Contains('L')) { Left = left; }
+        if (tag.Contains('T')) { Top = top; }
+    }
+
+    /// <summary>标题栏 ↻：立刻重跑一次采集器（页面里自己的刷新不受影响）。</summary>
     private async void Refresh_Click(object sender, RoutedEventArgs e)
     {
         if (_collector is null)
@@ -218,6 +458,47 @@ public partial class CustomBoardWindow : Window
         {
             RefreshButton.IsEnabled = true;
         }
+    }
+
+    private void ToggleTopmost_Click(object sender, RoutedEventArgs e) => _viewModel.ToggleTopmost();
+
+    private void ToggleLock_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.ToggleLock();
+        ApplyLockInteraction();
+    }
+
+    /// <summary>锁定 = 置灰 + 鼠标穿透；靠右上角的小锁徽标（或 Ctrl+Alt+L）解锁。</summary>
+    private void ApplyLockInteraction()
+    {
+        var locked = _viewModel.IsLocked;
+        ClickThrough.Apply(this, locked);
+        Web.IsHitTestVisible = !locked;
+
+        if (!locked)
+        {
+            _unlockChip?.Close();
+            _unlockChip = null;
+            return;
+        }
+
+        if (_unlockChip is { IsLoaded: true })
+        {
+            return;
+        }
+
+        _unlockChip = new UnlockChipWindow(this, LockButton, () =>
+        {
+            if (_viewModel.IsLocked)
+            {
+                _viewModel.ToggleLock();
+            }
+
+            ApplyLockInteraction();
+        });
+        _unlockChip.Closed += (_, _) => _unlockChip = null;
+        _unlockChip.Show();
+        _unlockChip.FollowAnchor();
     }
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();

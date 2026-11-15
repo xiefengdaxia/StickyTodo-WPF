@@ -5,7 +5,7 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <!-- 版本号：发布脚本会用 -p:Version 覆盖；这里写死是为了本地跑的构建也有正确版本，
          否则「检查更新」拿不到 1.0.0 以外的信息 -->
-    <Version>1.7.11</Version>
+    <Version>1.7.12</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
@@ -45,6 +45,14 @@
     <ProjectReference Include="..\StickyTodo.Mcp\StickyTodo.Mcp.csproj" />
     <ProjectReference Include="..\StickyTodo.Weather\StickyTodo.Weather.csproj" />
     <ProjectReference Include="..\StickyTodo.Updates\StickyTodo.Updates.csproj" />
+  </ItemGroup>
+
+  <!-- 看板市场内容跟着进输出目录（exe 旁边的 market\），发布包也就自带市场 -->
+  <ItemGroup>
+    <Content Include="..\..\market\**\*">
+      <Link>market\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

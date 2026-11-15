@@ -32,6 +32,7 @@
         <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis" />
         <conv:InverseBoolConverter x:Key="InverseBool" />
         <conv:NullToCollapsedConverter x:Key="NullToCollapsed" />
+    <conv:ShadowWhenOpaqueConverter x:Key="PaperShadow" />
         <!-- 多语言：{Binding Converter={StaticResource Loc}, ConverterParameter=key} -->
         <conv:LocalizedStringConverter x:Key="Loc" />
         <conv:LocalizedFormatConverter x:Key="LocFormat" />

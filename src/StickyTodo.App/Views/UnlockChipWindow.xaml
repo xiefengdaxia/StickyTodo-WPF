@@ -16,16 +16,14 @@
     <Border x:Name="Chip"
             Width="26" Height="26"
             CornerRadius="13"
-            Background="{DynamicResource Brush.Accent}"
-            BorderBrush="#66FFFFFF"
+            Background="{DynamicResource Brush.AccentSoft}"
+            BorderBrush="{DynamicResource Brush.Line}"
             BorderThickness="1"
             Cursor="Hand"
             ToolTip="点击解锁（看板已锁定，鼠标穿透）"
             MouseLeftButtonUp="Chip_Click"
             HorizontalAlignment="Center"
-            VerticalAlignment="Center">        <Border.Effect>
-            <DropShadowEffect BlurRadius="8" ShadowDepth="1" Opacity="0.35" Color="#FF000000" Direction="270" />
-        </Border.Effect>
+            VerticalAlignment="Center">
         <TextBlock Text="🔓"
                    FontSize="12"
                    HorizontalAlignment="Center"

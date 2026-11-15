@@ -349,6 +349,21 @@ public partial class ManagerWindow : Window
     private async void CreateCustom_Click(object sender, RoutedEventArgs e) =>
         await CreateBoardAsync(BoardKind.Custom);
 
+    private static MarketWindow? _marketWindow;
+
+    private void Market_Click(object sender, RoutedEventArgs e)
+    {
+        if (_marketWindow is { IsLoaded: true })
+        {
+            _marketWindow.Activate();
+            return;
+        }
+
+        _marketWindow = new MarketWindow(_viewModel, _windows) { Owner = this };
+        _marketWindow.Closed += (_, _) => _marketWindow = null;
+        _marketWindow.Show();
+    }
+
     private async Task CreateBoardAsync(BoardKind kind)
     {
         var (title, initial) = kind switch

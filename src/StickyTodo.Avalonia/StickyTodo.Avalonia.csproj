@@ -6,7 +6,7 @@
          本应用只跑 Windows，故用 net6.0-windows：平台分析器不再对 Windows 专属 API
          （性能计数器等）报 CA1416，也不影响 Win7 路线 -->
     <TargetFramework>net6.0-windows</TargetFramework>
-    <Version>1.7.11</Version>
+    <Version>1.7.12</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
@@ -42,6 +42,14 @@
 
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+
+  <!-- 看板市场内容跟着进输出目录（exe 旁边的 market\），发布包也就自带市场（与 WPF 版同口径） -->
+  <ItemGroup>
+    <Content Include="..\..\market\**\*">
+      <Link>market\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

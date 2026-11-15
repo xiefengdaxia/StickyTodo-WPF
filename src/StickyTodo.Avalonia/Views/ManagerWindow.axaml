@@ -71,7 +71,15 @@
               <Button Content="{loc:Loc manager.newPerformance}" Classes="ghost" HorizontalContentAlignment="Left"
                       Padding="12,8" Margin="0,0,0,6" Click="CreatePerformance_Click" />
               <Button Content="{loc:Loc manager.newCustom}" Classes="ghost" HorizontalContentAlignment="Left"
-                      Padding="12,8" Margin="0,0,0,14" Click="CreateCustom_Click" />
+                      Padding="12,8" Margin="0,0,0,6" Click="CreateCustom_Click" />
+              <!-- 看板市场入口 -->
+              <Button Classes="ghost" HorizontalContentAlignment="Left"
+                      Padding="12,8" Margin="0,0,0,14" Click="Market_Click">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="🧩" FontSize="12" VerticalAlignment="Center" />
+                  <TextBlock Text="{loc:Loc market.title}" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
 
               <TextBlock Text="{loc:Loc manager.selected}" Classes="section" Margin="2,0,0,7" />
               <Button Content="{loc:Loc common.rename}" Classes="ghost" HorizontalContentAlignment="Left"

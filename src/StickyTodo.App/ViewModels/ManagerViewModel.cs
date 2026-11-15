@@ -73,7 +73,9 @@ public sealed class BoardRowViewModel : ObservableObject
                 ? Loc.T("manager.summaryToken")
                 : IsToolBoard
                     ? Loc.T("manager.summaryTool")
-                    : Loc.F("manager.summaryTodo", Pending, Done);
+                    : Board.Kind == BoardKind.Custom
+                        ? Loc.T("manager.summaryCustom")
+                        : Loc.F("manager.summaryTodo", Pending, Done);
 
     public string WindowHint => Board.Window is null ? string.Empty : Loc.T("manager.rememberedGeometry");
 
@@ -204,4 +206,41 @@ public partial class ManagerViewModel : ObservableObject
             return false;
         }
     }
+
+    /// <summary>从看板市场安装：同名自定义看板已存在就覆盖内容，否则新建一个。</summary>
+    public async Task<Board?> InstallMarketBoardAsync(string name, string html, string? script, int? intervalSeconds)
+    {
+        try
+        {
+            ErrorText = null;
+            var existing = Boards
+                .Select(row => row.Board)
+                .FirstOrDefault(b => b.Kind == BoardKind.Custom &&
+                                     string.Equals(b.Name, name, StringComparison.OrdinalIgnoreCase));
+
+            if (existing is not null)
+            {
+                await Task.Run(() => _service.SaveCustomBoard(existing.Id, html, script, intervalSeconds));
+                await LoadAsync();
+                return existing;
+            }
+
+            var board = await Task.Run(() =>
+            {
+                var created = _service.CreateBoard(name, BoardKind.Custom);
+                _service.SaveCustomBoard(created.Id, html, script, intervalSeconds);
+                return created;
+            });
+            await LoadAsync();
+            return board;
+        }
+        catch (Exception ex)
+        {
+            ErrorText = ex.Message;
+            return null;
+        }
+    }
+
+    /// <summary>卸载市场看板（就是删除这个自定义看板）。</summary>
+    public Task<bool> UninstallBoardAsync(Board board) => DeleteBoardAsync(board);
 }

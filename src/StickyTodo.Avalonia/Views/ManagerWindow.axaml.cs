@@ -152,6 +152,39 @@ public partial class ManagerWindow : Window
     private async void CreateCustom_Click(object? sender, RoutedEventArgs e) =>
         await CreateBoardAsync(BoardKind.Custom, Loc.T("manager.newCustom"), Loc.T("manager.newCustomDefault"));
 
+    /// <summary>看板市场窗口（单例复用）：开着就激活，关掉后再点重新建一个。</summary>
+    private static MarketWindow? _marketWindow;
+
+    private void Market_Click(object? sender, RoutedEventArgs e)
+    {
+        var services = App.Services;
+        if (services is null)
+        {
+            return;
+        }
+
+        if (_marketWindow is { IsVisible: true })
+        {
+            _marketWindow.Activate();
+            return;
+        }
+
+        _marketWindow = new MarketWindow(_viewModel, services.Windows);
+        _marketWindow.Closed += (_, _) => _marketWindow = null;
+
+        if (IsVisible)
+        {
+            // 挂在管理面板上：随管理面板一起置顶，居中于它
+            _marketWindow.Show(this);
+        }
+        else
+        {
+            // 没有 owner 时不能沿用 CenterOwner，退回屏幕居中
+            _marketWindow.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            _marketWindow.Show();
+        }
+    }
+
     private async Task CreateBoardAsync(BoardKind kind, string title, string initial)
     {
         var name = await PromptWindow.PromptAsync(this, title, Loc.T("manager.boardName"), initial);

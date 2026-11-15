@@ -1,0 +1,136 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:StickyTodo.Notes.Localization"
+        x:Class="StickyTodo.Notes.Views.MarketWindow"
+        Title="{loc:Loc market.title}"
+        Width="980" Height="700"
+        MinWidth="620" MinHeight="420"
+        SystemDecorations="None"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent"
+        CanResize="True"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        FontFamily="Microsoft YaHei UI, Segoe UI"
+        UseLayoutRounding="True">
+
+  <Window.Styles>
+    <!--
+      卡片全部在代码里 new 出来（内容随市场目录变化），这里只给「类 → 外观」的映射：
+      Selector 用 class，代码里 Classes.Add(...) 挂上，画刷一律 DynamicResource 跟着皮肤变。
+    -->
+    <Style Selector="Border.marketCard">
+      <Setter Property="Width" Value="288" />
+      <Setter Property="Margin" Value="0,0,12,12" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Background" Value="{DynamicResource Brush.PaperOpaque}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Line}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+
+    <!-- 预览图：固定高度 + 圆角裁切（图片按 UniformToFill 填满）；深色底与 WPF 版一致 -->
+    <Style Selector="Border.marketPreview">
+      <Setter Property="Height" Value="152" />
+      <Setter Property="CornerRadius" Value="9,9,0,0" />
+      <Setter Property="Background" Value="#FF2A2A2A" />
+      <Setter Property="ClipToBounds" Value="True" />
+    </Style>
+
+    <Style Selector="TextBlock.cardName">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="TextBlock.cardVersion">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="Opacity" Value="0.55" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.InkSoft}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="6,0,0,0" />
+    </Style>
+
+    <Style Selector="TextBlock.cardSummary">
+      <Setter Property="FontSize" Value="11.5" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.Ink}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+      <Setter Property="MaxHeight" Value="46" />
+      <Setter Property="Opacity" Value="0.85" />
+      <Setter Property="Margin" Value="0,4,0,0" />
+    </Style>
+
+    <Style Selector="TextBlock.cardState">
+      <Setter Property="FontSize" Value="10.5" />
+      <Setter Property="Opacity" Value="0.6" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.InkSoft}" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style Selector="TextBlock.cardNoPreview">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="#FF9A9A9A" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- 标签小药丸 -->
+    <Style Selector="Border.cardTag">
+      <Setter Property="BorderBrush" Value="{DynamicResource Brush.Line}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="5" />
+      <Setter Property="Padding" Value="5,0,5,1" />
+      <Setter Property="Margin" Value="0,0,4,4" />
+    </Style>
+
+    <Style Selector="TextBlock.cardTagText">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="Opacity" Value="0.7" />
+      <Setter Property="Foreground" Value="{DynamicResource Brush.InkSoft}" />
+    </Style>
+  </Window.Styles>
+
+  <Border Name="Shell" Classes="shell">
+    <Grid RowDefinitions="Auto,*,Auto">
+
+      <!-- 标题栏：必须有背景色才能接住 PointerPressed（透明控件会让事件穿透） -->
+      <Border Grid.Row="0" Name="TitleBar" Background="Transparent" Padding="14,9"
+              CornerRadius="13,13,0,0"
+              BorderBrush="{DynamicResource Brush.Line}" BorderThickness="0,0,0,1">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="🧩" FontSize="14" VerticalAlignment="Center" />
+            <TextBlock Text="{loc:Loc market.title}" Classes="title" Margin="7,0,0,0" VerticalAlignment="Center" />
+            <TextBlock Text="{loc:Loc market.subtitle}" Classes="caption" Margin="10,0,0,0"
+                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+
+          <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+            <Button Classes="ghost" Content="{loc:Loc market.refresh}" FontSize="11.5"
+                    Padding="10,4" Click="Refresh_Click" />
+            <Button Classes="chromeClose" Content="✕" Margin="8,0,0,0" Click="Close_Click" />
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <!-- 卡片流：WrapPanel 按可用宽度自动换行 -->
+      <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                    HorizontalScrollBarVisibility="Disabled" Padding="16,14,8,4">
+        <StackPanel>
+          <WrapPanel Name="Cards" Orientation="Horizontal" />
+          <TextBlock Name="EmptyText" Text="{loc:Loc market.empty}" Classes="caption"
+                     Margin="2,10,0,0" IsVisible="False" />
+        </StackPanel>
+      </ScrollViewer>
+
+      <!-- 底部状态栏：装了几个 / 目录在哪 -->
+      <Border Grid.Row="2" CornerRadius="0,0,13,13" Padding="14,6"
+              BorderBrush="{DynamicResource Brush.Line}" BorderThickness="0,1,0,0">
+        <TextBlock Name="StatusText" Classes="caption" TextTrimming="CharacterEllipsis" />
+      </Border>
+    </Grid>
+  </Border>
+</Window>

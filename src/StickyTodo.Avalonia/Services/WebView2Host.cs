@@ -34,6 +34,12 @@ public sealed class WebView2Host : NativeControlHost
     /// <summary>初始化失败（缺运行时等）。</summary>
     public event EventHandler<Exception>? Failed;
 
+    /// <summary>页面 postMessage 过来的消息（JSON 文本）。在 UI 线程触发。</summary>
+    public event EventHandler<string>? WebMessageReceived;
+
+    /// <summary>一次导航结束（可以安全地往页面里推消息 / 注入脚本）。</summary>
+    public event EventHandler? NavigationCompleted;
+
     public bool IsReady => _core is not null;
 
     public WebView2Host()
@@ -105,6 +111,10 @@ public sealed class WebView2Host : NativeControlHost
             _core.NewWindowRequested += (_, e) => e.Handled = true;
             _core.DownloadStarting += (_, e) => e.Cancel = true;
 
+            // 页面 postMessage（区间、勾选这类界面状态）→ 转给窗口落盘
+            _core.WebMessageReceived += OnCoreWebMessageReceived;
+            _core.NavigationCompleted += (_, _) => NavigationCompleted?.Invoke(this, EventArgs.Empty);
+
             _webReady = true;
             SyncControllerBounds();
 
@@ -145,6 +155,59 @@ public sealed class WebView2Host : NativeControlHost
         }
         catch (Exception)
         {
+        }
+    }
+
+    /// <summary>
+    /// 在页面里执行一段脚本（不关心返回值）。WebView2 是独立合成表面，
+    /// 窗口的 Opacity 管不到它，整窗/背景透明度只能靠注入样式让页面自己画。
+    /// </summary>
+    public void ExecuteScript(string script)
+    {
+        try
+        {
+            if (_core is not null)
+            {
+                _ = _core.ExecuteScriptAsync(script);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Debug("[custom] 注入脚本失败：" + ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// 页面 postMessage → 纯文本抛给窗口。字符串消息优先；页面直接 postMessage(obj) 时
+    /// 拿 JSON 原文交给宿主自己解析。
+    /// </summary>
+    private void OnCoreWebMessageReceived(
+        object? sender,
+        Microsoft.Web.WebView2.Core.CoreWebView2WebMessageReceivedEventArgs e)
+    {
+        try
+        {
+            string? text;
+            try
+            {
+                text = e.TryGetWebMessageAsString();
+            }
+            catch (Exception)
+            {
+                // 不是字符串消息（页面传了对象）：退回 JSON 原文
+                text = e.WebMessageAsJson;
+            }
+
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return;
+            }
+
+            WebMessageReceived?.Invoke(this, text);
+        }
+        catch (Exception ex)
+        {
+            Log.Debug("[custom] 读取网页消息失败：" + ex.Message);
         }
     }
 

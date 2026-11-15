@@ -207,4 +207,44 @@ public partial class ManagerViewModel : ObservableObject
             return false;
         }
     }
+
+    /// <summary>
+    /// 安装市场看板：同名自定义看板就覆盖内容，没有就新建一个再写入（与 WPF 版同一套逻辑）。
+    /// 名字是市场的「已安装」判定依据，所以覆盖也按名字找。
+    /// </summary>
+    public async Task<Board?> InstallMarketBoardAsync(string name, string html, string? script, int? intervalSeconds)
+    {
+        try
+        {
+            ErrorText = null;
+            var existing = Boards
+                .Select(row => row.Board)
+                .FirstOrDefault(b => b.Kind == BoardKind.Custom &&
+                                     string.Equals(b.Name, name, StringComparison.OrdinalIgnoreCase));
+
+            if (existing is not null)
+            {
+                await Task.Run(() => _service.SaveCustomBoard(existing.Id, html, script, intervalSeconds));
+                await LoadAsync();
+                return existing;
+            }
+
+            var board = await Task.Run(() =>
+            {
+                var created = _service.CreateBoard(name, BoardKind.Custom);
+                _service.SaveCustomBoard(created.Id, html, script, intervalSeconds);
+                return created;
+            });
+            await LoadAsync();
+            return board;
+        }
+        catch (Exception ex)
+        {
+            ErrorText = ex.Message;
+            return null;
+        }
+    }
+
+    /// <summary>卸载市场看板（就是删除这个自定义看板）。</summary>
+    public Task<bool> UninstallBoardAsync(Board board) => DeleteBoardAsync(board);
 }
