@@ -38,8 +38,37 @@ jobs:
           dotnet-version: |
             8.0.x
             6.0.x
+      # 和 build.yml 保持同一套步骤：先整体 restore，再把失败的用例写进 job summary
+      # 并用 ::error:: 注解输出（注解能通过 GitHub API 读到，没登录网页也能定位失败用例）。
+      - name: Restore
+        run: dotnet restore StickyTodo.sln --nologo
       - name: Test
-        run: dotnet test tests/StickyTodo.Tests/StickyTodo.Tests.csproj -c Release --nologo
+        shell: pwsh
+        run: |
+          dotnet test tests/StickyTodo.Tests/StickyTodo.Tests.csproj -c Release --nologo --no-restore `
+            --logger "trx;LogFileName=results.trx" --results-directory TestResults
+
+          if ($LASTEXITCODE -eq 0) { exit 0 }
+
+          $summary = @()
+          $trx = "TestResults/results.trx"
+          if (Test-Path $trx) {
+            [xml]$doc = Get-Content $trx
+            $failed = @($doc.TestRun.Results.UnitTestResult | Where-Object { $_.outcome -eq 'Failed' })
+            $summary += "### 挂了 $($failed.Count) 个用例"
+            foreach ($item in $failed) {
+              $msg = $item.Output.ErrorInfo.Message
+              $summary += "- $($item.testName) — $msg"
+              $oneLine = ($msg -split "`n")[0]
+              Write-Host "::error title=$($item.testName)::$oneLine"
+            }
+          } else {
+            $summary += "测试运行器没有产出 trx 文件"
+            Write-Host "::error title=test::没有产出 trx 文件"
+          }
+
+          if ($summary.Count -gt 0) { $summary -join "`n" | Out-File $env:GITHUB_STEP_SUMMARY -Append }
+          exit 1
       # 冒烟测试要跑 App 的 exe，而 dotnet test 不会编译 App 项目（测试只引用 Core/Infra）
       - name: Build app
         run: dotnet build src/StickyTodo.App/StickyTodo.App.csproj -c Release --nologo
