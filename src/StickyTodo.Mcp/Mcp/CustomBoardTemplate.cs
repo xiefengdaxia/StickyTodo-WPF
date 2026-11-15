@@ -8,6 +8,9 @@ namespace StickyTodo.Mcp;
 ///   { "type": "data",   "data": ...,       "fetchedAt": "..." }  → 采集到的数据
 ///   { "type": "error",  "message": "..." }                       → 采集失败
 ///   { "type": "board",  "name": "...",      "updatedAt": "..." } → 看板元信息
+/// 采集脚本（board.js）里除了 http_get / http_post / http 三个网络函数，
+/// 还可以用 <c>mcp(toolName, args)</c> 直接调用本机 MCP 工具
+/// （如 <c>mcp('list_todos', {})</c>），返回已解析的对象。
 /// </summary>
 public static class CustomBoardTemplate
 {

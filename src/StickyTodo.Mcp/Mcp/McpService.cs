@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using StickyTodo.Core.Abstractions;
 using StickyTodo.Core.Pomodoro;
 using StickyTodo.Core.Services;
@@ -43,6 +45,9 @@ public sealed class McpService : IDisposable
         Registry = new McpToolRegistry(todos, settings, pomodoro, weather, tokens, _collector, ui);
         Handler = new McpProtocolHandler(Registry);
         Server = new McpHttpServer(Handler, ReadToken, () => settings.McpPort, Log);
+
+        // 采集脚本里的 mcp()：走同一套工具实现，但不占端口、不把令牌交给脚本。
+        _collector.AttachMcpBridge(CallToolForScript);
     }
 
     /// <summary>数据采集器：进程活着就一直在跑（只有配了脚本的看板才有开销）。</summary>
@@ -53,6 +58,84 @@ public sealed class McpService : IDisposable
     public McpProtocolHandler Handler { get; }
 
     public McpHttpServer Server { get; }
+
+    /// <summary>
+    /// 采集脚本里 mcp(tool, args) 的落地：进程内跑一遍 JSON-RPC 处理链，
+    /// 和 HTTP 进来的调用走完全相同的代码路径（同一个 Registry），脚本拿不到 Bearer 令牌。
+    /// 工具返回的内容是文本（工具结果里的 content[0].text），这里原样交给脚本 JSON.parse。
+    /// </summary>
+    private string? CallToolForScript(string tool, string? argsJson)
+    {
+        JsonObject arguments;
+        try
+        {
+            arguments = string.IsNullOrWhiteSpace(argsJson)
+                ? new JsonObject()
+                : JsonNode.Parse(argsJson) as JsonObject ?? new JsonObject();
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("mcp('" + tool + "') 的参数不是合法 JSON 对象：" + ex.Message);
+        }
+
+        var request = new JsonObject
+        {
+            ["jsonrpc"] = "2.0",
+            ["id"] = 1,
+            ["method"] = "tools/call",
+            ["params"] = new JsonObject
+            {
+                ["name"] = tool,
+                ["arguments"] = arguments,
+            },
+        };
+
+        using var document = JsonDocument.Parse(request.ToJsonString());
+        var response = Handler.HandleAsync(document.RootElement).GetAwaiter().GetResult();
+        if (string.IsNullOrWhiteSpace(response))
+        {
+            return null;
+        }
+
+        using var parsed = JsonDocument.Parse(response);
+        var root = parsed.RootElement;
+        if (root.TryGetProperty("error", out var error))
+        {
+            var message = error.TryGetProperty("message", out var text) && text.ValueKind == JsonValueKind.String
+                ? text.GetString()
+                : error.ToString();
+            throw new InvalidOperationException("mcp('" + tool + "') 失败：" + message);
+        }
+
+        if (!root.TryGetProperty("result", out var result))
+        {
+            return null;
+        }
+
+        var payload = FirstContentText(result);
+        if (result.TryGetProperty("isError", out var isError) && isError.ValueKind == JsonValueKind.True)
+        {
+            throw new InvalidOperationException("mcp('" + tool + "') 返回错误：" + (payload ?? "未知错误"));
+        }
+
+        return payload;
+    }
+
+    private static string? FirstContentText(JsonElement result)
+    {
+        if (result.TryGetProperty("content", out var content) &&
+            content.ValueKind == JsonValueKind.Array &&
+            content.GetArrayLength() > 0)
+        {
+            var first = content[0];
+            if (first.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.String)
+            {
+                return text.GetString();
+            }
+        }
+
+        return null;
+    }
 
     /// <summary>启动采集器（幂等）。与 MCP 开关无关——看板数据采集独立于接入开关。</summary>
     public void StartCollector() => Collector.Start();

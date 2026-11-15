@@ -54,6 +54,12 @@ public sealed class CollectorHost : IDisposable
     private CancellationTokenSource? _cts;
     private Task? _loop;
 
+    /// <summary>
+    /// 采集脚本里 mcp(tool, args) 的落地实现：由 McpService 注入，进程内直调 MCP 工具，
+    /// 脚本自己永远拿不到令牌。（不注入时脚本调 mcp() 会得到明确的错误。）
+    /// </summary>
+    private Func<string, string?, string?>? _mcpBridge;
+
     /// <summary>某看板采集结果变化（成功或失败都会触发）。事件在后台线程抛出。</summary>
     public event EventHandler<string>? DataChanged;
 
@@ -70,6 +76,9 @@ public sealed class CollectorHost : IDisposable
     };
 
     // ---------------- 对外 API ----------------
+
+    /// <summary>注入 mcp() 桥（McpService 构造尾部调用；不注入时脚本调 mcp() 会报错）。</summary>
+    public void AttachMcpBridge(Func<string, string?, string?> bridge) => _mcpBridge = bridge;
 
     public void Start()
     {
@@ -405,6 +414,11 @@ public sealed class CollectorHost : IDisposable
         function http_post(url, body, timeout_ms) {
             return __http_req("POST", String(url), body == null ? null : String(body), timeout_ms || 10000, "{}");
         }
+        function mcp(name, args) {
+            var text = __mcpCall(String(name), args == null ? null : JSON.stringify(args));
+            if (text == null || text === "") { return null; }
+            return JSON.parse(text);
+        }
         """;
 
     private string ExecuteScript(Board board, List<string> log)
@@ -419,6 +433,16 @@ public sealed class CollectorHost : IDisposable
         engine.SetValue("console", new ConsoleShim(log));
         engine.SetValue("__httpReq", new Func<string, string, string?, long, string, HttpResult>(
             (method, url, body, timeoutMs, headersJson) => HttpCall(method, url, body, timeoutMs, headersJson, log)));
+        engine.SetValue("__mcpCall", new Func<string, string?, string?>((name, argsJson) =>
+        {
+            var bridge = _mcpBridge;
+            if (bridge is null)
+            {
+                throw new InvalidOperationException("mcp() 不可用：采集器没有连到 MCP 服务。");
+            }
+
+            return bridge(name, argsJson);
+        }));
 
         engine.Execute(ScriptPreamble);
         engine.Execute(board.CustomScript!);

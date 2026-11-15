@@ -6,6 +6,7 @@ using StickyTodo.Core.Entities;
 using StickyTodo.Core.Entitlements;
 using StickyTodo.Core.Pomodoro;
 using StickyTodo.Core.Services;
+using StickyTodo.Mcp.Market;
 using StickyTodo.Weather;
 
 namespace StickyTodo.Mcp;
@@ -61,6 +62,7 @@ public sealed class McpToolRegistry
         RegisterData(Add);
         RegisterSystem(Add);
         RegisterCustomBoards(Add);
+        RegisterMarket(Add);
 
         _tools = list.ToDictionary(t => t.Name, StringComparer.Ordinal);
     }
@@ -340,6 +342,11 @@ public sealed class McpToolRegistry
         if (item.Note is not null)
         {
             node["note"] = item.Note;
+        }
+
+        if (item.DoneAt is not null)
+        {
+            node["doneAt"] = Fmt(item.DoneAt);
         }
 
         if (item.DueAt is not null)
@@ -811,7 +818,7 @@ public sealed class McpToolRegistry
             "新看板信息", Obj(
                 Prop("name", PropStr("看板名")),
                 Prop("html", PropStr("完整 HTML 文档（不传用内置模板）。监听 window.chrome.webview 的 message 事件收数据：{type:'data',data,fetchedAt} / {type:'error',message}")),
-                Prop("script", PropStr("采集脚本 JS：必须定义 function collect() 返回可序列化对象；可用 http_get(url)/http_post(url,body)/http(url,{method,headers,body,timeout_ms}) 同步抓取，console.log 留诊断日志")),
+                Prop("script", PropStr("采集脚本 JS：必须定义 function collect() 返回可序列化对象；可用 http_get(url)/http_post(url,body)/http(url,{method,headers,body,timeout_ms}) 同步抓取，console.log 留诊断日志；另有 mcp(toolName, args) 可在采集脚本里直接调本机 MCP 工具（如 mcp('list_todos',{})），返回已解析的对象")),
                 Prop("interval_seconds", PropInt("采集间隔秒数（15~86400，默认 60）")),
                 Prop("open", PropBool("创建后立即打开窗口，默认 true"))),
             "name"),
@@ -969,6 +976,129 @@ public sealed class McpToolRegistry
 
                 return Json(new JsonObject { ["collectors"] = array });
             });
+    }
+
+    // ---------------- 看板市场 ----------------
+
+    private void RegisterMarket(Action<string, string, JsonObject, Func<JsonObject, CancellationToken, Task<McpToolResult>>> add)
+    {
+        add("list_market", "列出看板市场里可安装的看板包，并标出本机是否已装过同名的自定义看板。", Schema(
+            "市场看板列表", Obj()),
+            (Args, Ct) => Task.FromResult(Json(MarketJson())));
+
+        add("install_market_board", "从市场安装一个看板：本机有同名自定义看板就覆盖它，没有就新建一个。", Schema(
+            "安装结果", Obj(
+                Prop("id", PropStr("市场看板的 id 或名字（见 list_market）")),
+                Prop("name", PropStr("安装后的看板名，缺省用市场包的 name")),
+                Prop("open", PropBool("安装后立即打开窗口，默认 true"))),
+            "id"),
+            async (Args, Ct) =>
+            {
+                var key = RequireString(Args, "id");
+                var package = FindMarketBoard(key)
+                              ?? throw new InvalidOperationException($"市场里没有看板「{key}」。先调 list_market 看有哪些。");
+
+                var name = OptionalString(Args, "name") ?? package.Name;
+                var existing = _todos.GetBoards().FirstOrDefault(b =>
+                    b.Kind == BoardKind.Custom && string.Equals(b.Name, name, StringComparison.OrdinalIgnoreCase));
+
+                var installedAsNew = existing is null;
+                var board = existing ?? _todos.CreateBoard(name, BoardKind.Custom);
+                _todos.SaveCustomBoard(board.Id, package.Html, package.Script, package.IntervalSeconds);
+                _collector.NotifyBoardsChanged();
+
+                JsonObject? collectorJson = null;
+                if (!string.IsNullOrWhiteSpace(package.Script))
+                {
+                    var ran = await _collector.RunNowAsync(board.Id).ConfigureAwait(false);
+                    var snapshot = _collector.GetSnapshot(board.Id);
+                    var fetchedAt = snapshot?.FetchedAt;
+                    collectorJson = new JsonObject
+                    {
+                        ["ran"] = ran,
+                        ["error"] = snapshot?.Error,
+                        ["fetchedAt"] = fetchedAt is null ? null : Fmt(fetchedAt.Value),
+                    };
+                }
+
+                // 覆盖安装：已经开着的窗口还停在旧页面上，让它重新加载。
+                if (!installedAsNew)
+                {
+                    await UiAction(() => _ui.ReloadCustomBoard(board.Id)).ConfigureAwait(false);
+                }
+
+                if (OptionalBool(Args, "open") ?? true)
+                {
+                    await UiAsync(() => _ui.OpenBoard(board.Id)).ConfigureAwait(false);
+                }
+
+                return Json(new JsonObject
+                {
+                    ["id"] = board.Id,
+                    ["name"] = _todos.GetBoard(board.Id)?.Name ?? name,
+                    ["installed_as_new"] = installedAsNew,
+                    ["collector"] = collectorJson,
+                });
+            });
+    }
+
+    /// <summary>市场目录 + 全部看板包（标记本机是否已装过同名自定义看板）。</summary>
+    private JsonObject MarketJson()
+    {
+        var directory = BoardMarket.ResolveDirectory();
+
+        // 同名看板（忽略大小写）视为已安装，多个同名时取第一个
+        var installed = new Dictionary<string, Board>(StringComparer.OrdinalIgnoreCase);
+        foreach (var board in _todos.GetBoards().Where(b => b.Kind == BoardKind.Custom))
+        {
+            installed.TryAdd(board.Name, board);
+        }
+
+        var array = new JsonArray();
+        foreach (var package in BoardMarket.Load(directory))
+        {
+            installed.TryGetValue(package.Name, out var match);
+            var tags = new JsonArray();
+            foreach (var tag in package.Tags)
+            {
+                tags.Add(tag);
+            }
+
+            array.Add(new JsonObject
+            {
+                ["id"] = package.Id,
+                ["name"] = package.Name,
+                ["summary"] = package.Summary,
+                ["author"] = package.Author,
+                ["version"] = package.Version,
+                ["tags"] = tags,
+                ["interval_seconds"] = package.IntervalSeconds,
+                ["has_script"] = !string.IsNullOrWhiteSpace(package.Script),
+                ["installed"] = match is not null,
+                ["installed_board_id"] = match?.Id,
+            });
+        }
+
+        var node = new JsonObject
+        {
+            ["directory"] = directory,
+            ["boards"] = array,
+        };
+        if (string.IsNullOrWhiteSpace(directory))
+        {
+            node["hint"] = $"没找到市场目录：设置环境变量 {BoardMarket.DirectoryEnvironmentVariable}，"
+                           + $"或把 {BoardMarket.FolderName}/ 放到程序目录旁边。";
+        }
+
+        return node;
+    }
+
+    /// <summary>按包 id（优先）或包名字找市场看板；都没有返回 null。</summary>
+    private static MarketBoard? FindMarketBoard(string key)
+    {
+        var packages = BoardMarket.Load();
+        return packages.FirstOrDefault(p => string.Equals(p.Id, key, StringComparison.OrdinalIgnoreCase))
+               ?? packages.FirstOrDefault(p => string.Equals(p.Name, key, StringComparison.OrdinalIgnoreCase));
     }
 
     private static JsonObject? SnapshotJson(CollectorHost.CollectorSnapshot? snapshot, string? boardId = null)
