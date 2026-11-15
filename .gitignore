@@ -24,3 +24,4 @@ publish-avalonia/
 
 # Avalonia 自检输出（发布脚本的临时产物）
 avalonia-selftest.txt
+.alma-snapshots

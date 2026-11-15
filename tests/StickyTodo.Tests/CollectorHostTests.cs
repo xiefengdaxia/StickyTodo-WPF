@@ -114,6 +114,56 @@ public sealed class CollectorHostTests : DatabaseTestBase
     }
 
     [Fact]
+    public async Task RunNow_ScriptCanCallMcpTool_ThroughBridge()
+    {
+        var todos = new TodoService(Repository, new PermanentFreeEntitlement());
+        var board = CreateScriptedBoard(todos, """
+            function collect() {
+                var todos = mcp("list_todos", { include_done: true });
+                return { count: todos.length, first: todos[0].title };
+            }
+            """);
+        var collector = CreateCollector(todos);
+        collector.NotifyBoardsChanged();
+
+        string? calledTool = null;
+        var payload = """[{"title":"买牛奶","isDone":false},{"title":"写周报","isDone":true}]""";
+        collector.AttachMcpBridge((name, argsJson) =>
+        {
+            calledTool = name;
+            Assert.Contains("include_done", argsJson);
+            return payload;
+        });
+
+        var ran = await collector.RunNowAsync(board.Id);
+        Assert.True(ran);
+
+        var snapshot = collector.GetSnapshot(board.Id);
+        Assert.NotNull(snapshot);
+        Assert.Null(snapshot!.Error);
+        Assert.Equal("list_todos", calledTool);
+        Assert.Contains("买牛奶", snapshot.DataJson);
+        Assert.Contains("2", snapshot.DataJson);
+    }
+
+    [Fact]
+    public async Task RunNow_WithoutBridge_ScriptGetsClearError()
+    {
+        var todos = new TodoService(Repository, new PermanentFreeEntitlement());
+        var board = CreateScriptedBoard(todos, """function collect() { return mcp("list_todos", {}); }""");
+        var collector = CreateCollector(todos);
+        collector.NotifyBoardsChanged();
+
+        var ran = await collector.RunNowAsync(board.Id);
+        Assert.True(ran);
+
+        var snapshot = collector.GetSnapshot(board.Id);
+        Assert.NotNull(snapshot);
+        Assert.NotNull(snapshot!.Error);
+        Assert.Contains("mcp()", snapshot.Error);
+    }
+
+    [Fact]
     public void Resync_RemovesCollectorOfDeletedBoard()
     {
         var todos = new TodoService(Repository, new PermanentFreeEntitlement());
