@@ -1061,7 +1061,9 @@ public sealed class McpToolRegistry
             var tags = new JsonArray();
             foreach (var tag in package.Tags)
             {
-                tags.Add(tag);
+                // 用 JsonValue.Create：Add(string) 会走泛型 Add<T> 产出 JsonValueCustomized，
+                // 而输出选项里没有 TypeInfoResolver（net6 目标），序列化时会整包抛异常。
+                tags.Add(JsonValue.Create(tag));
             }
 
             array.Add(new JsonObject
@@ -1243,7 +1245,12 @@ public sealed class McpToolRegistry
 
     private static McpToolResult TextResult(string text) => McpToolResult.Text(text);
 
-    /// <summary>中文不转义成 unicode 转义（可读、省 token）。只用于输出。</summary>
+    /// <summary>
+    /// 中文不转义成 unicode 转义（可读、省 token）。只用于输出。
+    /// 注意：这里没有 TypeInfoResolver（net6 目标没有这个 API），所以往 JsonArray 里塞
+    /// 标量必须用 JsonValue.Create(...)，不能用 Add(string)——后者走泛型 Add&lt;T&gt;，
+    /// 会生成 JsonValueCustomized&lt;string&gt;，序列化时直接抛 InvalidOperationException。
+    /// </summary>
     private static readonly JsonSerializerOptions JsonOutputOptions = new()
     {
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,

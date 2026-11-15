@@ -66,6 +66,23 @@ public sealed class McpProtocolHandlerTests : DatabaseTestBase
     }
 
     [Fact]
+    public async Task ToolsCall_ListMarket_ReturnsBoards()
+    {
+        var (handler, _, _) = CreateHandler();
+
+        var response = await CallAsync(handler, 10, "tools/call", new { name = "list_market", arguments = new { } });
+        using var document = JsonDocument.Parse(response);
+        var result = document.RootElement.GetProperty("result");
+
+        // 回归：JsonArray.Add(string) 走泛型 Add<T>，序列化选项缺 TypeInfoResolver 时会整包报错。
+        var failed = result.TryGetProperty("isError", out var isError) && isError.ValueKind == JsonValueKind.True;
+        Assert.False(failed, result.GetProperty("content")[0].GetProperty("text").GetString());
+
+        using var payload = JsonDocument.Parse(result.GetProperty("content")[0].GetProperty("text").GetString()!);
+        Assert.False(string.IsNullOrWhiteSpace(payload.RootElement.GetProperty("directory").GetString()));
+        Assert.True(payload.RootElement.GetProperty("boards").GetArrayLength() >= 1);
+    }
+    [Fact]
     public async Task ToolsList_ContainsBoardAndTodoTools()
     {
         var (handler, _, _) = CreateHandler();

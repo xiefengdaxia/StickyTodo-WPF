@@ -27,7 +27,10 @@ public sealed class McpProtocolHandler
     private readonly McpToolRegistry _registry;
     private readonly string _serverVersion;
 
-    /// <summary>响应信封序列化：中文不转义成 unicode（可读、省 token）。只用于输出。</summary>
+    /// <summary>
+    /// 响应信封序列化：中文不转义成 unicode（可读、省 token）。只用于输出。
+    /// 没有 TypeInfoResolver（net6 没这个 API），标量进 JsonArray 一律用 JsonValue.Create。
+    /// </summary>
     private static readonly JsonSerializerOptions JsonOutputOptions = new()
     {
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
