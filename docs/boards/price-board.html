@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+    :root {
+        color-scheme: light dark;
+        --fg: #2f4234; --dim: #6b7f70; --accent: #3e7b4f; --line: rgba(128,128,128,.20);
+        --chip: rgba(62,123,79,.10); --chipOn: #3e7b4f; --warn: #c0392b; --head: #fdfdfd;
+    }
+    @media (prefers-color-scheme: dark) {
+        :root { --fg: #d6e2d8; --dim: #8aa192; --accent: #7dbd93; --line: rgba(200,220,205,.16);
+                --chip: rgba(125,189,147,.13); --chipOn: #4e8a63; --head: #23282a; }
+    }
+    html, body { margin: 0; padding: 0; background: transparent; }
+    body {
+        font: 12.5px/1.45 -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif; color: var(--fg);
+        padding: 10px 12px 14px;
+        -webkit-user-select: text; user-select: text;
+        /* 网页自己画卡片底：WebView 的透明区只能透到桌面，透不到 WPF 的纸面，所以不能留空 */
+        background: rgba(253, 252, 250, var(--paper-alpha, .97));
+        border-radius: 12px;
+        min-height: calc(100vh - 24px);
+        box-sizing: border-box;
+    }
+    @media (prefers-color-scheme: dark) {
+        body { background: rgba(35, 40, 42, var(--paper-alpha, .97)); }
+    }
+    h1 { font-size: 13.5px; margin: 0 0 2px; color: var(--accent); display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+    h1 small { font-size: 10.5px; font-weight: 400; color: var(--dim); }
+    .meta { font-size: 10.5px; color: var(--dim); margin-bottom: 7px; }
+    .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 7px; }
+    .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+    .seg button { border: 0; background: transparent; color: var(--fg); font: inherit; font-size: 11.5px; padding: 3px 8px; cursor: pointer; }
+    .seg button + button { border-left: 1px solid var(--line); }
+    .seg button.on { background: var(--chipOn); color: #fff; }
+    .link { border: 0; background: transparent; color: var(--accent); font: inherit; font-size: 11px; cursor: pointer; padding: 1px 3px; }
+    .link:hover { text-decoration: underline; }
+    .stats { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 7px; }
+    .stat { background: var(--chip); border-radius: 7px; padding: 4px 8px; min-width: 74px; }
+    .stat b { display: block; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+    .stat span { font-size: 10px; color: var(--dim); }
+    .picker { border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; margin-bottom: 6px; }
+    .picker > summary { cursor: pointer; font-size: 11.5px; color: var(--accent); outline: none; display: flex; align-items: center; gap: 6px; }
+    .groups { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; margin-top: 6px; }
+    .group { min-width: 0; }
+    .ghead { display: flex; align-items: center; gap: 4px; font-size: 11.5px; }
+    .ghead .cnt { color: var(--dim); font-size: 10.5px; }
+    .ghead .fold { border: 0; background: transparent; color: var(--dim); cursor: pointer; font-size: 10px; padding: 0 2px; }
+    .mlist { display: none; flex-direction: column; gap: 1px; padding: 2px 0 4px 18px; }
+    .group.open .mlist { display: flex; }
+    .group label.m { display: flex; align-items: center; gap: 4px; font-size: 11px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .group label.m.off { opacity: .45; text-decoration: line-through; }
+    input[type=checkbox] { accent-color: var(--chipOn); margin: 0; flex: none; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { padding: 4px 5px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    th:first-child, td:first-child { text-align: left; }
+    th { font-weight: 600; opacity: .72; font-size: 10.5px; position: sticky; top: 0; background: var(--head); z-index: 1; }
+    td.num { font-family: Consolas, 'Cascadia Mono', monospace; font-variant-numeric: tabular-nums; }
+    tr.sum td { border-top: 2px solid var(--accent); border-bottom: none; font-weight: 700; color: var(--accent); padding-top: 6px; }
+    tr.top td { font-weight: 600; }
+    table.noPrice th.p, table.noPrice td.p { display: none; }
+    .bar { display: inline-block; height: 4px; border-radius: 2px; background: var(--accent); opacity: .45; vertical-align: middle; margin-left: 5px; }
+    .tag { font-size: 9.5px; border: 1px solid var(--line); border-radius: 4px; padding: 0 3px; margin-left: 3px; color: var(--dim); }
+    .err { color: var(--warn); font-size: 11.5px; margin: 4px 0; white-space: pre-wrap; }
+    .hint { font-size: 10.5px; color: var(--dim); margin: -2px 0 6px; }
+    .waiting { opacity: .6; font-style: italic; }
+    details.more { margin-top: 8px; }
+    details.more summary { cursor: pointer; font-size: 11.5px; color: var(--accent); }
+    .scroll { overflow: auto; max-height: 40vh; margin-top: 4px; }
+    .scroll table { font-size: 11px; }
+    .scroll thead th { background: var(--head); }
+    .note { margin-top: 8px; font-size: 10.5px; color: var(--dim); line-height: 1.55; }
+    .switch { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--dim); cursor: pointer; }
+</style>
+</head>
+<body>
+<h1>价格计算 <small id="sub">前 10 家最低价均价 × 本机用量</small></h1>
+<div class="meta" id="meta">等待数据…</div>
+
+<div class="row">
+    <div class="seg" id="rangeSeg"></div>
+    <label class="switch"><input type="checkbox" id="showPrice"> 显示单价</label>
+    <span class="dim" id="memNote" style="font-size:10.5px;opacity:.6"></span>
+</div>
+
+<div class="stats" id="stats"></div>
+<div class="err" id="error"></div>
+
+<details class="picker" id="picker" open>
+    <summary>模型范围 <span id="selCount" style="opacity:.65;font-weight:400"></span>
+        <button class="link" id="selAll" type="button">全选</button>
+        <button class="link" id="selNone" type="button">清空</button>
+    </summary>
+    <div class="groups" id="groups"></div>
+</details>
+<div class="hint" id="hint"></div>
+
+<div id="root" class="waiting">等待采集器…</div>
+
+<details class="more" id="dailyWrap" style="display:none">
+    <summary>逐日费用明细</summary>
+    <div class="scroll" id="daily"></div>
+</details>
+
+<div class="note">
+    价格：a6api 模型广场「价格从低到高」前 10 家渠道，输入/输出/缓存读/缓存写四项分别取均价（USD/1M），按 <b id="fxNote">7.3</b> 折人民币。
+    用量：本机 StickyTodo 统计的每日 token（含 5 个客户端），缓存 = 总量 − 输入 − 输出。区间与勾选会自动记住。
+</div>
+
+<script>
+var RANGES = [
+    { k: 'today', label: '今日', n: 1 },
+    { k: 'yesterday', label: '昨日', n: 1 },
+    { k: 'd3', label: '近3天', n: 3 },
+    { k: 'd7', label: '近7天', n: 7 },
+    { k: 'd14', label: '近14天', n: 14 }
+];
+var STORE_KEY = 'stickytodo.priceBoard.v1';
+var CACHE_KEY = '{{SECRET_8v0cm9hd}}';
+var FX = 7.3;
+var data = null;
+var state = { range: 'today', sel: {}, open: {}, showPrice: false };
+var canPersist = true;
+var hasBridge = !!(window.chrome && window.chrome.webview);
+var priceCache = {};
+
+function loadState() {
+    try {
+        window.localStorage.setItem('pb.probe', '1');
+        window.localStorage.removeItem('pb.probe');
+        var raw = window.localStorage.getItem(STORE_KEY);
+        if (raw) {
+            var o = JSON.parse(raw) || {};
+            if (o.range) state.range = o.range;
+            if (o.sel && typeof o.sel === 'object') state.sel = o.sel;
+            if (o.open && typeof o.open === 'object') state.open = o.open;
+            if (typeof o.showPrice === 'boolean') state.showPrice = o.showPrice;
+        }
+    } catch (e) {
+        canPersist = false;
+    }
+}
+function saveState() {
+    if (canPersist) {
+        try { window.localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+        catch (e) { canPersist = false; updateMemNote(); }
+    }
+    // localStorage 在 opaque origin 下会被拒，改由宿主落盘（重启后仍能恢复）
+    if (hasBridge) {
+        try { window.chrome.webview.postMessage(JSON.stringify({ type: 'ui.state', state: state })); }
+        catch (e) { }
+    }
+}
+function updateMemNote() {
+    document.getElementById('memNote').textContent = (canPersist || hasBridge) ? '' : '本机不支持记忆（重启后重置）';
+}
+function loadCache() {
+    try {
+        var raw = window.localStorage.getItem(CACHE_KEY);
+        if (raw) priceCache = JSON.parse(raw) || {};
+    } catch (e) { priceCache = {}; }
+}
+function saveCache() {
+    try { window.localStorage.setItem(CACHE_KEY, JSON.stringify(priceCache)); } catch (e) { }
+}
+
+function fmtMoney(v) {
+    if (v === null || v === undefined || isNaN(v)) return '—';
+    if (v >= 1000) return v.toFixed(0);
+    if (v >= 10) return v.toFixed(2);
+    if (v >= 1) return v.toFixed(2);
+    if (v >= 0.01) return v.toFixed(3);
+    return v.toFixed(4);
+}
+function fmtPrice(v) {
+    if (v === null || v === undefined) return '—';
+    if (v >= 1) return v.toFixed(3);
+    if (v >= 0.01) return v.toFixed(4);
+    if (v >= 0.0001) return v.toFixed(5);
+    return v.toFixed(6);
+}
+function fmtTok(n) {
+    if (!n) return '0';
+    if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+    if (n >= 1e3) return (n / 1e3).toFixed(0) + 'K';
+    return String(Math.round(n));
+}
+function cacheOf(r) {
+    var c = (r.total || 0) - (r.input || 0) - (r.output || 0);
+    return c > 0 ? c : 0;
+}
+function rowsFor(range) {
+    var rows = (data && data.usage) || [];
+    var def = RANGES.filter(function (x) { return x.k === range; })[0] || RANGES[0];
+    if (!rows.length) return [];
+    if (def.k === 'today') return rows.slice(-1);
+    if (def.k === 'yesterday') return rows.slice(-2, -1);
+    return rows.slice(-def.n);
+}
+function costOf(row, m) {
+    if (!m || !m.ok) return null;
+    var pIn = m.in / 1e6 * FX, pOut = m.out / 1e6 * FX, pCr = m.cr / 1e6 * FX;
+    return ((row.input || 0) / 1e6 * pIn + (row.output || 0) / 1e6 * pOut + cacheOf(row) / 1e6 * pCr);
+}
+function isOn(m) {
+    return state.sel[m.m] === undefined ? !!m.on : !!state.sel[m.m];
+}
+
+// ---------- 区间 ----------
+function renderRanges() {
+    document.getElementById('rangeSeg').innerHTML = RANGES.map(function (r) {
+        return '<button type="button" data-range="' + r.k + '"' + (r.k === state.range ? ' class="on"' : '') + '>' + r.label + '</button>';
+    }).join('');
+}
+document.getElementById('rangeSeg').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-range]');
+    if (!b) return;
+    state.range = b.getAttribute('data-range');
+    saveState(); renderRanges(); renderAll();
+});
+document.getElementById('showPrice').addEventListener('change', function (e) {
+    state.showPrice = e.target.checked;
+    saveState();
+    renderAll();
+});
+
+// ---------- 模型勾选（两列 + 厂商可折叠） ----------
+function renderPicker() {
+    var models = (data && data.models) || [];
+    var groups = {}, order = [];
+    models.forEach(function (m) {
+        if (!groups[m.brand]) { groups[m.brand] = []; order.push(m.brand); }
+        groups[m.brand].push(m);
+    });
+    order.sort(function (a, b) {
+        var ia = (groups[a][0].bi === undefined) ? 99 : groups[a][0].bi;
+        var ib = (groups[b][0].bi === undefined) ? 99 : groups[b][0].bi;
+        return ia - ib;
+    });
+    var html = '';
+    order.forEach(function (brand) {
+        var all = groups[brand];
+        var list = all.filter(function (m) { return m.ok; });
+        var onCount = list.filter(isOn).length;
+        var open = !!state.open[brand];
+        html += '<div class="group' + (open ? ' open' : '') + '" data-brand="' + brand + '">' +
+            '<div class="ghead">' +
+            '<input type="checkbox" data-vendor="' + brand + '"' +
+            (onCount === list.length && list.length > 0 ? ' checked' : '') +
+            (onCount > 0 && onCount < list.length ? ' data-mixed="1"' : '') + '>' +
+            '<button class="fold" type="button" data-fold="' + brand + '">' + (open ? '▾' : '▸') + '</button>' +
+            '<span>' + brand + '</span><span class="cnt">' + onCount + '/' + list.length + '</span>' +
+            '</div><div class="mlist">';
+        all.forEach(function (m) {
+            if (!m.ok) {
+                html += '<label class="m off" title="' + (m.err || '取价失败') + '"><input type="checkbox" disabled>' + m.m + '</label>';
+                return;
+            }
+            html += '<label class="m' + (isOn(m) ? '' : ' off') + '"><input type="checkbox" data-model="' + m.m + '"' +
+                (isOn(m) ? ' checked' : '') + '>' + m.m + '</label>';
+        });
+        html += '</div></div>';
+    });
+    document.getElementById('groups').innerHTML = html;
+    document.querySelectorAll('#groups input[data-mixed]').forEach(function (el) { el.indeterminate = true; });
+    document.getElementById('selCount').textContent = '· 已选 ' + models.filter(isOn).length + '/' + models.length;
+}
+document.getElementById('groups').addEventListener('click', function (e) {
+    var fold = e.target.closest('button[data-fold]');
+    if (!fold) return;
+    var brand = fold.getAttribute('data-fold');
+    state.open[brand] = !state.open[brand];
+    saveState();
+    renderPicker();
+});
+document.getElementById('groups').addEventListener('change', function (e) {
+    var el = e.target;
+    if (el.hasAttribute('data-vendor')) {
+        var brand = el.getAttribute('data-vendor');
+        var models = (data.models || []).filter(function (m) { return m.brand === brand && m.ok; });
+        var allOn = models.every(isOn);
+        models.forEach(function (m) { state.sel[m.m] = !allOn; });
+    } else if (el.hasAttribute('data-model')) {
+        state.sel[el.getAttribute('data-model')] = el.checked;
+    } else {
+        return;
+    }
+    saveState(); renderPicker(); renderAll();
+});
+document.getElementById('selAll').addEventListener('click', function (e) {
+    e.preventDefault(); e.stopPropagation();
+    (data.models || []).forEach(function (m) { if (m.ok) state.sel[m.m] = true; });
+    saveState(); renderPicker(); renderAll();
+});
+document.getElementById('selNone').addEventListener('click', function (e) {
+    e.preventDefault(); e.stopPropagation();
+    (data.models || []).forEach(function (m) { state.sel[m.m] = false; });
+    saveState(); renderPicker(); renderAll();
+});
+
+// ---------- 主表 ----------
+function renderAll() {
+    if (!data) return;
+    var rows = rowsFor(state.range);
+    var n = rows.length || 1;
+    var selModels = (data.models || []).filter(function (m) { return m.ok && isOn(m); });
+
+    var per = selModels.map(function (m) {
+        var c = 0;
+        rows.forEach(function (r) { var v = costOf(r, m); if (v !== null) c += v; });
+        return {
+            m: m, sum: c, day: c / n, month: c / n * 30,
+            pIn: m.in / 1e6 * FX, pOut: m.out / 1e6 * FX, pCr: m.cr / 1e6 * FX
+        };
+    }).sort(function (a, b) { return a.day - b.day; });
+
+    var sumCost = per.reduce(function (a, x) { return a + x.sum; }, 0);
+    var sumIn = 0, sumOut = 0, sumTotal = 0, sumSteps = 0;
+    rows.forEach(function (r) { sumIn += r.input || 0; sumOut += r.output || 0; sumTotal += r.total || 0; sumSteps += r.steps || 0; });
+    var rangeLabel = (RANGES.filter(function (r) { return r.k === state.range; })[0] || RANGES[0]).label;
+
+    document.getElementById('meta').textContent =
+        '区间 ' + rangeLabel + '（' + n + ' 天） · 模型 ' + selModels.length + '/' + data.models.length +
+        ' · 汇率 ' + FX + ' · ' + (data.usageSource || '本机用量');
+    updateMemNote();
+
+    document.getElementById('stats').innerHTML =
+        '<div class="stat"><b>' + fmtTok(sumTotal) + '</b><span>' + rangeLabel + ' tokens</span></div>' +
+        '<div class="stat"><b>' + fmtTok(sumIn) + '</b><span>输入</span></div>' +
+        '<div class="stat"><b>' + fmtTok(sumTotal - sumIn - sumOut) + '</b><span>缓存读</span></div>' +
+        '<div class="stat"><b>¥' + fmtMoney(sumCost) + '</b><span>' + rangeLabel + '合计</span></div>' +
+        '<div class="stat"><b>¥' + fmtMoney(sumCost / n * 30) + '</b><span>月估</span></div>';
+
+    var maxDay = 0;
+    per.forEach(function (x) { if (x.day > maxDay) maxDay = x.day; });
+
+    var cls = state.showPrice ? '' : ' class="noPrice"';
+    var html = '<div class="scroll"><table' + cls + '><thead><tr><th>模型</th>' +
+        '<th class="p">输入</th><th class="p">输出</th><th class="p">缓存读</th>' +
+        '<th>' + rangeLabel + '</th><th>日均</th><th>月估</th></tr></thead><tbody>';
+    if (!per.length) {
+        html += '<tr><td colspan="7" class="waiting">还没有勾选任何模型</td></tr>';
+    }
+    per.forEach(function (x, idx) {
+        html += '<tr' + (idx === 0 ? ' class="top"' : '') + '>' +
+            '<td>' + x.m.m + '<span class="tag">' + x.m.brand + (x.m.stale ? '·旧' : '') + '</span></td>' +
+            '<td class="num p">' + fmtPrice(x.pIn) + '</td>' +
+            '<td class="num p">' + fmtPrice(x.pOut) + '</td>' +
+            '<td class="num p">' + fmtPrice(x.pCr) + '</td>' +
+            '<td class="num">' + fmtMoney(x.sum) + '</td>' +
+            '<td class="num">' + fmtMoney(x.day) +
+                '<span class="bar" style="width:' + Math.max(2, Math.round(x.day / (maxDay || 1) * 34)) + 'px"></span></td>' +
+            '<td class="num">' + fmtMoney(x.month) + '</td></tr>';
+    });
+    if (per.length) {
+        html += '<tr class="sum"><td>合计 ' + per.length + ' 个</td><td class="p"></td><td class="p"></td><td class="p"></td>' +
+            '<td class="num">' + fmtMoney(sumCost) + '</td>' +
+            '<td class="num">' + fmtMoney(sumCost / n) + '</td>' +
+            '<td class="num">' + fmtMoney(sumCost / n * 30) + '</td></tr>';
+    }
+    html += '</tbody></table></div>';
+    var root = document.getElementById('root');
+    root.innerHTML = html;
+    root.className = '';
+
+    // 逐日矩阵
+    var dailyWrap = document.getElementById('dailyWrap');
+    if (rows.length && per.length) {
+        var head = '<table><thead><tr><th>日期</th><th>输入</th><th>输出</th><th>缓存读</th>';
+        per.forEach(function (x) { head += '<th>' + x.m.m.replace(/^claude-|^gpt-|^deepseek-/, '') + '</th>'; });
+        head += '<th>合计</th></tr></thead><tbody>';
+        for (var i = rows.length - 1; i >= 0; i--) {
+            var r = rows[i], rowSum = 0;
+            head += '<tr><td>' + String(r.d).slice(5) + '</td>' +
+                '<td class="num">' + fmtTok(r.input) + '</td>' +
+                '<td class="num">' + fmtTok(r.output) + '</td>' +
+                '<td class="num">' + fmtTok(cacheOf(r)) + '</td>';
+            per.forEach(function (x) {
+                var c = costOf(r, x.m);
+                if (c !== null) rowSum += c;
+                head += '<td class="num">' + (c === null ? '—' : fmtMoney(c)) + '</td>';
+            });
+            head += '<td class="num">' + fmtMoney(rowSum) + '</td></tr>';
+        }
+        head += '</tbody></table>';
+        document.getElementById('daily').innerHTML = head;
+        dailyWrap.style.display = '';
+    } else {
+        dailyWrap.style.display = 'none';
+    }
+}
+
+function render(newData, fetchedAt) {
+    document.getElementById('error').textContent = newData && newData.usageError ? newData.usageError : '';
+    data = newData;
+    FX = data.fx || 7.3;
+    document.getElementById('fxNote').textContent = FX;
+    if (!data.models || !data.models.length) {
+        document.getElementById('root').textContent = '采集数据为空';
+        return;
+    }
+    (data.models || []).forEach(function (m) { if (m.ok) priceCache[m.m] = { in: m.in, out: m.out, cr: m.cr, cw: m.cw, n: m.n }; });
+    data.models = data.models.map(function (m) {
+        if (m.ok) return m;
+        var c = priceCache[m.m];
+        if (!c) return m;
+        return { m: m.m, brand: m.brand, on: m.on, bi: m.bi, ok: true, stale: true, n: c.n, in: c.in, out: c.out, cr: c.cr, cw: c.cw };
+    });
+    saveCache();
+    document.getElementById('showPrice').checked = state.showPrice;
+    renderPicker();
+    renderAll();
+    var miss = (data.models || []).filter(function (m) { return !m.ok; }).length;
+    document.getElementById('hint').textContent = miss > 0 ? ('还有 ' + miss + ' 个模型价格待补齐') : '';
+}
+
+loadState();
+loadCache();
+renderRanges();
+updateMemNote();
+document.getElementById('showPrice').checked = state.showPrice;
+
+function applyState(o) {
+    if (!o || typeof o !== 'object') return;
+    if (o.range) state.range = o.range;
+    if (o.sel && typeof o.sel === 'object') state.sel = o.sel;
+    if (o.open && typeof o.open === 'object') state.open = o.open;
+    if (typeof o.showPrice === 'boolean') state.showPrice = o.showPrice;
+    renderRanges();
+    document.getElementById('showPrice').checked = state.showPrice;
+    if (data) { renderPicker(); renderAll(); }
+}
+
+if (window.chrome && window.chrome.webview) {
+    window.chrome.webview.addEventListener('message', function (event) {
+        var msg = event.data || {};
+        if (msg.type === 'data') { render(msg.data, msg.fetchedAt); }
+        else if (msg.type === 'error') { document.getElementById('error').textContent = msg.message || '采集失败'; }
+        else if (msg.type === 'ui') { applyState(msg.state); }
+        else if (msg.type === 'board') { if (msg.name) document.getElementById('sub').textContent = msg.name; }
+    });
+}
+</script>
+</body>
+</html>
