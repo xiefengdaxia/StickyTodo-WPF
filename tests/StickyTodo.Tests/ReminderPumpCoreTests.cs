@@ -16,7 +16,8 @@ public sealed class ReminderPumpCoreTests : DatabaseTestBase
         var service = new TodoService(Repository, new PermanentFreeEntitlement());
         var board = service.EnsureDefaultBoard();
         var todo = service.AddTodo(board.Id, "到点的待办");
-        service.SetRemindAt(todo.Id, DateTimeOffset.Now.AddSeconds(-1));
+        // 给足余量：这条用例只验「已到点的提醒会触发」，卡 1 秒在全量并行跑时会被 CPU 抖动挤到边界上。
+        service.SetRemindAt(todo.Id, DateTimeOffset.Now.AddMinutes(-1));
 
         var pump = new ReminderPumpCore(service);
         var fired = new List<TodoItem>();
