@@ -42,7 +42,9 @@ public sealed class MultiAgentTokenStatsProvider : ITokenStatsProvider
             new GeminiAgentSource(),
             new QoderAgentSource(),
             new KimiAgentSource(),
-            new PiAgentSource());
+            new PiAgentSource(),
+            // Alma 自己的账本（%APPDATA%\Alma\chat_threads.db 的 agent_op_traces）
+            new AlmaAgentSource());
     }
 
     /// <summary>全部注册的客户端（含不可用的——设置页要能展示"未检测到"）。</summary>
