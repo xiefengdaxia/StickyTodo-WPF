@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 用量热力图</title>
+<style>
+  :root{
+    --ink:#E9F5EF;
+    --dim:#84A79A;
+    --faint:rgba(233,245,239,.38);
+    --hair:rgba(233,245,239,.10);
+    --lv0:rgba(233,245,239,.055);
+    --lv1:#123F36;
+    --lv2:#1B6E52;
+    --lv3:#27A06B;
+    --lv4:#49D78E;
+    --lv5:#9DFFC4;
+    --mono:Consolas,'Cascadia Mono',monospace;
+  }
+  html,body{margin:0;padding:0;background:transparent;height:100%;overflow:hidden;}
+  .card{
+    position:fixed;inset:0;border-radius:10px;box-sizing:border-box;overflow:hidden;
+    padding:clamp(10px,2.6vmin,24px) clamp(12px,3vmin,28px);
+    display:flex;flex-direction:column;
+    color:var(--ink);
+    font-family:'Segoe UI','Microsoft YaHei UI',system-ui,sans-serif;
+    background:linear-gradient(165deg, rgba(9,14,16,var(--paper-alpha,.97)), rgba(8,28,24,var(--paper-alpha,.97)));
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.055);
+  }
+
+  /* ---------- 头部 ---------- */
+  .head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex:none;}
+  .kicker{
+    font-size:clamp(9px,1.35vmin,11px);letter-spacing:.2em;text-transform:uppercase;
+    color:var(--dim);font-weight:300;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .chip{
+    flex:none;font-family:var(--mono);font-size:clamp(8.5px,1.25vmin,10px);
+    letter-spacing:.08em;color:#8FE3B6;padding:2px 7px;border-radius:999px;
+    border:1px solid rgba(143,227,182,.28);background:rgba(143,227,182,.07);
+    font-variant-numeric:tabular-nums;white-space:nowrap;
+  }
+
+  /* ---------- 主体 ---------- */
+  .body{
+    flex:1 1 auto;min-height:0;display:flex;align-items:stretch;justify-content:center;
+    gap:clamp(12px,3.6vmin,40px);padding:clamp(3px,1.4vmin,12px) 0;
+  }
+  .calwrap{
+    flex:0 1 auto;min-width:0;min-height:0;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;
+    gap:clamp(4px,1vmin,8px);
+  }
+  .wdcol{
+    display:grid;grid-template-rows:repeat(7,var(--cell,14px));gap:var(--gap,3px);
+    flex:none;
+  }
+  .wdcol span{
+    display:flex;align-items:center;justify-content:flex-end;
+    font-size:min(10px,calc(var(--cell,14px) * .4));line-height:1;color:var(--faint);
+    letter-spacing:0;
+  }
+  .wdcol span:nth-child(2n+2){opacity:0;}
+  .calwrap.nolabels .wdcol{display:none;}
+  .grid{
+    display:grid;
+    grid-template-rows:repeat(7,var(--cell,14px));
+    grid-auto-flow:column;
+    grid-auto-columns:var(--cell,14px);
+    gap:var(--gap,3px);
+  }
+  .c{
+    border-radius:2px;background:var(--lv0);
+    transition:background .25s ease,transform .16s ease,box-shadow .16s ease;
+  }
+  .c.lv1{background:var(--lv1)}
+  .c.lv2{background:var(--lv2)}
+  .c.lv3{background:var(--lv3)}
+  .c.lv4{background:var(--lv4)}
+  .c.lv5{background:var(--lv5)}
+  .c.void{background:transparent;pointer-events:none}
+  .c:not(.void):hover{transform:scale(1.16);box-shadow:0 0 0 1px rgba(233,245,239,.55),0 0 10px rgba(157,255,196,.22)}
+  .c.today{box-shadow:0 0 0 1px rgba(157,255,196,.45)}
+
+  /* ---------- 右侧指标 ---------- */
+  .stats{
+    flex:none;width:clamp(82px,29%,220px);min-width:0;
+    display:flex;flex-direction:column;justify-content:center;
+    gap:clamp(3px,1.4vmin,13px);
+  }
+  .stat{min-width:0;}
+  .s-k{
+    display:block;font-size:clamp(8.5px,1.25vmin,10px);letter-spacing:.14em;
+    color:var(--dim);text-transform:uppercase;white-space:nowrap;
+  }
+  .s-v{
+    display:block;font-family:var(--mono);font-variant-numeric:tabular-nums;
+    font-size:clamp(13px,2.5vmin,20px);line-height:1.16;color:var(--ink);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em;
+  }
+  .stat.main .s-v{font-size:clamp(17px,4.4vmin,38px);line-height:1.08;}
+  .s-v.accent{color:#9DFFC4;}
+  .s-d{
+    display:block;font-family:var(--mono);font-size:clamp(8.5px,1.25vmin,10px);
+    color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .legend{
+    display:flex;align-items:center;gap:3px;margin-top:1px;
+    font-size:clamp(8px,1.15vmin,9.5px);color:var(--faint);white-space:nowrap;overflow:hidden;
+  }
+  .legend i{display:block;width:clamp(6px,.9vmin,9px);height:clamp(6px,.9vmin,9px);border-radius:2px;flex:none;}
+
+  /* ---------- 底部读数 ---------- */
+  .foot{
+    flex:none;display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+    border-top:1px solid var(--hair);padding-top:clamp(3px,1.1vmin,8px);
+  }
+  .readout{
+    font-family:var(--mono);font-size:clamp(8.5px,1.3vmin,11px);letter-spacing:.03em;
+    color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    font-variant-numeric:tabular-nums;
+  }
+  .readout.warn{color:#FFC08A;}
+  .src{
+    flex:none;max-width:45%;font-size:clamp(8px,1.15vmin,10px);color:var(--faint);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+
+  /* ---------- 自适应降级 ---------- */
+  @media (max-height:250px){
+    .legend,.src,.s-d{display:none;}
+    .body{padding:1px 0;}
+  }
+  @media (max-width:370px){
+    .stats{width:clamp(68px,26%,96px);}
+    .s-v{font-size:clamp(13px,3vmin,18px);}
+  }
+  @media (max-width:320px){
+    .chip{display:none;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .c{transition:none;}
+    .c:not(.void):hover{transform:none;}
+  }
+</style></head>
+<body>
+<div class="card">
+  <div class="head">
+    <div class="kicker" id="title">AI 用量热力图</div>
+    <div class="chip" id="chip">近 30 天</div>
+  </div>
+
+  <div class="body">
+    <div class="calwrap" id="calwrap">
+      <div class="wdcol"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div>
+      <div class="grid" id="grid"></div>
+    </div>
+    <div class="stats">
+      <div class="stat main"><span class="s-k">总计</span><span class="s-v accent" id="total">—</span></div>
+      <div class="stat"><span class="s-k">日均</span><span class="s-v" id="avg">—</span></div>
+      <div class="stat"><span class="s-k">峰值</span><span class="s-v" id="peak">—</span><span class="s-d" id="peakDate">—</span></div>
+      <div class="legend">
+        <span>少</span>
+        <i style="background:var(--lv0)"></i><i style="background:var(--lv1)"></i><i style="background:var(--lv2)"></i><i style="background:var(--lv3)"></i><i style="background:var(--lv4)"></i><i style="background:var(--lv5)"></i>
+        <span>多</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <div class="readout" id="readout">等待采集器…</div>
+    <div class="src" id="src"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var el = function (id) { return document.getElementById(id); };
+  var gridEl = el('grid'), wrapEl = el('calwrap'), bodyEl = el('calwrap').parentNode, statsEl = bodyEl.querySelector('.stats');
+  var totalEl = el('total'), avgEl = el('avg'), peakEl = el('peak');
+  var peakDateEl = el('peakDate'), readoutEl = el('readout'), srcEl = el('src');
+  var chipEl = el('chip'), titleEl = el('title');
+
+  var WD = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+  var SLOTS = 35;                // 骨架：7 行 × 5 列
+  var cols = 5;
+  var cells = [];                // 复用格子，避免每 60 秒重排
+  var summary = '等待采集器…';
+  var hasData = false;
+
+  function num(v) { return (typeof v === 'number' && v === v && v !== Infinity) ? v : 0; }
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+  function mmdd(date) { return String(date || '').slice(5); }
+
+  function trim(v, digits) {
+    var s = v.toFixed(digits == null ? 2 : digits);
+    return s.indexOf('.') >= 0 ? s.replace(/0+$/, '').replace(/\.$/, '') : s;
+  }
+
+  function fmt(v) {
+    v = num(v);
+    if (v >= 1e9) { return trim(v / 1e9) + 'B'; }
+    if (v >= 1e6) { return trim(v / 1e6, v >= 1e8 ? 1 : 2) + 'M'; }
+    if (v >= 1e4) { return Math.round(v / 1e3) + 'K'; }
+    if (v >= 1e3) { return (v / 1e3).toFixed(1) + 'K'; }
+    return String(Math.round(v));
+  }
+
+  function dowOf(dateStr) {
+    var m = String(dateStr || '').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (!m) { return 0; }
+    var d = new Date(+m[1], +m[2] - 1, +m[3]);
+    return (d.getDay() + 6) % 7;
+  }
+
+  // 0..5 档：按峰值的比例分档，5 档色阶才拉得开
+  function level(total, max) {
+    if (!(total > 0) || !(max > 0)) { return 0; }
+    var r = clamp(total / max, 0, 1);
+    if (r < 0.10) { return 1; }
+    if (r < 0.30) { return 2; }
+    if (r < 0.55) { return 3; }
+    if (r < 0.80) { return 4; }
+    return 5;
+  }
+
+  // 格子边长按可用空间算（不依赖百分比高度，300×200 也不会溢出）
+  function layout() {
+    // 用 .body（宽度确定）来量可用空间：量自身会形成「内容撑开→再量」的回环
+    var box = bodyEl.getBoundingClientRect();
+    var statsW = statsEl.getBoundingClientRect().width;
+    var colGap = parseFloat(getComputedStyle(bodyEl).columnGap) || 12;
+    var w = box.width - statsW - colGap - 2;
+    var h = box.height - 2;
+    if (!(w > 0) || !(h > 0)) { w = 220; h = 120; }
+    var gap = clamp(Math.round(h / 55), 2, 5);
+
+    function fit(availW) {
+      return Math.floor(Math.min((h - gap * 6) / 7, (availW - gap * (cols - 1)) / cols, 42));
+    }
+
+    var labels = w > 170;                       // 星期列只在格子够大时才出现
+    var size = fit(w - (labels ? 16 : 0));
+    if (labels && size < 22) { labels = false; size = fit(w); }
+    if (!(size > 3)) { size = 3; }
+
+    wrapEl.className = labels ? 'calwrap' : 'calwrap nolabels';
+    wrapEl.style.setProperty('--gap', gap + 'px');
+    wrapEl.style.setProperty('--cell', size + 'px');
+  }
+
+  function setReadout(text, warn) {
+    readoutEl.textContent = text;
+    readoutEl.className = 'readout' + (warn ? ' warn' : '');
+  }
+
+  function buildGrid(slots, columnCount) {
+    cols = columnCount;
+    gridEl.innerHTML = '';
+    cells = [];
+    for (var i = 0; i < slots; i++) {
+      var c = document.createElement('i');
+      c.className = 'c void';
+      gridEl.appendChild(c);
+      cells.push(c);
+    }
+    layout();
+  }
+
+  function skeleton() {
+    buildGrid(SLOTS, 5);
+    totalEl.textContent = '—';
+    avgEl.textContent = '—';
+    peakEl.textContent = '—';
+    peakDateEl.textContent = '—';
+    chipEl.textContent = '近 30 天';
+    srcEl.textContent = '';
+    srcEl.removeAttribute('title');
+    hasData = false;
+    setReadout('等待采集器…', false);
+  }
+
+  function render(data) {
+    var days = (data && data.days) || [];
+    if (!days.length) { skeleton(); return; }
+
+    var i, d, max = num(data.max), biggest = 0;
+    for (i = 0; i < days.length; i++) { biggest = Math.max(biggest, num(days[i].total)); }
+    if (!(max > 0)) { max = biggest; }
+
+    // 首列按星期对齐（周一起），列数随天数算
+    var firstDow = typeof days[0].dow === 'number' ? clamp(days[0].dow, 0, 6) : dowOf(days[0].date);
+    var slots = days.length + firstDow;
+    var columnCount = Math.ceil(slots / 7);
+
+    if (cells.length !== columnCount * 7 || cols !== columnCount) {
+      buildGrid(columnCount * 7, columnCount);
+    }
+
+    var latest = days.length - 1;
+    for (i = 0; i < cells.length; i++) {
+      var cell = cells[i];
+      var idx = i - firstDow;
+      if (idx < 0 || idx >= days.length) {
+        if (cell.className !== 'c void') { cell.className = 'c void'; cell.removeAttribute('title'); }
+        continue;
+      }
+      d = days[idx];
+      var day = (typeof d.dow === 'number' && d.dow >= 0) ? clamp(d.dow, 0, 6) : dowOf(d.date);
+      var lv = level(num(d.total), max);
+      cell.className = 'c' + (lv ? ' lv' + lv : '') + (idx === latest ? ' today' : '');
+      var tip = mmdd(d.date) + ' ' + WD[day] + ' · ' + fmt(d.total) + ' tokens';
+      if (num(d.steps) > 0) { tip += ' · ' + Math.round(num(d.steps)) + ' 步'; }
+      cell.setAttribute('title', tip);
+    }
+
+    totalEl.textContent = fmt(data.total);
+    avgEl.textContent = fmt(data.avg);
+    var peak = data.peak || {};
+    peakEl.textContent = fmt(peak.total);
+    peakDateEl.textContent = peak.date ? mmdd(peak.date) + ' ' + WD[dowOf(peak.date)] : '—';
+
+    var range = data.range || {};
+    var dayCount = num(range.days) || days.length;
+    chipEl.textContent = '近 ' + dayCount + ' 天';
+    summary = dayCount + ' 天 · ' + (num(data.activeDays) || 0) + ' 天有产出 · 均 ' + fmt(data.avg) + '/天';
+    if (!hasData) { setReadout(summary, false); }
+    hasData = true;
+
+    var source = data.source ? String(data.source) : '';
+    srcEl.textContent = source ? '来源 ' + source : '';
+    srcEl.title = source;
+    layout();
+  }
+
+  // 悬停：底部读数换成当天明细（不弹浮层，小窗口也不会溢出）
+  gridEl.addEventListener('mouseover', function (e) {
+    var t = e.target;
+    if (!t || !t.className || typeof t.className !== 'string') { return; }
+    if (t.className.indexOf('c') !== 0 || t.className.indexOf('void') >= 0) { return; }
+    if (t.title) { setReadout(t.title, false); }
+  });
+  gridEl.addEventListener('mouseleave', function () {
+    if (hasData) { setReadout(summary, false); }
+  });
+
+  function onMessage(e) {
+    var m = (e && e.data) || {};
+    if (m.type === 'data') {
+      render(m.data || {});
+    } else if (m.type === 'error') {
+      setReadout(m.message ? String(m.message) : '采集失败，稍后重试', true);
+    } else if (m.type === 'board') {
+      if (m.name) { titleEl.textContent = m.name; document.title = m.name; }
+    } else if (m.type === 'ui') {
+      // 本看板不保存界面状态。
+    }
+  }
+
+  skeleton();
+  if (window.chrome && window.chrome.webview && window.chrome.webview.addEventListener) {
+    window.chrome.webview.addEventListener('message', onMessage);
+  }
+  window.addEventListener('resize', layout);
+})();
+</script>
+</body></html>

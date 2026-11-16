@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>打字机诗句</title>
+<style>
+  html,body{margin:0;padding:0;background:transparent;height:100%;overflow:hidden;}
+  .card{position:fixed;inset:0;border-radius:10px;box-sizing:border-box;
+    padding:clamp(13px,3.4vw,26px) clamp(15px,4vw,30px);
+    background:linear-gradient(165deg,rgba(10,14,20,var(--paper-alpha,.97)),rgba(16,20,28,var(--paper-alpha,.97)));
+    font-family:'Segoe UI','Microsoft YaHei UI',system-ui,sans-serif;
+    color:#f4ece0;overflow:hidden;cursor:default;
+    user-select:none;-webkit-user-select:none;-webkit-font-smoothing:antialiased;}
+
+  /* 暖色层：深色底上压一点琥珀/月白，纸面透明度滑块照样生效 */
+  .warm{position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    background:radial-gradient(104% 84% at 90% 110%,rgba(206,140,66,.24),rgba(206,140,66,0) 62%),
+               linear-gradient(165deg,rgba(33,20,11,.62),rgba(18,13,11,.80));
+    background:radial-gradient(104% 84% at 90% 110%,rgba(206,140,66,calc(var(--paper-alpha,.97)*.24)),rgba(206,140,66,0) 62%),
+               linear-gradient(165deg,rgba(33,20,11,calc(var(--paper-alpha,.97)*.62)),rgba(18,13,11,calc(var(--paper-alpha,.97)*.80)));}
+
+  /* 大号半透明引号，只当装饰 */
+  .mark{position:absolute;left:6px;top:2px;z-index:0;
+    font-family:Georgia,'Times New Roman',serif;
+    font-size:clamp(96px,26vh,210px);line-height:.86;
+    color:rgba(242,190,124,.20);pointer-events:none;}
+
+  .body{position:relative;z-index:1;height:100%;display:flex;flex-direction:column;
+    justify-content:center;
+    padding-top:clamp(8px,3vh,22px);padding-bottom:clamp(18px,5.2vh,40px);}
+
+  .text{margin:0;flex:0 1 auto;max-height:100%;overflow:hidden;
+    font-size:calc(clamp(17px,min(6.4vh,4.2vw),42px) * var(--fit,1));
+    font-weight:300;line-height:1.82;letter-spacing:.07em;
+    color:#f6efe3;text-align:center;text-shadow:0 1px 16px rgba(255,190,120,.14);
+    opacity:1;transition:opacity .38s ease;}
+  .text.mid{--fit:.86;}
+  .text.small{--fit:.74;}
+
+  .cur{display:inline-block;width:.085em;min-width:2px;height:1.02em;margin-left:.08em;
+    vertical-align:-.14em;border-radius:1px;background:#f0bd80;
+    animation:blink 1.06s steps(1) infinite;}
+  @keyframes blink{0%,48%{opacity:.92}49%,100%{opacity:0}}
+
+  .src{position:absolute;right:clamp(14px,3.4vw,26px);bottom:clamp(9px,2.2vh,16px);z-index:1;
+    max-width:82%;text-align:right;
+    font-size:clamp(10.5px,min(1.85vh,2.4vw),13px);letter-spacing:.1em;color:#e3b681;
+    opacity:0;transform:translateY(4px);
+    transition:opacity .8s ease,transform .8s ease;}
+  .src.show{opacity:1;transform:none;}
+  .src.dim{color:#a08f7c;letter-spacing:.03em;}
+
+  @media (max-width:360px){ .mark{display:none;} }
+  @media (max-height:190px){ .mark{display:none;} .body{padding-top:8px;} }
+</style></head><body>
+<div class="card">
+  <div class="warm"></div>
+  <div class="mark">“</div>
+  <div class="body">
+    <div class="text" id="text"><span class="cur" id="cur"></span></div>
+  </div>
+  <div class="src" id="src"></div>
+</div>
+<script>
+(function () {
+  'use strict';
+
+  var textEl = document.getElementById('text');
+  var srcEl = document.getElementById('src');
+  var curEl = document.getElementById('cur');
+
+  var PLACEHOLDER = '等一句诗…';   // 没有数据也不能空白
+  var IDLE_RETYPE_MS = 30000;      // 没新数据也隔一会儿淡出重打
+  var FADE_MS = 380;
+  var CHAR_MS = 45, CHAR_JITTER = 15;
+
+  var reduced = false;
+  try {
+    reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  } catch (e) { reduced = false; }
+
+  var data = { text: '', from: '', who: '' };
+  var typeTimer = null, fadeTimer = null, idleTimer = null;
+
+  function clearTimers() {
+    if (typeTimer) { clearTimeout(typeTimer); typeTimer = null; }
+    if (fadeTimer) { clearTimeout(fadeTimer); fadeTimer = null; }
+    if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+  }
+
+  function currentText() {
+    return (data.text && data.text.length) ? data.text : PLACEHOLDER;
+  }
+
+  // 「—— 作者《出处》」，缺哪个就省哪个
+  function sourceLine() {
+    var tail = '';
+    if (data.who && data.from) { tail = data.who + '《' + data.from + '》'; }
+    else if (data.who) { tail = data.who; }
+    else if (data.from) { tail = '《' + data.from + '》'; }
+    return tail ? '—— ' + tail : '';
+  }
+
+  function tierOf(n) { return n > 40 ? ' small' : (n > 24 ? ' mid' : ''); }
+
+  // 先按整段量一遍：装不下就把整块字号按 --fit 缩，避免打完才撑破
+  function fitToBox(text) {
+    textEl.style.removeProperty('--fit');
+    textEl.textContent = text;
+    var guard = 0;
+    while (textEl.scrollHeight > textEl.clientHeight + 1 && guard < 6) {
+      guard++;
+      textEl.style.setProperty('--fit', (1 - guard * 0.09).toFixed(2));
+    }
+    textEl.textContent = '';
+  }
+
+  function begin() {
+    clearTimers();
+    var text = currentText();
+    var chars = Array.from(text);
+
+    textEl.className = 'text' + tierOf(chars.length);
+    srcEl.className = 'src';
+    srcEl.textContent = '';
+    textEl.style.opacity = '1';
+    fitToBox(text);
+    textEl.appendChild(curEl);
+
+    if (reduced) {
+      textEl.insertBefore(document.createTextNode(text), curEl);
+      done();
+      return;
+    }
+
+    var i = 0;
+    (function step() {
+      if (i >= chars.length) { done(); return; }
+      textEl.insertBefore(document.createTextNode(chars[i]), curEl);
+      i++;
+      typeTimer = setTimeout(step, CHAR_MS + Math.random() * CHAR_JITTER);
+    })();
+  }
+
+  function done() {
+    typeTimer = null;
+    var line = sourceLine();
+    if (line) {
+      srcEl.textContent = line;
+      srcEl.className = 'src show';
+    }
+    idleTimer = setTimeout(retype, IDLE_RETYPE_MS);
+  }
+
+  // 淡出 → 重打
+  function retype() {
+    clearTimers();
+    textEl.style.opacity = '0';
+    srcEl.className = 'src';
+    fadeTimer = setTimeout(begin, FADE_MS);
+  }
+
+  function applyData(d) {
+    if (typeof d === 'string') { d = { text: d }; }
+    d = d || {};
+    data = {
+      text: typeof d.text === 'string' ? d.text : '',
+      from: typeof d.from === 'string' ? d.from : '',
+      who: typeof d.who === 'string' ? d.who : ''
+    };
+    retype();
+  }
+
+  function applyError(message) {
+    // 采集失败也要有内容：占位文案继续打，错因丢到右下角
+    srcEl.textContent = (typeof message === 'string' && message.length) ? message : '采集失败';
+    srcEl.className = 'src dim show';
+  }
+
+  function onMessage(event) {
+    var m = (event && event.data) || {};
+    if (typeof m === 'string') {
+      try { m = JSON.parse(m) || {}; } catch (e) { m = {}; }
+    }
+    if (m.type === 'data') { applyData(m.data); }
+    else if (m.type === 'error') { applyError(m.message); }
+  }
+
+  try {
+    begin();
+    if (window.chrome && window.chrome.webview && window.chrome.webview.addEventListener) {
+      window.chrome.webview.addEventListener('message', onMessage);
+    }
+  } catch (err) {
+    textEl.textContent = PLACEHOLDER;
+    textEl.appendChild(curEl);
+  }
+})();
+</script></body></html>

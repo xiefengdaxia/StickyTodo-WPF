@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>昼夜时钟</title>
+<style>
+  html,body{margin:0;padding:0;background:transparent;height:100%;overflow:hidden;}
+  .card{position:fixed;inset:0;border-radius:10px;box-sizing:border-box;
+    padding:clamp(9px,3vw,20px) clamp(11px,3.2vw,26px);
+    background:linear-gradient(165deg,rgba(10,14,20,var(--paper-alpha,.97)),rgba(16,20,28,var(--paper-alpha,.97)));
+    display:flex;flex-direction:column;justify-content:center;
+    font-family:'Segoe UI','Microsoft YaHei UI',system-ui,sans-serif;
+    color:#edf1f7;overflow:hidden;cursor:default;
+    user-select:none;-webkit-user-select:none;-webkit-font-smoothing:antialiased;}
+
+  /* 时段色层：渐变没法 transition，改成多层叠着做 opacity 交叉淡入（1s） */
+  .sky{position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    opacity:0;transition:opacity 1s ease;}
+  .sky-b{background:linear-gradient(165deg,rgba(5,7,12,.90),rgba(9,11,18,.96));
+    background:linear-gradient(165deg,rgba(5,7,12,calc(var(--paper-alpha,.97)*.90)),rgba(9,11,18,calc(var(--paper-alpha,.97)*.96)));}
+  .sky-d{background:linear-gradient(165deg,rgba(13,17,46,.88),rgba(19,23,60,.96));
+    background:linear-gradient(165deg,rgba(13,17,46,calc(var(--paper-alpha,.97)*.88)),rgba(19,23,60,calc(var(--paper-alpha,.97)*.96)));}
+  .sky-y{background:linear-gradient(165deg,rgba(7,30,31,.88),rgba(9,38,37,.96));
+    background:linear-gradient(165deg,rgba(7,30,31,calc(var(--paper-alpha,.97)*.88)),rgba(9,38,37,calc(var(--paper-alpha,.97)*.96)));}
+  .sky-k{background:linear-gradient(165deg,rgba(44,24,11,.88),rgba(50,28,13,.96));
+    background:linear-gradient(165deg,rgba(44,24,11,calc(var(--paper-alpha,.97)*.88)),rgba(50,28,13,calc(var(--paper-alpha,.97)*.96)));}
+  .sky-n{background:linear-gradient(165deg,rgba(9,11,24,.90),rgba(13,15,30,.96));
+    background:linear-gradient(165deg,rgba(9,11,24,calc(var(--paper-alpha,.97)*.90)),rgba(13,15,30,calc(var(--paper-alpha,.97)*.96)));}
+  .card.p-b .sky-b,.card.p-d .sky-d,.card.p-y .sky-y,
+  .card.p-k .sky-k,.card.p-n .sky-n{opacity:1;}
+
+  .stage{position:relative;z-index:1;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:clamp(2px,1.1vh,9px);min-height:0;}
+
+  /* ── 大号时间：极细字重 + 等宽数字 ── */
+  .clock{display:flex;align-items:baseline;justify-content:center;line-height:1;
+    cursor:pointer;transition:opacity .2s ease;}
+  .clock:hover .hm{color:#fff;}
+  .hm{font-size:clamp(30px,min(19vh,22vw),86px);font-weight:200;
+    font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;
+    letter-spacing:-.012em;color:#f4f7fb;transition:color .3s ease;}
+  .ap{font-size:clamp(9px,min(2.1vh,2.4vw),12px);font-weight:400;letter-spacing:.18em;
+    color:#9dafc6;margin-left:.5em;transform:translateY(-.12em);
+    opacity:0;transition:opacity .25s ease;}
+  .clock.h12 .ap{opacity:1;}
+  .sec{display:inline-block;overflow:hidden;
+    font-size:clamp(12px,min(5.6vh,6.4vw),24px);font-weight:200;
+    font-variant-numeric:tabular-nums;color:#93a6bd;margin-left:.55em;max-width:4em;
+    transition:max-width .3s ease,margin-left .3s ease,opacity .3s ease;}
+  .clock.nosec .sec{max-width:0;margin-left:0;opacity:0;}
+
+  /* ── 日期 / 周几 / 第几天 ── */
+  .line{display:flex;align-items:baseline;justify-content:center;flex-wrap:nowrap;
+    white-space:nowrap;font-size:clamp(9.5px,min(1.9vh,2.6vw),13px);
+    letter-spacing:.10em;color:#a6b6cb;}
+  .sep{margin:0 .6em;color:#607385;}
+
+  /* ── 一天之弧 ── */
+  .arcwrap{position:relative;width:100%;max-width:720px;
+    display:flex;justify-content:center;margin:clamp(1px,1vh,10px) auto 0;cursor:pointer;}
+  .arc{display:block;width:100%;height:auto;max-height:clamp(52px,44vh,216px);}
+  .track{stroke:url(#gTrack);stroke-width:2;stroke-linecap:round;}
+  .prog{stroke:url(#gFill);stroke-width:2.6;stroke-linecap:round;
+    filter:drop-shadow(0 0 3px rgba(150,180,255,.30));}
+  .base{stroke:rgba(190,205,230,.15);stroke-width:.8;stroke-dasharray:1.4 4.2;}
+  .tick{stroke:rgba(190,205,230,.32);stroke-width:.9;stroke-linecap:round;}
+  .tick.key{stroke:rgba(236,214,178,.62);stroke-width:1.1;}
+  .lb{font-size:4.6px;fill:rgba(178,194,216,.48);letter-spacing:.03em;}
+  .dot{transition:fill 1.2s ease;}
+  .dot.sun{fill:#ffd28d;filter:drop-shadow(0 0 2px rgba(255,196,120,.95)) drop-shadow(0 0 7px rgba(255,168,72,.55));}
+  .dot.moon{fill:#cfdbf4;filter:drop-shadow(0 0 2px rgba(178,206,255,.85)) drop-shadow(0 0 6px rgba(120,160,255,.40));}
+
+  .hint{position:absolute;right:clamp(8px,2vw,16px);bottom:clamp(4px,1.1vh,11px);z-index:1;
+    font-size:10px;letter-spacing:.04em;color:#8d9fb5;opacity:0;
+    transition:opacity .35s ease;pointer-events:none;}
+
+  .card:hover .hint{opacity:.6;}
+
+  /* ── 自适应：极窄 / 极矮时收敛次级信息，永远不滚动 ── */
+  @media (max-width:400px){ .extra{display:none;} .hint{display:none;} }
+  @media (max-width:430px),(max-height:215px){ .lb{display:none;} }
+</style></head><body>
+<div class="card" id="card">
+  <div class="sky sky-b"></div><div class="sky sky-d"></div><div class="sky sky-y"></div>
+  <div class="sky sky-k"></div><div class="sky sky-n"></div>
+
+  <div class="stage">
+    <div class="clock h12" id="clock" role="button" tabindex="0"
+         title="点击切换 12 / 24 小时制">
+      <span class="hm" id="hm">--:--</span><span class="ap" id="ap"></span><span class="sec" id="sec"></span>
+    </div>
+
+    <div class="line">
+      <span id="dat">—</span>
+      <span class="sep extra">·</span><span class="extra" id="wd">—</span>
+      <span class="sep extra">·</span><span class="extra" id="dn">—</span>
+    </div>
+
+    <div class="arcwrap" id="arcwrap" title="点击切换秒显示">
+      <svg class="arc" id="arc" viewBox="0 36 220 68" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+        <defs>
+          <linearGradient id="gTrack" x1="0" y1="0" x2="220" y2="0" gradientUnits="userSpaceOnUse">
+            <stop offset="0"    stop-color="#6f86b8" stop-opacity=".13"/>
+            <stop offset=".28"  stop-color="#8ea6d8" stop-opacity=".16"/>
+            <stop offset=".5"   stop-color="#ffc987" stop-opacity=".24"/>
+            <stop offset=".72"  stop-color="#8ea6d8" stop-opacity=".16"/>
+            <stop offset="1"    stop-color="#6f86b8" stop-opacity=".13"/>
+          </linearGradient>
+          <linearGradient id="gFill" x1="0" y1="0" x2="220" y2="0" gradientUnits="userSpaceOnUse">
+            <stop offset="0"    stop-color="#7d97d1"/>
+            <stop offset=".24"  stop-color="#9db0e2"/>
+            <stop offset=".34"  stop-color="#ffd39b"/>
+            <stop offset=".5"   stop-color="#ffe7c0"/>
+            <stop offset=".66"  stop-color="#ffd39b"/>
+            <stop offset=".76"  stop-color="#9db0e2"/>
+            <stop offset="1"    stop-color="#7d97d1"/>
+          </linearGradient>
+        </defs>
+        <path class="base" id="base" d="M4 88H216" fill="none"/>
+        <path class="track" id="track" d="M14 88Q110 4 206 88" fill="none"/>
+        <path class="prog" id="prog" d="M14 88Q110 4 206 88" fill="none"/>
+        <g id="ticks"></g>
+        <circle class="dot sun" id="dot" cx="14" cy="88" r="3.5"/>
+        <text class="lb" id="lbSun" x="62" y="101" text-anchor="middle">日出 06:00</text>
+        <text class="lb" id="lbSet" x="158" y="101" text-anchor="middle">日落 18:00</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="hint">点时间切 12/24 · 点弧线切秒</div>
+</div>
+<script>
+(function () {
+  'use strict';
+
+  var card = document.getElementById('card');
+  var clock = document.getElementById('clock');
+  var hm = document.getElementById('hm');
+  var ap = document.getElementById('ap');
+  var secEl = document.getElementById('sec');
+  var dat = document.getElementById('dat');
+  var wdEl = document.getElementById('wd');
+  var dnEl = document.getElementById('dn');
+  var arcwrap = document.getElementById('arcwrap');
+  var track = document.getElementById('track');
+  var prog = document.getElementById('prog');
+  var dot = document.getElementById('dot');
+  var ticks = document.getElementById('ticks');
+  var lbSun = document.getElementById('lbSun');
+  var lbSet = document.getElementById('lbSet');
+
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  var WD = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+  // 界面状态（交给宿主存盘，下次打开推回来）
+  var hour12 = false;
+  var showSeconds = true;
+
+  var len = 1;
+  try { len = track.getTotalLength() || 1; } catch (e) { len = 1; }
+
+  function two(n) { return (n < 10 ? '0' : '') + n; }
+
+  function pointAt(f) {
+    f = f < 0 ? 0 : (f > 1 ? 1 : f);
+    try { return track.getPointAtLength(f * len); } catch (e) { return { x: 14, y: 88 }; }
+  }
+
+  // 弧上的 3 小时刻度 + 日出/日落标注：几何只算一次（viewBox 缩放不影响）
+  function buildTicks() {
+    if (!ticks) { return; }
+    while (ticks.firstChild) { ticks.removeChild(ticks.firstChild); }
+    var marks = [3, 6, 9, 12, 15, 18, 21];
+    for (var i = 0; i < marks.length; i++) {
+      var key = (marks[i] === 6 || marks[i] === 18);
+      var a = pointAt(marks[i] / 24);
+      var b = pointAt(marks[i] / 24 + 0.02);
+      var dx = b.x - a.x, dy = b.y - a.y;
+      var d = Math.sqrt(dx * dx + dy * dy) || 1;
+      var nx = dy / d, ny = -dx / d;            // 弧外法线（朝上）
+      var r1 = 2.6, r2 = key ? 7.4 : 5.3;
+      var line = document.createElementNS(SVGNS, 'line');
+      line.setAttribute('x1', (a.x + nx * r1).toFixed(2));
+      line.setAttribute('y1', (a.y + ny * r1).toFixed(2));
+      line.setAttribute('x2', (a.x + nx * r2).toFixed(2));
+      line.setAttribute('y2', (a.y + ny * r2).toFixed(2));
+      line.setAttribute('class', key ? 'tick key' : 'tick');
+      ticks.appendChild(line);
+    }
+    var rise = pointAt(0.25), sink = pointAt(0.75);
+    if (lbSun) { lbSun.setAttribute('x', rise.x.toFixed(1)); }
+    if (lbSet) { lbSet.setAttribute('x', sink.x.toFixed(1)); }
+  }
+
+  var lastPhase = '', lastDot = '';
+
+  // 凌晨深靛 → 白天深青 → 黄昏暖褐 → 深夜墨黑
+  function phaseOf(h) {
+    if (h < 5) { return 'p-b'; }
+    if (h < 8) { return 'p-d'; }
+    if (h < 16) { return 'p-y'; }
+    if (h < 19) { return 'p-k'; }
+    return 'p-n';
+  }
+
+  function paint(h) {
+    var phase = phaseOf(h);
+    if (phase !== lastPhase) { card.className = 'card ' + phase; lastPhase = phase; }
+    var kind = (h >= 6 && h < 18) ? 'sun' : 'moon';
+    if (kind !== lastDot) {
+      dot.setAttribute('class', 'dot ' + kind);
+      dot.setAttribute('r', kind === 'sun' ? '3.5' : '2.9');
+      lastDot = kind;
+    }
+  }
+
+  function update() {
+    var now = new Date();
+    var h = now.getHours(), mi = now.getMinutes(), s = now.getSeconds();
+
+    var hh = h;
+    if (hour12) { hh = h % 12; if (hh === 0) { hh = 12; } }
+    hm.textContent = (hour12 ? hh : two(hh)) + ':' + two(mi);
+    ap.textContent = hour12 ? (h < 12 ? 'AM' : 'PM') : '';
+    secEl.textContent = two(s);
+
+    var y = now.getFullYear(), mo = now.getMonth(), d = now.getDate();
+    var doy = Math.round((Date.UTC(y, mo, d) - Date.UTC(y, 0, 1)) / 86400000) + 1;
+    dat.textContent = y + '年' + (mo + 1) + '月' + d + '日';
+    wdEl.textContent = WD[now.getDay()];
+    dnEl.textContent = '今年第 ' + doy + ' 天';
+
+    var frac = (h * 60 + mi + s / 60) / 1440;
+    prog.style.strokeDasharray = len + ' ' + len;
+    prog.style.strokeDashoffset = (len * (1 - frac)).toFixed(2);
+    var p = pointAt(frac);
+    dot.setAttribute('cx', p.x.toFixed(2));
+    dot.setAttribute('cy', p.y.toFixed(2));
+
+    paint(h);
+  }
+
+  function syncUi() {
+    clock.className = hour12 ? 'clock h12' : 'clock';
+    if (!showSeconds) { clock.className += ' nosec'; }
+    update();
+  }
+
+  function postState() {
+    try {
+      if (window.chrome && window.chrome.webview && window.chrome.webview.postMessage) {
+        window.chrome.webview.postMessage({
+          type: 'ui.state',
+          state: { hour12: !!hour12, showSeconds: !!showSeconds }
+        });
+      }
+    } catch (e) { /* 没有宿主就只留在内存里 */ }
+  }
+
+  function onMessage(event) {
+    var m = (event && event.data) || {};
+    if (typeof m === 'string') {
+      try { m = JSON.parse(m) || {}; } catch (e) { m = {}; }
+    }
+    if (m.type === 'ui' && m.state && typeof m.state === 'object') {
+      if (typeof m.state.hour12 === 'boolean') { hour12 = m.state.hour12; }
+      if (typeof m.state.showSeconds === 'boolean') { showSeconds = m.state.showSeconds; }
+      syncUi();
+    }
+  }
+
+  function toggleHour12(e) {
+    if (e && e.preventDefault) { e.preventDefault(); }
+    hour12 = !hour12;
+    syncUi();
+    postState();
+  }
+
+  function toggleSeconds(e) {
+    if (e && e.preventDefault) { e.preventDefault(); }
+    showSeconds = !showSeconds;
+    syncUi();
+    postState();
+  }
+
+  try {
+    buildTicks();
+    syncUi();
+
+    clock.addEventListener('click', toggleHour12);
+    clock.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') { toggleHour12(e); }
+    });
+    arcwrap.addEventListener('click', toggleSeconds);
+
+    if (window.chrome && window.chrome.webview && window.chrome.webview.addEventListener) {
+      window.chrome.webview.addEventListener('message', onMessage);
+    }
+
+    setInterval(update, 300);
+  } catch (err) {
+    // 兜底：任何异常都不许让卡片空着
+    hm.textContent = '--:--';
+  }
+})();
+</script></body></html>

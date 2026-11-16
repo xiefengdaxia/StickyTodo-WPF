@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>年度进度</title>
+<style>
+  :root{
+    --ink:#F3EEE7;
+    --dim:#9A938A;
+    --hair:rgba(243,238,231,.12);
+    --accent:#FF8A3D;
+    --accent-dim:rgba(255,138,61,.35);
+    --mono:Consolas,'Cascadia Mono',monospace;
+  }
+  html,body{margin:0;padding:0;background:transparent;height:100%;overflow:hidden;}
+  .card{
+    position:fixed;inset:0;border-radius:10px;box-sizing:border-box;overflow:hidden;
+    padding:clamp(11px,2.6vmin,24px) clamp(14px,3vmin,28px);
+    display:flex;flex-direction:column;
+    color:var(--ink);
+    font-family:'Segoe UI','Microsoft YaHei UI',system-ui,sans-serif;
+    background:linear-gradient(165deg, rgba(14,15,18,var(--paper-alpha,.97)), rgba(27,19,13,var(--paper-alpha,.97)));
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.055);
+  }
+
+  /* ---------- 顶部 ---------- */
+  .top{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex:none;}
+  .kicker{
+    font-size:clamp(9px,1.35vmin,11px);letter-spacing:.22em;text-transform:uppercase;
+    color:var(--dim);font-weight:300;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .meta-top{
+    display:flex;align-items:baseline;gap:clamp(7px,1.8vmin,14px);
+    font-family:var(--mono);font-size:clamp(9px,1.3vmin,11px);letter-spacing:.08em;
+    color:var(--dim);white-space:nowrap;font-variant-numeric:tabular-nums;
+  }
+  .meta-top b{color:var(--accent-dim);font-weight:600;}
+  .meta-top .live{color:rgba(243,238,231,.42);}
+
+  /* ---------- 主区 ---------- */
+  .main{
+    flex:1 1 auto;min-height:0;display:flex;align-items:center;
+    gap:clamp(8px,3vmin,26px);padding:clamp(2px,1vmin,10px) 0;
+  }
+  .hero{flex:1 1 auto;min-width:0;}
+  .pct{
+    display:flex;align-items:baseline;
+    font-family:var(--mono);font-variant-numeric:tabular-nums;
+    font-size:clamp(34px,min(21vw,27vh),94px);
+    line-height:.92;letter-spacing:-.035em;color:var(--ink);
+    text-shadow:0 0 26px rgba(255,138,61,.12);
+  }
+  .pct .unit{
+    font-size:.32em;letter-spacing:0;margin-left:.12em;color:var(--accent);
+    font-weight:400;transform:translateY(-.05em);
+  }
+  .hero-sub{
+    margin-top:clamp(5px,1.3vmin,11px);
+    font-size:clamp(9.5px,1.5vmin,12px);letter-spacing:.04em;color:var(--dim);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .hero-sub b{font-family:var(--mono);color:#D9D2C7;font-weight:400;}
+
+  /* 进度环 */
+  .gauge{
+    flex:none;display:block;
+    width:clamp(52px,26vh,138px);height:clamp(52px,26vh,138px);
+    overflow:visible;
+  }
+  .gauge .trk{fill:none;stroke:rgba(243,238,231,.10);stroke-width:2.2;}
+  .gauge .fil{
+    fill:none;stroke:var(--accent);stroke-width:2.2;stroke-linecap:round;
+    transform:rotate(-90deg);transform-origin:50% 50%;
+    transition:stroke-dashoffset .2s cubic-bezier(.4,0,.2,1);
+  }
+  .gauge .tip{
+    fill:#FFD9BC;filter:drop-shadow(0 0 3px rgba(255,138,61,.95));
+    transition:transform .2s cubic-bezier(.4,0,.2,1);
+  }
+
+  /* ---------- 次级信息 ---------- */
+  .facts{display:flex;gap:clamp(12px,3.4vmin,34px);flex:none;margin-top:clamp(2px,1vmin,8px);}
+  .fact{min-width:0;}
+  .f-k{
+    font-size:clamp(9px,1.3vmin,10.5px);letter-spacing:.14em;color:var(--dim);
+    text-transform:uppercase;white-space:nowrap;
+  }
+  .f-v{
+    font-family:var(--mono);font-variant-numeric:tabular-nums;
+    font-size:clamp(12px,1.9vmin,16px);color:#E8E2D9;letter-spacing:.01em;
+    white-space:nowrap;margin-top:2px;
+  }
+  .f-v b{color:var(--accent);font-weight:500;}
+  .f-v s{text-decoration:none;color:var(--dim);font-size:.82em;margin-left:.15em;}
+
+  /* ---------- 刻度尺 ---------- */
+  .ruler{position:relative;flex:none;height:clamp(14px,3.2vmin,24px);margin-top:clamp(4px,1.2vmin,10px);}
+  .ruler .base{position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--hair);}
+  .ruler .tick{position:absolute;bottom:0;width:1px;background:var(--hair);height:5px;}
+  .ruler .tick.q{height:9px;background:rgba(243,238,231,.26);}
+  .ruler .fillline{
+    position:absolute;left:0;bottom:0;height:1px;width:0;background:var(--accent);
+    transition:width .2s cubic-bezier(.4,0,.2,1);
+  }
+  .ruler .marker{
+    position:absolute;bottom:-2px;width:5px;height:5px;border-radius:50%;
+    background:var(--accent);box-shadow:0 0 8px rgba(255,138,61,.75);
+    transform:translateX(-50%);left:0;
+    transition:left .2s cubic-bezier(.4,0,.2,1);
+  }
+  /* ---------- 自适应降级 ---------- */
+  @media (max-width:440px){
+    .gauge{display:none;}
+    .meta-top .live{display:none;}
+  }
+  @media (max-height:250px){
+    .facts,.hero-sub,.meta-top .live{display:none;}
+    .ruler{height:13px;}
+    .main{padding:0;align-items:center;}
+  }
+  @media (max-height:190px){
+    .ruler{display:none;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .gauge .fil,.gauge .tip,.ruler .marker,.ruler .fillline{transition:none;}
+  }
+</style></head>
+<body>
+<div class="card">
+  <div class="top">
+    <div class="kicker" id="title">年度进度</div>
+    <div class="meta-top"><span id="metaTop">—</span><span class="live" id="live">--:--:--</span></div>
+  </div>
+
+  <div class="main">
+    <div class="hero">
+      <div class="pct"><span id="num">0.0</span><span class="unit">%</span></div>
+      <div class="hero-sub" id="dayLine">&nbsp;</div>
+    </div>
+    <svg class="gauge" viewBox="0 0 100 100" aria-hidden="true">
+      <circle class="trk" cx="50" cy="50" r="44"></circle>
+      <circle class="fil" id="ring" cx="50" cy="50" r="44"></circle>
+      <circle class="tip" id="tip" cx="50" cy="50" r="2.1"></circle>
+    </svg>
+  </div>
+
+  <div class="facts">
+    <div class="fact"><div class="f-k">剩余</div><div class="f-v"><b id="restDays">—</b><s>天</s></div></div>
+    <div class="fact"><div class="f-k">本季 <span id="qName">Q1</span></div><div class="f-v"><b id="qPct">—</b><s>%</s></div></div>
+    <div class="fact"><div class="f-k">本周 <span id="wName">W1</span></div><div class="f-v"><b id="wPct">—</b><s>%</s></div></div>
+  </div>
+
+  <div class="ruler">
+    <div class="base"></div>
+    <div class="fillline" id="fillline"></div>
+    <div class="marker" id="marker"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var el = function (id) { return document.getElementById(id); };
+  var numEl = el('num'), ringEl = el('ring'), tipEl = el('tip');
+  var dayLine = el('dayLine'), restDays = el('restDays'), qPct = el('qPct'), wPct = el('wPct');
+  var qName = el('qName'), wName = el('wName');
+  var metaTop = el('metaTop'), markerEl = el('marker'), fillline = el('fillline'), liveEl = el('live');
+  var titleEl = el('title');
+
+  var C = 2 * Math.PI * 44;             // 进度环周长
+  ringEl.style.strokeDasharray = C.toFixed(2);
+  ringEl.style.strokeDashoffset = C.toFixed(2);
+
+  var frozen = null;                    // 预览用：data.now 可冻结时间
+  var shown = 0;                        // 缓动当前的百分比
+  var raf = 0;
+  var first = true;
+  var WD = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+  function two(n) { return (n < 10 ? '0' : '') + n; }
+  function clamp01(v) { return v < 0 ? 0 : (v > 1 ? 1 : v); }
+  function dayStart(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+
+  // ISO 周序号（周一为一周之始）
+  function isoWeek(d) {
+    var t = dayStart(d);
+    t.setDate(t.getDate() - ((t.getDay() + 6) % 7) + 3);
+    var jan4 = new Date(t.getFullYear(), 0, 4);
+    jan4.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7) + 3);
+    return 1 + Math.round((t - jan4) / 604800000);
+  }
+
+  function easeNumber(target, dur) {
+    var from = shown;
+    if (Math.abs(target - from) < 0.004) {
+      shown = target;
+      numEl.textContent = target.toFixed(1);
+      return;
+    }
+    if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    var t0 = (window.performance && performance.now) ? performance.now() : Date.now();
+    function step(t) {
+      var now = t || ((window.performance && performance.now) ? performance.now() : Date.now());
+      var k = clamp01((now - t0) / dur);
+      var e = 1 - Math.pow(1 - k, 3);
+      numEl.textContent = (from + (target - from) * e).toFixed(1);
+      if (k < 1) { raf = requestAnimationFrame(step); }
+      else { raf = 0; shown = target; }
+    }
+    raf = requestAnimationFrame(step);
+  }
+
+  function buildTicks() {
+    var ruler = document.querySelector('.ruler');
+    for (var i = 0; i < 12; i++) {
+      var t = document.createElement('i');
+      t.className = 'tick' + (i % 3 === 0 ? ' q' : '');
+      t.style.left = (i * 100 / 12).toFixed(4) + '%';
+      ruler.insertBefore(t, markerEl);
+    }
+  }
+
+  function paint(p, opts) {
+    var dur = opts && opts.dur != null ? opts.dur : 200;
+    easeNumber(p * 100, dur);
+    ringEl.style.strokeDashoffset = (C * (1 - p)).toFixed(2);
+    var ang = (-90 + p * 360) * Math.PI / 180;
+    tipEl.setAttribute('transform', 'translate(' + (44 * Math.cos(ang)).toFixed(2) + ' ' + (44 * Math.sin(ang)).toFixed(2) + ')');
+    markerEl.style.left = (p * 100).toFixed(3) + '%';
+    fillline.style.width = (p * 100).toFixed(3) + '%';
+    ringEl.style.opacity = p > 0.002 ? '1' : '0';
+    tipEl.style.opacity = p > 0.002 ? '1' : '0';
+  }
+
+  function tick() {
+    var now = frozen ? new Date(frozen) : new Date();
+    var y = now.getFullYear();
+    var yStart = new Date(y, 0, 1);
+    var yEnd = new Date(y + 1, 0, 1);
+    var yearMs = yEnd - yStart;
+    var totalDays = Math.round(yearMs / 86400000);
+    var pYear = clamp01((now - yStart) / yearMs);
+    var dayOfYear = Math.round((dayStart(now) - yStart) / 86400000) + 1;
+
+    // 季度
+    var q = Math.floor(now.getMonth() / 3) + 1;
+    var qStart = new Date(y, (q - 1) * 3, 1);
+    var qEnd = new Date(y, q * 3, 1);
+    var pQuarter = clamp01((now - qStart) / (qEnd - qStart));
+
+    // 本周（周一起）
+    var monday = dayStart(now);
+    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+    var pWeek = clamp01((now - monday) / (7 * 86400000));
+    var weekNo = isoWeek(now);
+
+    paint(pYear, { dur: first ? 700 : 200 });
+    first = false;
+
+    dayLine.innerHTML = '第 <b>' + dayOfYear + '</b> 天 / 共 <b>' + totalDays + '</b> 天 · ' +
+      (now.getMonth() + 1) + ' 月 ' + now.getDate() + ' 日 ' + WD[now.getDay()];
+
+    restDays.textContent = Math.max(0, totalDays - dayOfYear);
+    qName.textContent = 'Q' + q;
+    qPct.textContent = (pQuarter * 100).toFixed(1);
+    wName.textContent = 'W' + weekNo;
+    wPct.textContent = (pWeek * 100).toFixed(1);
+    metaTop.innerHTML = y + ' <b>·</b> W' + weekNo;
+    liveEl.textContent = two(now.getHours()) + ':' + two(now.getMinutes()) + ':' + two(now.getSeconds());
+  }
+
+  buildTicks();
+  tick();
+  var timer = setInterval(tick, 1000);
+
+  function onMessage(e) {
+    var m = (e && e.data) || {};
+    if (m.type === 'data' && m.data) {
+      // 纯前端看板不依赖采集器；若有人推数据，可用 now / percent 冻结画面做预览。
+      if (typeof m.data.now === 'string') { frozen = m.data.now; tick(); }
+      if (typeof m.data.percent === 'number' && isFinite(m.data.percent)) {
+        paint(clamp01(m.data.percent / 100), { dur: 200 });
+      }
+    } else if (m.type === 'error') {
+      // 纯前端看板没有采集器，错误只影响不了画面；保持静默，不打扰。
+    } else if (m.type === 'board') {
+      if (m.name) { titleEl.textContent = m.name; document.title = m.name; }
+    } else if (m.type === 'ui') {
+      // 本看板不保存界面状态。
+    }
+  }
+
+  if (window.chrome && window.chrome.webview && window.chrome.webview.addEventListener) {
+    window.chrome.webview.addEventListener('message', onMessage);
+  }
+  window.addEventListener('resize', function () { tick(); });
+})();
+</script>
+</body></html>

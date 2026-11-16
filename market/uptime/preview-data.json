@@ -1,0 +1,29 @@
+{
+  "checkedAt": "2026-11-15T22:41:07.000Z",
+  "probes": [
+    {
+      "url": "https://api.github.com",
+      "host": "api.github.com",
+      "ok": true,
+      "status": 200,
+      "ms": 121,
+      "error": null
+    },
+    {
+      "url": "https://www.baidu.com",
+      "host": "www.baidu.com",
+      "ok": true,
+      "status": 200,
+      "ms": 68,
+      "error": null
+    },
+    {
+      "url": "https://open.er-api.com/v6/latest/USD",
+      "host": "open.er-api.com",
+      "ok": true,
+      "status": 200,
+      "ms": 453,
+      "error": null
+    }
+  ]
+}

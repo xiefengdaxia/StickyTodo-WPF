@@ -1,0 +1,13 @@
+{
+  "id": "token-heatmap",
+  "name": "AI 用量热力图",
+  "summary": "近 30 天的 AI 编程 token 用量，一格一天。",
+  "description": "调本机 MCP 的 get_token_stats 取近 30 天 token 用量，画成 7 行日历热力格（5 档青绿色阶）。附总计 / 日均 / 峰值日 / 数据来源；鼠标悬停格子看当天明细。数据全来自本机数据库。",
+  "author": "StickyTodo 示例",
+  "version": "2.0.0",
+  "intervalSeconds": 300,
+  "tags": ["AI", "用量", "热力图"],
+  "html": "board.html",
+  "script": "board.js",
+  "preview": "preview.png"
+}

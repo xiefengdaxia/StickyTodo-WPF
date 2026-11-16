@@ -1,0 +1,13 @@
+{
+  "id": "aqi",
+  "name": "空气质量环",
+  "summary": "今天的空气指数与四项污染物，一块表看完。",
+  "description": "每 20 分钟读一次 Open-Meteo 空气质量接口（免 key），环形仪表显示欧洲 AQI 分档，下方列出 PM2.5 / PM10 / O₃ / NO₂。",
+  "author": "StickyTodo 示例",
+  "version": "2.0.0",
+  "intervalSeconds": 1200,
+  "tags": ["生活", "天气"],
+  "html": "board.html",
+  "script": "board.js",
+  "preview": "preview.png"
+}

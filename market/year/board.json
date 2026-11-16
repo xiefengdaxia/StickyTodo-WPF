@@ -1,0 +1,11 @@
+{
+  "id": "year",
+  "name": "年度进度",
+  "summary": "今年过去了多少，一眼看到。",
+  "description": "纯前端：按本地时间算今年/本季/本周的进度，秒级更新，不需要采集器。大号百分比 + 进度环 + 横向刻度尺；高度不足 250px 时自动只留大数字。",
+  "author": "StickyTodo 示例",
+  "version": "2.0.0",
+  "tags": ["时间", "极简"],
+  "html": "board.html",
+  "preview": "preview.png"
+}

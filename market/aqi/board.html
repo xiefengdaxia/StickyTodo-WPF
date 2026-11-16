@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<title>空气质量环</title>
+<style>
+  html,body{margin:0;padding:0;background:transparent;height:100%;overflow:hidden;}
+  body{font-family:'Segoe UI','Microsoft YaHei UI',system-ui,sans-serif;color:#DCF0EA;
+       -webkit-font-smoothing:antialiased;}
+  .num,.cv,.val{font-family:ui-monospace,'Cascadia Mono',Consolas,'Courier New',monospace;
+       font-variant-numeric:tabular-nums;}
+
+  .card{position:fixed;inset:0;border-radius:10px;box-sizing:border-box;padding:11px 15px 12px;
+        --lv:#2EE6A8;--lv-rgb:46,230,168;
+        background:linear-gradient(165deg,rgba(11,17,22,var(--paper-alpha,.97)),rgba(14,24,28,var(--paper-alpha,.97)));
+        display:flex;flex-direction:column;gap:6px;overflow:hidden;}
+  /* 环后面那团同色冷光：像检测仪的背光板 */
+  .card::before{content:"";position:absolute;inset:0;border-radius:10px;pointer-events:none;z-index:0;
+        background:
+          radial-gradient(62% 55% at 50% 46%,rgba(var(--lv-rgb),.16),transparent 68%),
+          repeating-linear-gradient(0deg,rgba(120,255,220,.035) 0 1px,transparent 1px 23px);
+        transition:background .6s linear;}
+  .hd,.stage,.cells{position:relative;z-index:1;}
+
+  .hd{flex:0 0 auto;display:flex;align-items:baseline;justify-content:space-between;gap:8px;min-width:0;}
+  .title{font-size:clamp(9px,1.6vh,12px);letter-spacing:2.6px;color:#8FB8AE;white-space:nowrap;}
+  .meta{font-size:clamp(9px,1.4vh,11px);color:#5E7F77;white-space:nowrap;overflow:hidden;
+        text-overflow:ellipsis;display:flex;align-items:center;gap:5px;justify-content:flex-end;min-width:0;}
+  .live{width:4px;height:4px;border-radius:50%;background:var(--lv);flex:0 0 auto;
+        box-shadow:0 0 6px rgba(var(--lv-rgb),.8);animation:live 2.4s ease-in-out infinite;}
+  @keyframes live{0%,100%{opacity:.35}50%{opacity:1}}
+
+  .stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;}
+  .ring{position:relative;width:100%;height:100%;}
+  .dial{width:100%;height:100%;display:block;overflow:visible;}
+  .dial .tk{fill:none;stroke:rgba(255,255,255,.075);stroke-width:8;}
+  .dial .tick{fill:none;stroke:rgba(255,255,255,.11);stroke-width:.9;}
+  .dial .ph{fill:none;stroke:rgba(126,214,196,.5);stroke-width:4;stroke-linecap:round;
+            stroke-dasharray:2 6;animation:waitpulse 2.6s ease-in-out infinite;}
+  @keyframes waitpulse{0%,100%{opacity:.26}50%{opacity:.6}}
+  .dial .pg{fill:none;stroke:var(--lv);stroke-width:8;stroke-linecap:round;
+            stroke-dasharray:326.73;stroke-dashoffset:326.73;opacity:0;
+            filter:drop-shadow(0 0 5px rgba(var(--lv-rgb),.8));
+            transition:stroke-dashoffset 1.15s cubic-bezier(.22,1,.36,1),stroke .6s linear,opacity .5s linear;}
+
+  .center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+          justify-content:center;gap:2px;pointer-events:none;}
+  .val{font-size:44px;font-weight:600;line-height:1;letter-spacing:-1.5px;color:var(--lv);
+       text-shadow:0 0 20px rgba(var(--lv-rgb),.32);transition:color .6s linear;}
+  .lvl{font-size:12px;letter-spacing:3px;color:#A7C6BF;white-space:nowrap;}
+  .unit{font-size:8.5px;color:#4F6C65;letter-spacing:1.4px;}
+
+  .cells{flex:0 0 auto;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+         gap:clamp(4px,1vh,10px);}
+  .cell{border:1px solid rgba(255,255,255,.075);border-radius:7px;background:rgba(255,255,255,.022);
+        padding:clamp(3px,1.1vh,10px) 4px;text-align:center;min-width:0;overflow:hidden;}
+  .ck{font-size:clamp(7.5px,1.4vh,10px);letter-spacing:.6px;color:#6E8A84;white-space:nowrap;overflow:hidden;}
+  .cv{font-size:clamp(11px,2.55vh,20px);font-weight:600;line-height:1.2;color:#DDF6EE;white-space:nowrap;}
+  .cu{font-size:clamp(7px,1.15vh,9px);color:#4F6C65;white-space:nowrap;}
+
+  /* —— 自适应 —— */
+  .card.narrow{padding:8px 10px 9px;gap:4px;}
+  .card.narrow .cells{gap:4px;}
+  .card.narrow .cell{padding:3px 2px;}
+  .card.narrow .cv{font-size:12px;}
+  .card.narrow .ck{font-size:7.5px;letter-spacing:0;}
+  .card.narrow .cu{font-size:6.5px;letter-spacing:0;}
+  .card.narrow .lvl{letter-spacing:1.5px;}
+  .card.short .title{letter-spacing:1.6px;font-size:9px;}
+</style></head><body>
+<div class="card" id="card">
+  <div class="hd">
+    <span class="title" id="title">今日空气</span>
+    <span class="meta"><i class="live" id="live"></i><span id="meta">北京 · 等待采集器…</span></span>
+  </div>
+  <div class="stage">
+    <div class="ring" id="wrap">
+      <svg class="dial" viewBox="0 0 120 120" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+        <circle class="tk" cx="60" cy="60" r="52"></circle>
+        <circle class="tick" cx="60" cy="60" r="45" stroke-dasharray="1 4.834"></circle>
+        <path class="ph" id="ph" d="M 60 8 A 52 52 0 0 1 105.03 44.02"></path>
+        <g transform="rotate(-90 60 60)">
+          <circle class="pg" id="pg" cx="60" cy="60" r="52"></circle>
+        </g>
+      </svg>
+      <div class="center">
+        <div class="val" id="val">--</div>
+        <div class="lvl" id="lvl">等待采集器…</div>
+        <div class="unit" id="unit">EAQI</div>
+      </div>
+    </div>
+  </div>
+  <div class="cells">
+    <div class="cell"><div class="ck">PM2.5</div><div class="cv" id="pm25">—</div><div class="cu">µg/m³</div></div>
+    <div class="cell"><div class="ck">PM10</div><div class="cv" id="pm10">—</div><div class="cu">µg/m³</div></div>
+    <div class="cell"><div class="ck">O₃</div><div class="cv" id="ozone">—</div><div class="cu">µg/m³</div></div>
+    <div class="cell"><div class="ck">NO₂</div><div class="cv" id="no2">—</div><div class="cu">µg/m³</div></div>
+  </div>
+</div>
+<script>
+(function () {
+  var C = 2 * Math.PI * 52;   // 环周长（r=52）
+
+  var card = document.getElementById('card');
+  var wrap = document.getElementById('wrap');
+  var valEl = document.getElementById('val');
+  var lvlEl = document.getElementById('lvl');
+  var unitEl = document.getElementById('unit');
+  var metaEl = document.getElementById('meta');
+  var pg = document.getElementById('pg');
+  var ph = document.getElementById('ph');
+  var titleEl = document.getElementById('title');
+
+  var isWaiting = false;
+
+  var cells = {
+    pm25: document.getElementById('pm25'),
+    pm10: document.getElementById('pm10'),
+    ozone: document.getElementById('ozone'),
+    no2: document.getElementById('no2')
+  };
+
+  /* 分档配色：优=青绿、良=黄绿、中等=琥珀、较差=橙、差=橙红、很差=红 */
+  var PALETTE = {
+    '优':   { hex: '#2EE6A8', rgb: '46,230,168' },
+    '良':   { hex: '#A3E635', rgb: '163,230,53' },
+    '中等': { hex: '#FBBF24', rgb: '251,191,36' },
+    '较差': { hex: '#FB923C', rgb: '251,146,60' },
+    '差':   { hex: '#F2603D', rgb: '242,96,61' },
+    '很差': { hex: '#E5484D', rgb: '229,72,77' }
+  };
+
+  function levelByAqi(aqi) {
+    if (aqi <= 20) { return '优'; }
+    if (aqi <= 40) { return '良'; }
+    if (aqi <= 60) { return '中等'; }
+    if (aqi <= 80) { return '较差'; }
+    if (aqi <= 100) { return '差'; }
+    return '很差';
+  }
+
+  function levelMeta(name, aqi) {
+    var key = PALETTE[name] ? name : levelByAqi(aqi);
+    return { name: key, hex: PALETTE[key].hex, rgb: PALETTE[key].rgb };
+  }
+
+  function applyLevel(meta) {
+    card.style.setProperty('--lv', meta.hex);
+    card.style.setProperty('--lv-rgb', meta.rgb);
+  }
+
+  /* ---------- 自适应：字号跟着环的直径走 ---------- */
+  function layout() {
+    var w = wrap.clientWidth || 0;
+    var h = wrap.clientHeight || 0;
+    var d = Math.min(w, h);
+    if (d > 0) {
+      valEl.style.fontSize = Math.max(17, Math.round(d * 0.30)) + 'px';
+      // 等待态里数字让位，那句话就是环心唯一的内容，得看得清
+      lvlEl.style.fontSize = Math.max(9, Math.round(d * (isWaiting ? 0.115 : 0.098))) + 'px';
+    }
+    var vw = window.innerWidth || 300;
+    var vh = window.innerHeight || 200;
+    card.className = 'card' + (vw < 340 ? ' narrow' : '') + (vh < 240 ? ' short' : '');
+  }
+  layout();
+  window.addEventListener('resize', layout);
+
+  /* ---------- 数值格式 ---------- */
+  function fmtNumber(v) {
+    var n = Number(v);
+    if (!isFinite(n)) { return '—'; }
+    return n >= 100 ? String(Math.round(n)) : (Math.round(n * 10) / 10).toFixed(1);
+  }
+
+  function hhmm(text) {
+    var s = String(text || '');
+    var t = s.indexOf('T') >= 0 ? s.split('T')[1] : s;
+    return t ? t.substring(0, 5) : '';
+  }
+
+  /* ---------- 等待态：60% 虚线占位 ---------- */
+  function renderWaiting(reason) {
+    isWaiting = true;
+    pg.style.opacity = '0';
+    ph.style.opacity = '';
+    applyLevel(PALETTE['优']); // 青绿，安静的待机色
+    valEl.textContent = '--';
+    valEl.style.visibility = 'hidden';
+    lvlEl.textContent = reason || '等待采集器…';
+    unitEl.textContent = 'EAQI';
+    metaEl.textContent = '北京 · ' + (reason || '等待采集器…');
+    cells.pm25.textContent = '—';
+    cells.pm10.textContent = '—';
+    cells.ozone.textContent = '—';
+    cells.no2.textContent = '—';
+    layout();
+  }
+
+  /* ---------- 主渲染 ---------- */
+  function render(d) {
+    if (!d || typeof d !== 'object') { return; }
+
+    var aqi = Number(d.aqi);
+    if (!isFinite(aqi)) { renderWaiting('数据格式不对'); return; }
+
+    var meta = levelMeta(d.level, aqi);
+    applyLevel(meta);
+
+    isWaiting = false;
+    valEl.style.visibility = 'visible';
+    valEl.textContent = String(Math.round(aqi));
+    // 只信自己认识的分档名，否则按数值重新判档，避免出现"红环 + 优"
+    lvlEl.textContent = PALETTE[d.level] ? d.level : meta.name;
+    unitEl.textContent = 'EAQI';
+
+    var pct = Math.max(0.02, Math.min(1, aqi / 100));
+    ph.style.opacity = '0';
+    pg.style.opacity = '1';
+    pg.style.strokeDashoffset = String(C * (1 - pct));
+
+    cells.pm25.textContent = fmtNumber(d.pm25);
+    cells.pm10.textContent = fmtNumber(d.pm10);
+    cells.ozone.textContent = fmtNumber(d.ozone);
+    cells.no2.textContent = fmtNumber(d.no2);
+
+    var time = hhmm(d.updated);
+    metaEl.textContent = '北京 · ' + (time ? '更新 ' + time : '实时');
+
+    layout();
+  }
+
+  /* ---------- 消息协议 ---------- */
+  if (window.chrome && window.chrome.webview) {
+    window.chrome.webview.addEventListener('message', function (e) {
+      var m = e.data || {};
+      if (m.type === 'data') { render(m.data); }
+      else if (m.type === 'error') { renderWaiting('采集失败'); metaEl.textContent = m.message || '采集失败'; }
+      else if (m.type === 'board') { if (m.name) { titleEl.textContent = m.name; } }
+    });
+  }
+
+  renderWaiting();
+})();
+</script></body></html>

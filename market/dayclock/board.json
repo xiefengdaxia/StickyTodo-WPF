@@ -1,0 +1,14 @@
+{
+  "id": "dayclock",
+  "name": "昼夜时钟",
+  "summary": "大号时间 + 一条走过一天的太阳弧。",
+  "description": "纯前端：时间、日期、年度第几天，太阳随时刻沿弧线移动；点击可切 12/24 小时制与秒，状态本地保存。",
+  "author": "StickyTodo 示例",
+  "version": "2.0.0",
+  "tags": [
+    "时钟",
+    "极简"
+  ],
+  "html": "board.html",
+  "preview": "preview.png"
+}

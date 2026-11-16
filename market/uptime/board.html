@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<title>站点探针</title>
+<style>
+  html,body{margin:0;padding:0;background:transparent;height:100%;overflow:hidden;}
+  body{font-family:'Segoe UI','Microsoft YaHei UI',system-ui,sans-serif;color:#DFF3EA;
+       -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+  .num,.ms,.code,.kicker,.tag{font-family:ui-monospace,'Cascadia Mono',Consolas,'Courier New',monospace;
+       font-variant-numeric:tabular-nums;}
+
+  .card{position:fixed;inset:0;border-radius:10px;box-sizing:border-box;padding:11px 14px 9px;
+        background:linear-gradient(165deg,rgba(11,17,22,var(--paper-alpha,.97)),rgba(14,24,28,var(--paper-alpha,.97)));
+        display:flex;flex-direction:column;overflow:hidden;}
+  /* 极细网格 + 左上角冷光，做出 htop 那种"玻璃仪表"的底 */
+  .card::before{content:"";position:absolute;inset:0;border-radius:10px;pointer-events:none;z-index:0;
+        background:
+          repeating-linear-gradient(0deg,rgba(110,255,200,.052) 0 1px,transparent 1px 24px),
+          repeating-linear-gradient(90deg,rgba(110,255,200,.036) 0 1px,transparent 1px 24px),
+          radial-gradient(115% 85% at 6% -20%,rgba(53,240,160,.13),transparent 58%);}
+
+  .hd,.rows,.ft{position:relative;z-index:1;}
+
+  .hd{display:flex;align-items:baseline;gap:9px;padding-bottom:clamp(3px,.9vh,10px);flex:0 0 auto;}
+  .kicker{font-size:clamp(8.5px,1.5vh,11px);letter-spacing:1.7px;color:#48A280;
+          text-transform:uppercase;flex:0 0 auto;}
+  .sum{display:flex;align-items:baseline;gap:clamp(4px,.7vh,7px);min-width:0;overflow:hidden;
+       white-space:nowrap;font-size:clamp(10.5px,2.35vh,15px);color:#93B6A9;}
+  .sum b{color:#EAFFF6;font-size:clamp(11.5px,2.9vh,19px);font-weight:600;}
+  .sum .sep{color:#527A6E;}
+  .sum .when{color:#7FD8AF;}
+
+  .rows{flex:1;display:flex;flex-direction:column;min-height:0;}
+  .row{display:grid;grid-template-columns:8px minmax(0,1fr) 34px minmax(48px,auto) minmax(72px,28%);
+       align-items:center;gap:clamp(6px,1.1vh,12px);flex:1;min-height:0;padding:0 1px;
+       border-bottom:1px solid rgba(255,255,255,.055);}
+  .row:last-child{border-bottom:none;}
+
+  .dot{width:8px;height:8px;border-radius:50%;background:#37474F;justify-self:center;}
+  .dot.ok{background:#35F0A0;animation:breathe-ok 2.6s ease-in-out infinite;}
+  .dot.slow{background:#FFB020;animation:breathe-slow 2.2s ease-in-out infinite;}
+  .dot.down{background:#FF5A5F;animation:breathe-down 1.5s ease-in-out infinite;}
+  .dot.wait{background:#2F4049;animation:breathe-wait 3.4s ease-in-out infinite;}
+  @keyframes breathe-ok{
+    0%,100%{opacity:.62;box-shadow:0 0 2px 0 rgba(53,240,160,.35),0 0 0 0 rgba(53,240,160,0);}
+    50%{opacity:1;box-shadow:0 0 9px 1px rgba(53,240,160,.8),0 0 0 3px rgba(53,240,160,.10);}}
+  @keyframes breathe-slow{
+    0%,100%{opacity:.62;box-shadow:0 0 2px 0 rgba(255,176,32,.35),0 0 0 0 rgba(255,176,32,0);}
+    50%{opacity:1;box-shadow:0 0 9px 1px rgba(255,176,32,.8),0 0 0 3px rgba(255,176,32,.10);}}
+  @keyframes breathe-down{
+    0%,100%{opacity:.7;box-shadow:0 0 2px 0 rgba(255,90,95,.4),0 0 0 0 rgba(255,90,95,0);}
+    50%{opacity:1;box-shadow:0 0 10px 1px rgba(255,90,95,.85),0 0 0 3px rgba(255,90,95,.12);}}
+  @keyframes breathe-wait{0%,100%{opacity:.35;}50%{opacity:.6;}}
+
+  .hostw{display:flex;flex-direction:column;gap:1px;min-width:0;overflow:hidden;}
+  .host{font-size:clamp(11px,3.1vh,19px);color:#CFE9DD;overflow:hidden;text-overflow:ellipsis;
+        white-space:nowrap;letter-spacing:.1px;}
+  .row.is-down .host{color:#FFC9CB;}
+  .row.skel .host{color:#4C6E63;}
+  .row.skel .ms{color:#456258;}
+  /* 面板拉高时才补的第二行：探的到底是哪个地址 */
+  .sub{display:none;font-size:clamp(9px,1.45vh,12.5px);color:#4E6E64;white-space:nowrap;
+       overflow:hidden;text-overflow:ellipsis;letter-spacing:.2px;}
+  @media (min-height:380px){ .sub{display:block;} }
+  .code{font-size:clamp(9.5px,1.85vh,13px);color:#5F7C72;text-align:center;}
+  .code.ok{color:#4FB98C;}
+  .code.bad{color:#FF7A7E;}
+  .ms{font-size:clamp(12px,4.1vh,29px);text-align:right;color:#DDF6EC;line-height:1;white-space:nowrap;}
+  .ms i{font-style:normal;font-size:clamp(8.5px,1.55vh,12px);color:#54736A;margin-left:1px;}
+  .ms.slow{color:#FFC24D;text-shadow:0 0 9px rgba(255,176,32,.35);}
+  .ms.slow i{color:#9A7220;}
+  .ms.off{color:#FF7A7E;}
+
+  /* 最近 12 次耗时：小倍数柱图，从右往左堆，旧格子留暗桩 */
+  /* 柱图铺满整行高度：面板拉高时它跟着长，不给空的"死区" */
+  .bars{display:flex;align-items:flex-end;gap:2px;align-self:stretch;height:auto;
+        padding:clamp(6px,1.8vh,18px) 0;}
+  .bars i{flex:1 1 auto;min-width:1px;height:2px;border-radius:1.5px 1.5px 1px 1px;
+          background:rgba(120,205,170,.16);
+          transition:height .5s cubic-bezier(.22,1,.36,1),background .3s linear;}
+  .bars i.on{background:linear-gradient(180deg,#6BFFC6,#16BE78);box-shadow:0 0 5px rgba(53,240,160,.35);}
+  .bars i.slow{background:linear-gradient(180deg,#FFD166,#DC8A00);box-shadow:0 0 5px rgba(255,176,32,.35);}
+  .bars i.off{background:linear-gradient(180deg,#FF9EA1,#D94248);box-shadow:0 0 5px rgba(255,90,95,.3);}
+
+  .ft{flex:0 0 auto;margin-top:clamp(3px,.8vh,8px);font-size:clamp(9px,1.45vh,11px);
+      color:#43645A;letter-spacing:.5px;display:flex;justify-content:space-between;gap:8px;
+      white-space:nowrap;overflow:hidden;}
+  .ft .err{color:#FF9B6A;text-overflow:ellipsis;overflow:hidden;}
+
+  /* —— 自适应：窄了先丢状态码，再缩边距；列数只在 .narrow 里变，避免 .tiny 单独出现时错位 —— */
+  .card.narrow .row{grid-template-columns:8px minmax(0,1fr) 52px minmax(52px,24%);gap:6px;}
+  .card.narrow .code{display:none;}
+  .card.narrow .kicker{display:none;}
+  .card.tiny{padding:8px 10px 6px;}
+  .card.tiny .bars{gap:1.5px;}
+  .card.tiny .ft{display:none;}
+  .card.tiny .hd{padding-bottom:2px;}
+</style></head><body>
+<div class="card" id="card">
+  <div class="hd">
+    <span class="kicker" id="kicker">UPTIME</span>
+    <span class="sum">
+      <b id="onCount">—/3</b><span>在线</span>
+      <span class="sep">·</span>
+      <span>平均</span><b id="avg">—</b><span>ms</span>
+      <span class="sep">·</span>
+      <span class="when" id="when">等待采集器…</span>
+    </span>
+  </div>
+  <div class="rows" id="rows"></div>
+  <div class="ft">
+    <span id="foot">PROBE 180s · 保留最近 12 次</span>
+    <span class="err" id="err"></span>
+  </div>
+</div>
+<script>
+(function () {
+  var MAX_SLOTS = 12;      // 每行保留的历史格数
+  var SLOW_MS = 800;       // 超过就变琥珀
+  var SKELETON_ROWS = 3;
+
+  var card = document.getElementById('card');
+  var rowsBox = document.getElementById('rows');
+  var onCount = document.getElementById('onCount');
+  var avgEl = document.getElementById('avg');
+  var whenEl = document.getElementById('when');
+  var footEl = document.getElementById('foot');
+  var errEl = document.getElementById('err');
+  var kicker = document.getElementById('kicker');
+
+  var history = {};        // host -> [ms, ms, ...]  最多 MAX_SLOTS 个
+  var hosts = [];          // 当前行顺序对应的 host
+  var receivedAt = 0;
+  var hasData = false;
+
+  /* ---------- 布局自适应（宿主窗口可 300×200 到 900×600） ---------- */
+  function fit() {
+    var w = window.innerWidth || 300;
+    var h = window.innerHeight || 200;
+    card.className = 'card' + (w < 400 ? ' narrow' : '') + (w < 330 || h < 230 ? ' tiny' : '');
+  }
+  fit();
+  window.addEventListener('resize', fit);
+
+  /* ---------- 骨架行 ---------- */
+  function buildRows(n) {
+    rowsBox.innerHTML = '';
+    for (var i = 0; i < n; i++) {
+      var row = document.createElement('div');
+      row.className = 'row skel';
+      var html = '<span class="dot wait"></span>'
+        + '<span class="hostw"><span class="host">— — —</span><span class="sub"></span></span>'
+        + '<span class="code">—</span>'
+        + '<span class="ms">—<i>ms</i></span>'
+        + '<span class="bars">';
+      for (var s = 0; s < MAX_SLOTS; s++) { html += '<i></i>'; }
+      html += '</span>';
+      row.innerHTML = html;
+      rowsBox.appendChild(row);
+    }
+  }
+  buildRows(SKELETON_ROWS);
+
+  /* ---------- 历史状态 ---------- */
+  function sanitizeHistory(raw) {
+    var out = {};
+    if (!raw || typeof raw !== 'object') { return out; }
+    for (var key in raw) {
+      if (!Object.prototype.hasOwnProperty.call(raw, key)) { continue; }
+      var list = raw[key];
+      if (!list || typeof list.length !== 'number') { continue; }
+      var clean = [];
+      for (var i = 0; i < list.length && clean.length < MAX_SLOTS; i++) {
+        var v = Number(list[i]);
+        if (isFinite(v) && v >= 0) { clean.push(Math.round(v)); }
+      }
+      out[String(key)] = clean.slice(-MAX_SLOTS);
+    }
+    return out;
+  }
+
+  function pushHistory(host, ms) {
+    if (!host) { return; }
+    var list = history[host] || (history[host] = []);
+    list.push(Math.max(0, Math.round(ms || 0)));
+    if (list.length > MAX_SLOTS) { list.splice(0, list.length - MAX_SLOTS); }
+  }
+
+  function saveState() {
+    try {
+      if (window.chrome && window.chrome.webview) {
+        window.chrome.webview.postMessage({ type: 'ui.state', state: { history: history } });
+      }
+    } catch (e) { /* 界面状态是锦上添花，失败不影响看板 */ }
+  }
+
+  /* ---------- 柱图 ---------- */
+  function paintBars(row, list, ok) {
+    var slots = row.querySelectorAll('.bars i');
+    if (!slots.length) { return; }
+
+    // 每行按自己的量级归一（小倍数），否则 68ms 的站点在面板里几乎看不见柱子；
+    // 绝对快慢由右边的数字负责说。80ms 下限防止极小的抖动被放大成"锯齿海"。
+    var scale = 80;
+    for (var i = 0; i < list.length; i++) { if (list[i] > scale) { scale = list[i]; } }
+    scale = scale * 1.1;
+
+    var offset = MAX_SLOTS - list.length;
+    for (var s = 0; s < slots.length; s++) {
+      var el = slots[s];
+      var idx = s - offset;
+      if (idx < 0 || idx >= list.length) {
+        el.className = '';
+        el.style.height = '2px';
+        el.style.opacity = '.55';
+        continue;
+      }
+      var ms = list[idx];
+      var pct = Math.max(9, Math.min(100, Math.round(ms / scale * 100)));
+      el.style.height = pct + '%';
+      el.style.opacity = '1';
+      el.className = ok ? (ms > SLOW_MS ? 'slow' : 'on') : 'off';
+    }
+  }
+
+  /* ---------- "刚刚 / 3 分钟前" ---------- */
+  function agoText() {
+    if (!receivedAt) { return '等待采集器…'; }
+    var sec = Math.round((Date.now() - receivedAt) / 1000);
+    if (sec < 45) { return '刚刚'; }
+    var min = Math.round(sec / 60);
+    if (min < 60) { return min + ' 分钟前'; }
+    return Math.round(min / 60) + ' 小时前';
+  }
+  setInterval(function () { whenEl.textContent = agoText(); }, 15000);
+
+  /* ---------- 主渲染 ---------- */
+  function render(data, at) {
+    var probes = (data && data.probes) || [];
+    if (!probes.length) { return; }
+
+    if (rowsBox.children.length !== probes.length) { buildRows(probes.length); }
+
+    var online = 0;
+    var sumMs = 0;
+    var nowHosts = [];
+
+    for (var i = 0; i < probes.length; i++) {
+      var p = probes[i] || {};
+      var row = rowsBox.children[i];
+      var host = p.host || p.url || '未知地址';
+      var ms = Number(p.ms);
+      if (!isFinite(ms) || ms < 0) { ms = 0; }
+
+      nowHosts.push(host);
+      pushHistory(host, ms);
+      if (p.ok) { online++; sumMs += ms; }
+
+      var msEl = row.querySelector('.ms');
+      var codeEl = row.querySelector('.code');
+      var dotEl = row.querySelector('.dot');
+
+      row.querySelector('.host').textContent = host;
+      row.querySelector('.host').title = p.url || host;
+      row.querySelector('.sub').textContent = p.url || '';
+
+      dotEl.className = 'dot ' + (!p.ok ? 'down' : (ms > SLOW_MS ? 'slow' : 'ok'));
+      row.className = 'row' + (p.ok ? '' : ' is-down');
+
+      codeEl.textContent = p.ok ? String(p.status || '—') : 'ERR';
+      codeEl.className = 'code ' + (p.ok ? 'ok' : 'bad');
+
+      if (p.ok) {
+        msEl.innerHTML = Math.round(ms) + '<i>ms</i>';
+        msEl.className = 'ms' + (ms > SLOW_MS ? ' slow' : '');
+      } else {
+        msEl.innerHTML = '—';
+        msEl.className = 'ms off';
+        msEl.title = p.error || '';
+      }
+
+      paintBars(row, history[host] || [], !!p.ok);
+    }
+
+    hosts = nowHosts;
+    hasData = true;
+
+    onCount.textContent = online + '/' + probes.length;
+    avgEl.textContent = online ? String(Math.round(sumMs / online)) : '—';
+    receivedAt = Date.now();
+    whenEl.textContent = agoText();
+    errEl.textContent = '';
+
+    saveState();
+  }
+
+  function renderError(message) {
+    errEl.textContent = message || '采集失败';
+    if (!hasData) {
+      whenEl.textContent = '采集失败';
+      onCount.textContent = '—/3';
+    }
+  }
+
+  function applyUiState(state) {
+    if (!state || typeof state !== 'object') { return; }
+    if (state.history) {
+      history = sanitizeHistory(state.history);
+      // 已经有数据的话，把恢复出来的历史立刻画回去（不用等下一次采集）
+      if (hasData && hosts.length) {
+        for (var i = 0; i < rowsBox.children.length && i < hosts.length; i++) {
+          var row = rowsBox.children[i];
+          // 历史只存耗时、不存成败；沿用这一行当前的红/绿来判断柱子颜色
+          var down = row.className.indexOf('is-down') >= 0;
+          paintBars(row, history[hosts[i]] || [], !down);
+        }
+      }
+    }
+  }
+
+  /* ---------- 消息协议 ---------- */
+  if (window.chrome && window.chrome.webview) {
+    window.chrome.webview.addEventListener('message', function (e) {
+      var m = e.data || {};
+      if (m.type === 'data') { render(m.data, m.fetchedAt); }
+      else if (m.type === 'error') { renderError(m.message); }
+      else if (m.type === 'ui') { applyUiState(m.state); }
+      else if (m.type === 'board') { if (m.name) { kicker.textContent = m.name; } }
+    });
+  }
+})();
+</script></body></html>

@@ -1,0 +1,13 @@
+{
+  "id": "uptime",
+  "name": "站点探针",
+  "summary": "三个站点的在线状态与响应耗时，一眼看全。",
+  "description": "每 3 分钟探测一次公开地址，记录状态码与耗时，页面保留最近 12 次的走势。",
+  "author": "StickyTodo 示例",
+  "version": "2.0.0",
+  "intervalSeconds": 180,
+  "tags": ["运维", "监控"],
+  "html": "board.html",
+  "script": "board.js",
+  "preview": "preview.png"
+}

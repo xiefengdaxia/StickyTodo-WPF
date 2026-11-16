@@ -1,0 +1,16 @@
+{
+  "id": "verse",
+  "name": "打字机诗句",
+  "summary": "一句中文短句逐字打出来，带细光标，打完淡入出处。",
+  "description": "采集脚本每 10 分钟从 hitokoto 一言接口（文学 / 诗词 / 哲学）取一条；页面用打字机效果逐字显示，打完在右下方淡入「—— 作者《出处》」，之后淡出重打。没有数据时显示占位文案，光标一直闪。",
+  "author": "StickyTodo 示例",
+  "version": "2.0.0",
+  "intervalSeconds": 600,
+  "tags": [
+    "诗句",
+    "打字机"
+  ],
+  "html": "board.html",
+  "script": "board.js",
+  "preview": "preview.png"
+}
