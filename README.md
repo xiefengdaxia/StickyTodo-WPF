@@ -8,17 +8,17 @@
 
 ## ✨ 亮点：AI 自定义看板（MCP 接入）
 
-**让 AI 把数据画在你的桌面上。** 应用内置 MCP 服务端（设置页一键开启，只监听 127.0.0.1 + 令牌鉴权），AI 客户端可以创建/关闭看板、增删待办、控制番茄钟、查天气与 Token 用量、改设置、截屏——共 **32 个工具**；还能创建 **UI 完全由 AI 编写的 HTML 看板**，配一个 AI 写的采集脚本定时去网站/服务器抓数据回填（跑在 Jint 沙盒里，只放行 HTTP；脚本还能用 `mcp(tool, args)` 直接调本机 MCP 工具，进程内调用、脚本拿不到令牌——今日进度看板就是这么读待办的）。下面 6 块看板全部由 AI 生成——点桌宠它会冒爱心：
+**让 AI 把数据画在你的桌面上。** 应用内置 MCP 服务端（设置页一键开启，只监听 127.0.0.1 + 令牌鉴权），AI 客户端可以创建/关闭看板、增删待办、控制番茄钟、查天气与 Token 用量、改设置、截屏——共 **32 个工具**；还能创建 **UI 完全由 AI 编写的 HTML 看板**，配一个 AI 写的采集脚本定时去网站/服务器抓数据回填（跑在 Jint 沙盒里，只放行 HTTP；脚本还能用 `mcp(tool, args)` 直接调本机 MCP 工具，进程内调用、脚本拿不到令牌——AI 用量热力图看板就是这么读 token 用量的）。下面 6 块看板全部由 AI 生成，全部放在 `market/` 里，管理面板 → 看板市场一键安装：
 
-| 桌宠（点它会冒爱心） | 灵动时钟 |
+| **年度进度**（今年过了多少，一眼看到） | **AI 用量热力图**（30 天 token，一格一天） |
 |---|---|
-| ![桌宠](artifacts/custom-pet.gif) | ![灵动时钟](artifacts/custom-clock.gif) |
-| **今日进度**（每 60 秒自动算） | **汇率速览**（真实汇率，每 10 分钟） |
-| ![今日进度](artifacts/custom-progress.gif) | ![汇率速览](artifacts/custom-exchange.gif) |
-| **GitHub 星标**（真实仓库数据） | **每日一言**（hitokoto 接口） |
-| ![GitHub 星标](artifacts/custom-github.gif) | ![每日一言](artifacts/custom-quote.gif) |
+| ![年度进度](artifacts/custom-year.png) | ![AI 用量热力图](artifacts/custom-token-heatmap.png) |
+| **站点探针**（三个站点在线状态，留最近 12 次） | **空气质量环**（AQI 环形仪表 + 四项污染物） |
+| ![站点探针](artifacts/custom-uptime.png) | ![空气质量环](artifacts/custom-aqi.png) |
+| **昼夜时钟**（大号时间 + 一条走过一天的太阳弧） | **打字机诗句**（一言接口取句，逐字打出来） |
+| ![昼夜时钟](artifacts/custom-dayclock.png) | ![打字机诗句](artifacts/custom-verse.png) |
 
-示例源码：`market/` —— 上面 6 块看板现在打包成了「看板市场」里的可安装包，一个目录 = 一个看板：`board.json` 清单 + `board.html` 界面 + `preview.png` 预览图，需要抓数据的再带一个 `board.js` 采集脚本。MCP 工具清单与接入方法见下文「**MCP 接入（AI 客户端控制本应用）**」
+示例源码：`market/` —— 一个目录 = 一个看板：`board.json` 清单 + `board.html` 界面 + `preview.png` 预览图，取数的再带一个 `board.js` 采集脚本。MCP 工具清单与接入方法见下文「**MCP 接入（AI 客户端控制本应用）**」
 
 | 便签（默认 92% 背景） | 背景 55%（看得见桌面） | 石墨夜色皮肤 |
 |---|---|---|
@@ -341,7 +341,7 @@ dotnet run --project tools/IconGen -c Release -- src/StickyTodo.App/Assets/stick
 - **AI 自定义看板**：`create_custom_board(html, script)` —— UI 是 AI 写的完整 HTML（WebView2 渲染，运行时缺失时降级为文本显示），数据由 AI 写的 **JS 采集脚本**定时抓取：脚本跑在 Jint 沙盒里，只有 `http_get / http_post / http` 三个网络函数（碰不到文件和进程），带内存、语句数与超时限额；另有 `mcp(tool, args)` 可以在脚本里直调本机 MCP 工具（如 `mcp('list_todos', {})`），返回已解析对象（进程内调用，脚本拿不到令牌）；`push_custom_data` 可以不经网络直接把数据推上墙
 - **背景透明度 / 整窗透明度 / 皮肤都能按这块看板单独设**（🎨 菜单）
 - MCP 改了数据之后，所有打开着的看板窗口会自动重读，屏幕上的列表立刻是最新的
-- 示例看板（桌宠 / 灵动时钟 / 今日进度 / 汇率 / GitHub 星标 / 每日一言）源码在 `market/`：一个看板一个目录，各含 `board.json` 清单 + `board.html` 界面 + `preview.png` 预览图，汇率 / GitHub / 今日进度 / 每日一言 另带 `board.js` 采集脚本；管理面板 → 看板市场可一键安装与卸载
+- 示例看板（年度进度 / AI 用量热力图 / 站点探针 / 空气质量环 / 昼夜时钟 / 打字机诗句）源码在 `market/`：一个看板一个目录，各含 `board.json` 清单 + `board.html` 界面 + `preview.png` 预览图，AI 用量热力图 / 站点探针 / 空气质量环 / 打字机诗句 另带 `board.js` 采集脚本；管理面板 → 看板市场可一键安装与卸载
 
 **日历看板**
 - 月视图固定 6 周网格（周一开头），今天高亮、周末标红、跨月日期淡化；星期表头随语言变化
