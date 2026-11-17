@@ -1,4 +1,4 @@
-﻿# 构建产物
+# 构建产物
 bin/
 obj/
 [Dd]ebug/
@@ -25,3 +25,6 @@ publish-avalonia/
 # Avalonia 自检输出（发布脚本的临时产物）
 avalonia-selftest.txt
 .alma-snapshots
+
+# 编辑器 / 智能体生成的临时计划与缓存
+.zcode/
