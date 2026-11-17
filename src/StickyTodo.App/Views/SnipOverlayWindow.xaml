@@ -69,17 +69,15 @@
 
     <Grid x:Name="Root" ClipToBounds="True">
 
-        <!-- 整屏截图（原始亮度） -->
-        <Image x:Name="Backdrop" Stretch="Fill" />
+        <!-- 整屏截图（压暗后当底图） -->
+        <Image x:Name="Backdrop" Stretch="Fill" RenderOptions.BitmapScalingMode="LowQuality" />
 
-        <!-- 整屏压暗：用四条矩形围出选区（比几何裁剪稳，任何渲染路径都准） -->
-        <Canvas x:Name="DimLayer" IsHitTestVisible="False">
-            <Rectangle x:Name="DimFull" Fill="#70000000" />
-            <Rectangle x:Name="DimTop" Fill="#70000000" Visibility="Collapsed" />
-            <Rectangle x:Name="DimBottom" Fill="#70000000" Visibility="Collapsed" />
-            <Rectangle x:Name="DimLeft" Fill="#70000000" Visibility="Collapsed" />
-            <Rectangle x:Name="DimRight" Fill="#70000000" Visibility="Collapsed" />
-        </Canvas>
+        <!-- 静态压暗层：Grid 里自动铺满，跟鼠标移动无关，永不重排 -->
+        <Rectangle x:Name="DimFull" Fill="#70000000" IsHitTestVisible="False" />
+
+        <!-- 选区那块用同一张原图「挖洞」提亮：拖动时只改 Clip，压暗层原地不动 -->
+        <Image x:Name="Bright" Stretch="Fill" RenderOptions.BitmapScalingMode="LowQuality"
+               IsHitTestVisible="False" Visibility="Collapsed" />
 
         <Canvas x:Name="SelectionLayer" Background="Transparent">
             <Rectangle x:Name="SelectionBorder"

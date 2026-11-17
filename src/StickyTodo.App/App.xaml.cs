@@ -593,7 +593,7 @@ public partial class App : System.Windows.Application
             onNewTodo: windows.OpenDefaultBoardForNewTodo,
             onToggleBoards: windows.ToggleBoardsVisibility,
             onLockActive: () => windows.ToggleActiveLock(),
-            onSnip: () => pins.CaptureAndPin(),
+            onSnip: () => _ = pins.CaptureAndPinAsync(),
             onPinAgain: () => pins.PinLast());
 
         Log.Information(

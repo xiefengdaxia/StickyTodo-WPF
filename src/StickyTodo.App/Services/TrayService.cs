@@ -397,7 +397,7 @@ public sealed class TrayService : IDisposable
         snip.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(() =>
         {
             _menu?.Close();
-            pins.CaptureAndPin();
+            _ = pins.CaptureAndPinAsync();
         });
         menu.Items.Add(snip);
 

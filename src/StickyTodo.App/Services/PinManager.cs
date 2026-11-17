@@ -18,6 +18,9 @@ public sealed class PinManager
     private BitmapSource? _lastImage;
     private Point? _lastTopLeft;
 
+    /// <summary>正在抓屏：F1 连按两次不要叠出两个覆盖层。</summary>
+    private bool _capturing;
+
     /// <summary>当前贴着的图片数量。</summary>
     public int Count => _pins.Count;
 
@@ -28,15 +31,34 @@ public sealed class PinManager
     /// F1：截取整个屏幕 → 让用户框选/标注 → 贴到桌面。
     /// 返回贴出来的窗口；用户取消则返回 null。
     /// </summary>
-    public PinWindow? CaptureAndPin()
+    public async Task<PinWindow?> CaptureAndPinAsync()
     {
-        var screenshot = ScreenCaptureService.CaptureVirtualScreen();
-        if (screenshot is null)
+        if (_capturing)
         {
-            Log.Warning("[pin] 抓屏失败");
             return null;
         }
 
+        _capturing = true;
+        try
+        {
+            // 整屏 BitBlt 在这台机器上约 100ms：放后台线程抓，UI 不会先冻一下才出遮罩
+            var screenshot = await Task.Run(ScreenCaptureService.CaptureVirtualScreen);
+            if (screenshot is null)
+            {
+                Log.Warning("[pin] 抓屏失败");
+                return null;
+            }
+
+            return ShowOverlayAndPin(screenshot);
+        }
+        finally
+        {
+            _capturing = false;
+        }
+    }
+
+    private PinWindow? ShowOverlayAndPin(BitmapSource screenshot)
+    {
         var overlay = new SnipOverlayWindow(screenshot)
         {
             WindowStartupLocation = WindowStartupLocation.Manual,

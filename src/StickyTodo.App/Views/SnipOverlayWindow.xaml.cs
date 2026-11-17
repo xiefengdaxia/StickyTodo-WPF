@@ -61,45 +61,32 @@ public partial class SnipOverlayWindow : Window
 
         _screenshot = screenshot;
         Backdrop.Source = screenshot;
+        Bright.Source = screenshot;
 
-        // 初始：整屏压暗，没有"亮洞"（尺寸在 Loaded 时按窗口大小再设一次）
+        // 初始：整屏压暗，没有"亮洞"
         ShowFullDim();
     }
 
-    /// <summary>整屏压暗（无选区）。</summary>
+    /// <summary>整屏压暗（无选区）。压暗层自己铺满窗口，这里只把「亮洞」藏掉。</summary>
     private void ShowFullDim()
     {
-        DimFull.Visibility = Visibility.Visible;
-        DimFull.Width = ActualWidth > 0 ? ActualWidth : Width;
-        DimFull.Height = ActualHeight > 0 ? ActualHeight : Height;
-
-        foreach (var rect in new[] { DimTop, DimBottom, DimLeft, DimRight })
-        {
-            rect.Visibility = Visibility.Collapsed;
-        }
+        Bright.Visibility = Visibility.Collapsed;
     }
 
-    /// <summary>把压暗层切成四块，围出一个亮的选区。</summary>
-    private void ShowDimAround(Rect selection)
+    /// <summary>
+    /// 用一个矩形 Clip 在压暗层上「挖洞」：压暗层是静态的，拖动时只有这张原图的
+    /// 裁剪几何在变，不会像以前那样每帧重排四块矩形、整窗重绘。
+    /// </summary>
+    private void ShowBrightArea(Rect selection)
     {
-        var w = ActualWidth > 0 ? ActualWidth : Width;
-        var h = ActualHeight > 0 ? ActualHeight : Height;
+        var rect = new Rect(
+            Math.Max(0, selection.X),
+            Math.Max(0, selection.Y),
+            Math.Max(0, selection.Width),
+            Math.Max(0, selection.Height));
 
-        DimFull.Visibility = Visibility.Collapsed;
-
-        Position(DimTop, 0, 0, w, selection.Y);
-        Position(DimBottom, 0, selection.Bottom, w, Math.Max(0, h - selection.Bottom));
-        Position(DimLeft, 0, selection.Y, selection.X, selection.Height);
-        Position(DimRight, selection.Right, selection.Y, Math.Max(0, w - selection.Right), selection.Height);
-
-        static void Position(FrameworkElement element, double left, double top, double width, double height)
-        {
-            Canvas.SetLeft(element, left);
-            Canvas.SetTop(element, top);
-            element.Width = Math.Max(0, width);
-            element.Height = Math.Max(0, height);
-            element.Visibility = height > 0 && width > 0 ? Visibility.Visible : Visibility.Collapsed;
-        }
+        Bright.Clip = rect.Width > 0 && rect.Height > 0 ? new RectangleGeometry(rect) : null;
+        Bright.Visibility = rect.Width > 0 && rect.Height > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -228,7 +215,7 @@ public partial class SnipOverlayWindow : Window
     {
         rect = Clamp(rect);
 
-        ShowDimAround(rect);
+        ShowBrightArea(rect);
 
         Canvas.SetLeft(SelectionBorder, rect.X);
         Canvas.SetTop(SelectionBorder, rect.Y);
@@ -241,7 +228,12 @@ public partial class SnipOverlayWindow : Window
         AnnoLayer.Width = rect.Width;
         AnnoLayer.Height = rect.Height;
 
-        SizeText.Text = $"{(int)Math.Round(rect.Width * ScaleX)} × {(int)Math.Round(rect.Height * ScaleY)}";
+        var px = $"{(int)Math.Round(rect.Width * ScaleX)} × {(int)Math.Round(rect.Height * ScaleY)}";
+        if (!string.Equals(SizeText.Text, px, StringComparison.Ordinal))
+        {
+            SizeText.Text = px;
+        }
+
         SizeBadge.Visibility = Visibility.Visible;
         Canvas.SetLeft(SizeBadge, rect.X);
         Canvas.SetTop(SizeBadge, Math.Max(0, rect.Y - 26));
