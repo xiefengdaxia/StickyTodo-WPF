@@ -22,7 +22,15 @@ public partial class GifToast : Window
     /// 这次录制的区域（物理像素）：提示条出现在**那块屏**的右下角，
     /// 而不是主屏；区域贴边时再夹进工作区，保证不会被屏幕边缘切掉。
     /// </param>
-    public GifToast(byte[] gif, string? filePath, System.Drawing.Rectangle? anchorRegion = null)
+    /// <param name="gifSize">
+    /// 生成的 GIF 实际尺寸（像素）：和录制区域的物理像素一致，
+    /// 显示成「1920×1080 · 12.3 MB」让用户一眼核对分辨率对不对。
+    /// </param>
+    public GifToast(
+        byte[] gif,
+        string? filePath,
+        System.Drawing.Rectangle? anchorRegion = null,
+        System.Drawing.Size? gifSize = null)
     {
         InitializeComponent();
 
@@ -33,7 +41,7 @@ public partial class GifToast : Window
         MessageText.Text = Loc.T("gif.copied");
         SaveButton.Content = Loc.T("gif.save");
         CloseButton.Content = Loc.T("common.close");
-        DetailText.Text = $"{gif.Length / 1024.0:0.#} KB" + SizeHint(Path.GetFileName(filePath));
+        DetailText.Text = Detail(gif.Length, gifSize) + SizeHint(Path.GetFileName(filePath));
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
         _timer.Tick += (_, _) =>
@@ -67,6 +75,19 @@ public partial class GifToast : Window
 
     private static string SizeHint(string? fileName) =>
         string.IsNullOrEmpty(fileName) ? string.Empty : $" · {fileName}";
+
+    /// <summary>
+    /// 「1920×1080 · 12.3 MB」：分辨率 + 体积。分辨率就是实际录到的那块区域的物理像素，
+    /// 用户拿它和框选范围一比就知道有没有被缩掉。
+    /// </summary>
+    private static string Detail(int bytes, System.Drawing.Size? size)
+    {
+        var volume = bytes >= 1024 * 1024
+            ? $"{bytes / (1024.0 * 1024.0):0.#} MB"
+            : $"{bytes / 1024.0:0.#} KB";
+
+        return size is { Width: > 0, Height: > 0 } s ? $"{s.Width}×{s.Height} · {volume}" : volume;
+    }
 
     /// <summary>
     /// 贴到录制区域所在那块屏的右下角，再夹进它的工作区

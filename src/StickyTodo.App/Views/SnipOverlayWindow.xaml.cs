@@ -890,24 +890,13 @@ public partial class SnipOverlayWindow : Window
     private System.Drawing.Rectangle SelectionScreenRect()
     {
         var bounds = Services.ScreenCaptureService.GetVirtualScreenBounds();
-        var sx = ScaleX;
-        var sy = ScaleY;
 
-        var x = bounds.Left + (int)Math.Round(_selection.X * sx);
-        var y = bounds.Top + (int)Math.Round(_selection.Y * sy);
-        var width = Math.Max(4, (int)Math.Round(_selection.Width * sx));
-        var height = Math.Max(4, (int)Math.Round(_selection.Height * sy));
+        // 选区是 DIP，录制/抓屏只认物理像素；比例拿不到时（覆盖层还没布局完）
+        // → 换算那边会退回显示器 DPI，绝不会把 DIP 当像素直接喂给 CopyFromScreen
+        var sx = Root.ActualWidth > 0 ? _screenshot.PixelWidth / Root.ActualWidth : 0;
+        var sy = Root.ActualHeight > 0 ? _screenshot.PixelHeight / Root.ActualHeight : 0;
 
-        // 越界坐标不要送给 CopyFromScreen（多屏拼接时容易算出界）
-        var right = Math.Min(bounds.Right, x + width);
-        var bottom = Math.Min(bounds.Bottom, y + height);
-        x = Math.Clamp(x, bounds.Left, bounds.Right);
-        y = Math.Clamp(y, bounds.Top, bounds.Bottom);
-
-        return new System.Drawing.Rectangle(
-            x, y,
-            Math.Max(4, right - x),
-            Math.Max(4, bottom - y));
+        return Services.ScreenCaptureService.SelectionToPixels(_selection, bounds, sx, sy);
     }
 
     /// <summary>

@@ -173,12 +173,18 @@ public sealed class GifRecordingService : IDisposable
         var quality = _settings.GifQuality;
         var countdown = _settings.GifCountdown;
 
+        // 到这里区域已经是物理像素（框选换算见 ScreenCaptureService.SelectionToPixels，
+        // 全屏/选屏用的是 Screen.Bounds），再记一条 DPI 方便用户核对录出来的分辨率
+        Log.Information(
+            "[gif] 录制区域 {Width}x{Height} @ {X},{Y} 物理像素 · 屏缩放 {Scale:P0}",
+            region.Width, region.Height, region.X, region.Y, ScreenCaptureService.DpiScaleFor(region));
+
         RememberMode(region);
         _recordedRegion = region;
         CloseBar();
 
         var recorder = new GifRecorder { Quality = quality };
-        recorder.Finished += OnFinished;
+        recorder.Finished += bytes => OnFinished(recorder, bytes);
         recorder.Failed += OnFailed;
         _recorder = recorder;
 
@@ -210,7 +216,7 @@ public sealed class GifRecordingService : IDisposable
 
     // ---------------- 完成 / 失败 ----------------
 
-    private void OnFinished(byte[] gif)
+    private void OnFinished(GifRecorder recorder, byte[] gif)
     {
         // 从编码线程回来，切回 UI 线程再动窗口
         Dispatch(() =>
@@ -225,7 +231,7 @@ public sealed class GifRecordingService : IDisposable
             try
             {
                 var path = GifClipboard.Publish(gif);
-                ShowToast(gif, path);
+                ShowToast(gif, path, recorder.LastSize);
             }
             catch (Exception ex)
             {
@@ -241,12 +247,12 @@ public sealed class GifRecordingService : IDisposable
         ConfirmWindow.Notify(null, "GIF", message);
     });
 
-    private void ShowToast(byte[] gif, string? path)
+    private void ShowToast(byte[] gif, string? path, System.Drawing.Size? gifSize)
     {
         _toast?.Close();
 
         // 提示条贴到刚录的那块屏的右下角（区域贴边时会自己夹进工作区）
-        var toast = new GifToast(gif, path, _recordedRegion);
+        var toast = new GifToast(gif, path, _recordedRegion, gifSize);
         toast.Closed += (_, _) =>
         {
             if (ReferenceEquals(_toast, toast))

@@ -9,12 +9,17 @@ using StickyTodo.Core.Media;
 namespace StickyTodo.App.Services;
 
 /// <summary>
-/// 一档清晰度：帧率 / 单帧最长边 / 色数。三者一起决定 GIF 的体积与观感。
+/// 一档清晰度：帧率 / 单帧最长边上限 / 色数。三者一起决定 GIF 的体积与观感。
+/// <see cref="MaxDimension"/> 为 0 表示**保持原始分辨率**，不做任何缩放（也不放大）。
 /// </summary>
 public readonly record struct GifQualityPreset(int Fps, int MaxDimension, int Colors)
 {
     /// <summary>这一档的抓帧间隔（毫秒）。</summary>
     public int IntervalMs => Math.Max(16, 1000 / Math.Max(1, Fps));
+
+    /// <summary>这一档要不要缩小（原始尺寸本来就更小时不缩，绝不放大）。</summary>
+    public bool ShouldDownscale(int width, int height) =>
+        MaxDimension > 0 && Math.Max(width, height) > MaxDimension;
 }
 
 /// <summary>清晰度档位名（与设置里的取值一一对应）。</summary>
@@ -31,16 +36,23 @@ public static class GifQualityPresets
         _ => Medium,
     };
 
+    /// <summary>保持原始分辨率（不缩放）。</summary>
+    public const int OriginalSize = 0;
+
+    /// <summary>
+    /// 档位只在**需要压体积**时才缩小（原始尺寸本来更小就原样录），一律不放大。
+    /// 录屏区域 1920×1080、选「高清」时 GIF 就是 1920×1080。
+    /// </summary>
     public static GifQualityPreset Resolve(string? quality) => Normalize(quality) switch
     {
-        // 小文件：8fps / 480px / 64 色 —— 发群里、贴 issue 够用
-        Low => new GifQualityPreset(8, 480, 64),
+        // 小文件：8fps / 长边 960 / 64 色 —— 发群里、贴 issue 够用
+        Low => new GifQualityPreset(8, 960, 64),
 
-        // 高清：20fps / 720px / 256 色 —— 演示动效、鼠标轨迹看得清
-        High => new GifQualityPreset(20, 720, 256),
+        // 高清：20fps / 原始分辨率 / 256 色 —— 演示动效、鼠标轨迹看得清
+        High => new GifQualityPreset(20, OriginalSize, 256),
 
-        // 标准：12fps / 640px / 128 色
-        _ => new GifQualityPreset(12, 640, 128),
+        // 标准：12fps / 长边 1280 / 128 色
+        _ => new GifQualityPreset(12, 1280, 128),
     };
 }
 
@@ -48,10 +60,14 @@ public static class GifQualityPresets
 /// GIF 录屏引擎（只管抓帧和编码，不碰任何窗口）。
 ///
 /// 抓帧用 GDI 的 CopyFromScreen **直接抓录制区域**：这台机器整屏一次 BitBlt 约 108ms，
-/// 先抓整屏再裁的话 20fps 根本跑不动。抓到的帧立刻按清晰度缩放并转成 BGRA 存内存。
+/// 先抓整屏再裁的话 20fps 根本跑不动。抓到的帧按清晰度档位缩放（默认不缩）并转成 BGRA 存内存。
 ///
-/// 上限：最长 30 秒 / 300 帧 / 单帧最长边 720px / 帧数据 320MB，最先到的那条自动停
-/// （GIF 越大越没用，聊天软件基本都在 8-10MB 开始不耐烦）。
+/// 分辨率就是录制区域的**物理像素**：1920×1080 的区域，抓到的位图也是 1920×1080。
+/// 只有「中 / 小文件」两档在原始尺寸更大时才缩到长边 1280 / 960，永远不放大。
+///
+/// 上限：最长 30 秒 / 300 帧 / 帧数据 320MB，最先到的那条自动收尾
+/// （GIF 越大越没用，聊天软件基本都在 8-10MB 开始不耐烦）。帧数据到顶时**先抽帧**
+/// （分辨率不动，帧率减半、时长不变），不够再抽，不会因为内存把一段录制早早掐断。
 ///
 /// 线程模型：抓帧和编码都在后台线程，完成时通过事件回到调用方；
 /// <see cref="FrameTick"/> 是从抓帧线程抛出来的，UI 侧自己 Dispatcher 切回去。
@@ -61,15 +77,13 @@ public sealed class GifRecorder : IDisposable
     /// <summary>最多录多少帧。</summary>
     public const int MaxFrames = 300;
 
-    /// <summary>单帧最长边上限（像素）。</summary>
-    public const int MaxDimension = 720;
-
     /// <summary>最长录制时长。</summary>
     public static readonly TimeSpan MaxDuration = TimeSpan.FromSeconds(30);
 
     /// <summary>
-    /// 帧数据的内存上限。每帧是整幅 BGRA：整屏 720px 一帧约 2MB，300 帧就是 600MB，
-    /// 8G 内存的机器上会很难看，所以再加一道总字节数的闸（到顶就当录满，正常出图）。
+    /// 帧数据的内存上限。每帧是整幅 BGRA：1920×1080 一帧约 8.3MB，
+    /// 300 帧就是 2.4GB —— 所以设这道闸，到顶就把已录的帧抽掉一半继续录
+    /// （分辨率不降、播放时长不变，只是帧率低一点）。
     /// </summary>
     public const long MaxBufferBytes = 320L * 1024 * 1024;
 
@@ -115,6 +129,12 @@ public sealed class GifRecorder : IDisposable
     public string Quality { get; set; } = GifQualityPresets.Medium;
 
     /// <summary>
+    /// 最近一次生成的 GIF 尺寸（像素）。<see cref="Finished"/> 触发时已经写好，
+    /// 提示条拿它显示「1920×1080」这样的实际分辨率，用户可以核对录制区域对不对。
+    /// </summary>
+    public Size? LastSize { get; private set; }
+
+    /// <summary>
     /// 是否把鼠标指针画进帧里（默认开）。看演示动效时没有指针就看不出「点了哪里」。
     /// 下一次 <see cref="Start"/> 生效。
     /// </summary>
@@ -156,7 +176,11 @@ public sealed class GifRecorder : IDisposable
         }
     }
 
-    /// <summary>开始录制一块屏幕区域（物理像素）。返回 false 表示没能开始。</summary>
+    /// <summary>
+    /// 开始录制一块屏幕区域。区域必须是**物理像素**（不是 DIP）：
+    /// 125% / 150% 缩放下把 DIP 矩形直接喂给 CopyFromScreen，录出来会小一圈还偏。
+    /// 返回 false 表示没能开始。
+    /// </summary>
     public bool Start(Rectangle regionPx, string? quality = null)
     {
         lock (_gate)
@@ -172,11 +196,15 @@ public sealed class GifRecorder : IDisposable
                 return false;
             }
 
-            _region = regionPx;
+            // GIF 的宽高是整数：区域先对齐到偶数，缩放时边缘不会录进 1px 的抖动/黑边
+            var width = Math.Max(2, regionPx.Width & ~1);
+            var height = Math.Max(2, regionPx.Height & ~1);
+            _region = new Rectangle(regionPx.X, regionPx.Y, width, height);
             _preset = GifQualityPresets.Resolve(quality ?? Quality);
             Quality = GifQualityPresets.Normalize(quality ?? Quality);
             _frames.Clear();
             _timeMarks.Clear();
+            LastSize = null;
             _discard = false;
             _stop = new ManualResetEvent(false);
             _state = RecordState.Recording;
@@ -190,9 +218,11 @@ public sealed class GifRecorder : IDisposable
         }
 
         Log.Information(
-            "[gif] 开始录制 {Width}x{Height} @ {X},{Y} · 清晰度 {Quality}（{Fps}fps / 最长边 {Max}px / {Colors}色）",
-            regionPx.Width, regionPx.Height, regionPx.X, regionPx.Y, Quality,
-            _preset.Fps, _preset.MaxDimension, _preset.Colors);
+            "[gif] 开始录制 {Width}x{Height} @ {X},{Y}（物理像素）· 清晰度 {Quality}（{Fps}fps / 最长边 {Max} / {Colors}色）",
+            _region.Width, _region.Height, _region.X, _region.Y, Quality,
+            _preset.Fps,
+            _preset.MaxDimension > 0 ? $"{_preset.MaxDimension}px" : "原始分辨率",
+            _preset.Colors);
 
         return true;
     }
@@ -238,10 +268,20 @@ public sealed class GifRecorder : IDisposable
             drawCursor = CaptureCursor;
         }
 
-        var scale = Math.Min(1d, MaxDimension / (double)Math.Max(region.Width, region.Height));
-        var targetWidth = scale < 1 ? Math.Max(2, (int)Math.Round(region.Width * scale)) : region.Width;
-        var targetHeight = scale < 1 ? Math.Max(2, (int)Math.Round(region.Height * scale)) : region.Height;
+        // 尺寸在这里一次算定：整段录制所有帧都用这一对宽高（GIF 要求帧尺寸一致）。
+        // 只有原始尺寸超过档位上限时才缩，且永远不放大；结果对齐到偶数。
+        var downscale = preset.ShouldDownscale(region.Width, region.Height);
+        var scale = downscale
+            ? preset.MaxDimension / (double)Math.Max(region.Width, region.Height)
+            : 1d;
+        var targetWidth = AlignEven(downscale ? (int)Math.Round(region.Width * scale) : region.Width);
+        var targetHeight = AlignEven(downscale ? (int)Math.Round(region.Height * scale) : region.Height);
         var interval = preset.IntervalMs;
+
+        Log.Information(
+            "[gif] 抓帧 {Width}x{Height} → GIF {TargetW}x{TargetH}{Scaled}",
+            region.Width, region.Height, targetWidth, targetHeight,
+            downscale ? "（按档位缩小）" : "（原始分辨率）");
 
         Bitmap? raw = null;
         Bitmap? scaled = null;
@@ -250,7 +290,7 @@ public sealed class GifRecorder : IDisposable
         {
             raw = new Bitmap(region.Width, region.Height, PixelFormat.Format32bppArgb);
 
-            if (scale < 1)
+            if (targetWidth != region.Width || targetHeight != region.Height)
             {
                 scaled = new Bitmap(targetWidth, targetHeight, PixelFormat.Format32bppArgb);
             }
@@ -268,6 +308,10 @@ public sealed class GifRecorder : IDisposable
             var clock = Stopwatch.StartNew();
             var failedFrames = 0;
             long bufferedBytes = 0;
+
+            // 帧数据吃紧时抽帧的步长：1 = 每帧都留，2 = 留一半（帧间隔由时间戳算，播放时长不变）
+            var thin = 1;
+            var captured = 0;
 
             while (!stop.WaitOne(0))
             {
@@ -301,8 +345,15 @@ public sealed class GifRecorder : IDisposable
                     }
 
                     var bgra = CopyToBgra(source);
-                    PushFrame(new GifFrame(bgra, targetWidth, targetHeight, interval), frameStart);
-                    bufferedBytes += bgra.Length;
+
+                    // 抽帧只影响帧率，分辨率不动
+                    if (thin <= 1 || captured % thin == 0)
+                    {
+                        PushFrame(new GifFrame(bgra, targetWidth, targetHeight, interval), frameStart);
+                        bufferedBytes += bgra.Length;
+                    }
+
+                    captured++;
                     failedFrames = 0;
                 }
                 catch (Exception ex)
@@ -339,8 +390,20 @@ public sealed class GifRecorder : IDisposable
 
                 if (bufferedBytes >= MaxBufferBytes)
                 {
-                    Log.Information("[gif] 帧数据达到 {Mb} MB 上限，自动停止", MaxBufferBytes / (1024 * 1024));
-                    break;
+                    // 内存到顶不掐录制：把已录的帧抽掉一半，接着按更低的帧率录下去
+                    // （原始分辨率不能动 —— 用户要的就是「录多大就多大」）
+                    var before = bufferedBytes;
+                    bufferedBytes = ThinOutLocked();
+                    thin = Math.Min(thin * 2, 8);
+
+                    Log.Information(
+                        "[gif] 帧数据 {Before} MB 超过上限，抽帧后 {After} MB 继续录（每 {Thin} 帧留 1 帧）",
+                        before / (1024 * 1024), bufferedBytes / (1024 * 1024), thin);
+                }
+                else if (thin > 1 && bufferedBytes < MaxBufferBytes / 2)
+                {
+                    // 抽过一半后内存又宽裕了，把帧率慢慢还回去，别整段都按低帧率录
+                    thin /= 2;
                 }
 
                 var wait = interval - (int)(clock.ElapsedMilliseconds - frameStart);
@@ -423,10 +486,54 @@ public sealed class GifRecorder : IDisposable
     {
         lock (_gate)
         {
+            // 首帧尺寸就是整段 GIF 的尺寸：后面万一有尺寸不一致的帧，宁可丢掉
+            if (_frames.Count > 0
+                && (_frames[0].Width != frame.Width || _frames[0].Height != frame.Height))
+            {
+                return;
+            }
+
             _frames.Add(frame);
             _timeMarks.Add(timeMark);
         }
     }
+
+    /// <summary>
+    /// 把已录的帧抽掉一半（保留偶数序号的那半），返回剩下的帧数据字节数。
+    /// 帧间隔是按抓帧时间戳算的，所以抽帧后播放时长不变，只是帧率低一点。
+    /// </summary>
+    private long ThinOutLocked()
+    {
+        lock (_gate)
+        {
+            var kept = 0;
+            long bytes = 0;
+
+            for (var i = 0; i < _frames.Count; i += 2)
+            {
+                var frame = _frames[i];
+                _frames[kept] = frame;
+                _timeMarks[kept] = i < _timeMarks.Count ? _timeMarks[i] : 0;
+                bytes += frame.Bgra.Length;
+                kept++;
+            }
+
+            if (_frames.Count > kept)
+            {
+                _frames.RemoveRange(kept, _frames.Count - kept);
+            }
+
+            if (_timeMarks.Count > kept)
+            {
+                _timeMarks.RemoveRange(kept, _timeMarks.Count - kept);
+            }
+
+            return bytes;
+        }
+    }
+
+    /// <summary>对齐到偶数（GIF 的宽高是整数，奇偶不一致会在缩放时抖出 1px 边）。</summary>
+    private static int AlignEven(int value) => Math.Max(2, value & ~1);
 
     private static byte[] CopyToBgra(Bitmap bitmap)
     {
@@ -482,6 +589,8 @@ public sealed class GifRecorder : IDisposable
                 }
 
                 var gif = GifEncoder.Encode(width, height, indexed, palette, loopCount: 0);
+
+                LastSize = new Size(width, height);
 
                 lock (_gate)
                 {

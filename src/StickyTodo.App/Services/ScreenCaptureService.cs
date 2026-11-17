@@ -40,6 +40,83 @@ public static class ScreenCaptureService
         return screens;
     }
 
+    /// <summary>
+    /// 区域所在显示器的 DPI 缩放（1.0 = 100%，1.5 = 150%）。
+    ///
+    /// GDI 的抓屏（<c>CopyFromScreen</c> / BitBlt）只认**物理像素**：DIP 矩形要乘上这个系数
+    /// 才是要抓的那块屏幕。已知比例时优先用 <see cref="SelectionToPixels"/> 的显式比例，
+    /// 这里是没有比例时的兜底（拿不到 DPI 就按 100%，和以前的行为一致）。
+    /// </summary>
+    public static double DpiScaleFor(Rectangle regionPx)
+    {
+        try
+        {
+            var rect = new Rect32
+            {
+                Left = regionPx.Left,
+                Top = regionPx.Top,
+                Right = regionPx.Right,
+                Bottom = regionPx.Bottom,
+            };
+
+            var monitor = MonitorFromRect(ref rect, MonitorDefaultToNearest);
+            if (monitor == IntPtr.Zero)
+            {
+                return 1d;
+            }
+
+            if (GetDpiForMonitor(monitor, MdtEffectiveDpi, out var dpiX, out _) != 0 || dpiX == 0)
+            {
+                return 1d;
+            }
+
+            return dpiX / 96.0;
+        }
+        catch (Exception)
+        {
+            // Win7 没有 Shcore.dll：当作 100% 缩放
+            return 1d;
+        }
+    }
+
+    /// <summary>
+    /// 覆盖层上的 DIP 选区 → 屏幕物理像素（录制 / 抓屏要的就是这个矩形）。
+    ///
+    /// <paramref name="scaleX"/> / <paramref name="scaleY"/> 是「截图像素 ÷ 覆盖层 DIP」的比例，
+    /// 覆盖层跨两块缩放不同的屏时它最准；万一覆盖层还没布局完（比例拿不到），
+    /// 就退回该区域的显示器 DPI —— 否则 150% 缩放下会录成一个偏小、偏左上角的区域。
+    /// 结果再夹进虚拟屏，越界坐标不要送给 <c>CopyFromScreen</c>。
+    /// </summary>
+    public static Rectangle SelectionToPixels(Rect dipSelection, Rectangle virtualScreen, double scaleX, double scaleY)
+    {
+        if (!IsUsableScale(scaleX) || !IsUsableScale(scaleY))
+        {
+            var probe = new Rectangle(
+                virtualScreen.Left + (int)Math.Round(dipSelection.X),
+                virtualScreen.Top + (int)Math.Round(dipSelection.Y),
+                Math.Max(1, (int)Math.Round(dipSelection.Width)),
+                Math.Max(1, (int)Math.Round(dipSelection.Height)));
+
+            var fallback = DpiScaleFor(probe);
+            scaleX = IsUsableScale(scaleX) ? scaleX : fallback;
+            scaleY = IsUsableScale(scaleY) ? scaleY : fallback;
+        }
+
+        var x = virtualScreen.Left + (int)Math.Round(dipSelection.X * scaleX);
+        var y = virtualScreen.Top + (int)Math.Round(dipSelection.Y * scaleY);
+        var width = Math.Max(4, (int)Math.Round(dipSelection.Width * scaleX));
+        var height = Math.Max(4, (int)Math.Round(dipSelection.Height * scaleY));
+
+        var right = Math.Min(virtualScreen.Right, x + width);
+        var bottom = Math.Min(virtualScreen.Bottom, y + height);
+        x = Math.Clamp(x, virtualScreen.Left, virtualScreen.Right);
+        y = Math.Clamp(y, virtualScreen.Top, virtualScreen.Bottom);
+
+        return new Rectangle(x, y, Math.Max(4, right - x), Math.Max(4, bottom - y));
+    }
+
+    private static bool IsUsableScale(double scale) => !double.IsNaN(scale) && !double.IsInfinity(scale) && scale > 0;
+
     /// <summary>虚拟桌面在屏幕像素下的矩形。</summary>
     public static Rectangle GetVirtualScreenBounds()
     {
@@ -141,6 +218,24 @@ public static class ScreenCaptureService
         cropped.Freeze();
         return cropped;
     }
+
+    private const uint MonitorDefaultToNearest = 2;
+    private const int MdtEffectiveDpi = 0;
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct Rect32
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromRect(ref Rect32 rect, uint flags);
+
+    [System.Runtime.InteropServices.DllImport("shcore.dll")]
+    private static extern int GetDpiForMonitor(IntPtr monitor, int dpiType, out uint dpiX, out uint dpiY);
 
     private const int SmCxVirtualScreen = 78;
     private const int SmCyVirtualScreen = 79;
