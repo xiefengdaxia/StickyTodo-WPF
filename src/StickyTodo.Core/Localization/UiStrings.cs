@@ -473,6 +473,7 @@ public static class UiStrings
         ["manager.footerHint"] = ["全部本地存储 · 快捷键 {0} 新建待办", "All local · {0} for a new to-do", "すべてローカル保存・{0} で新規 ToDo", "모두 로컬 저장 · {0}(으)로 새 할 일"],
         ["memo.saving"] = ["编辑中…", "Editing…", "編集中…", "편집 중…"],
         ["memo.saveFailed"] = ["保存失败", "Save failed", "保存に失敗しました", "저장 실패"],
+    ["memo.cutFailed"] = ["剪切失败：剪贴板被其他程序占用", "Cut failed: the clipboard is held by another program", "切り取り失敗：クリップボードが他のプログラムに使用中", "잘라내기 실패: 클립보드를 다른 프로그램이 사용 중"],
         ["settings.autoStartOn"] = ["已设为开机启动", "Set to start with Windows", "Windows 起動時に開始するよう設定しました", "Windows 시작 시 실행으로 설정됨"],
         ["settings.autoStartOff"] = ["已取消开机启动", "No longer starts with Windows", "起動時の自動開始を解除しました", "Windows 시작 시 실행 해제됨"],
         ["settings.autoStartFailed"] = ["设置开机启动失败：{0}", "Failed to configure auto-start: {0}", "自動起動の設定に失敗しました：{0}", "자동 시작 설정 실패: {0}"],
@@ -520,6 +521,9 @@ public static class UiStrings
     ["manager.aiGuideClose"] = ["知道了", "Got it", "了解", "확인"],
     // ===== 桌面时钟快捷入口 =====
     ["clock.quick"] = ["快捷入口", "Quick launch", "クイック起動", "빠른 실행"],
+    ["clock.quickMemo"] = ["便签看板", "Memo board", "メモボード", "메모 보드"],
+    ["clock.quickPomodoro"] = ["番茄时钟", "Pomodoro timer", "ポモドーロタイマー", "뽀모도로 타이머"],
+    ["clock.quickPerformance"] = ["性能看板", "Performance board", "パフォーマンスボード", "성능 보드"],
     // ================= 托盘 =================
         ["tray.manager"] = ["管理面板", "Manager", "管理パネル", "관리 패널"],
         ["tray.pomodoro"] = ["番茄时钟", "Pomodoro timer", "ポモドーロタイマー", "뽀모도로 타이머"],

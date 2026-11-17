@@ -35,7 +35,7 @@
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <!-- ================= 左侧快捷入口：打开中的看板 + 看板管理 + 设置 ================= -->
+        <!-- ================= 左侧快捷入口：便签 / 番茄 / 性能 / AI 看板 + 看板管理 + 设置 ================= -->
         <Border x:Name="QuickBar"
                 Grid.Column="0"
                 Width="40"
@@ -87,20 +87,23 @@
             </Border.Style>
 
             <StackPanel Margin="4,6">
-                <!-- 打开中的看板：超过 8 个就在这一列里滚动 -->
+                <!-- 固定顺序：便签 → 番茄时钟 → 性能 → 所有 AI 看板；超过可视高度就在这一列里滚动 -->
                 <ScrollViewer MaxHeight="240" VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled">
                     <ItemsControl ItemsSource="{Binding QuickItems}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
+                                <!-- 前景色跟着皮肤深浅走（QuickInk）：这一列底色固定深色，
+                                     浅色皮肤的 Brush.Ink 是近黑色，直接继承会"图标看不见" -->
                                 <Button Style="{StaticResource Button.Chrome}"
                                         Width="30" Height="30"
                                         FontSize="14"
                                         Focusable="False"
                                         Margin="0,1"
                                         Content="{Binding Glyph}"
+                                        Foreground="{Binding DataContext.QuickInk, RelativeSource={RelativeSource AncestorType=Window}}"
                                         ToolTip="{Binding Name}"
-                                        Click="QuickBoard_Click" />
+                                        Click="QuickItem_Click" />
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
@@ -116,6 +119,7 @@
                         Focusable="False"
                         Margin="0,1"
                         Content="☰"
+                        Foreground="{Binding QuickInk}"
                         ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.manage}"
                         Click="QuickManage_Click" />
 
@@ -127,6 +131,7 @@
                         Focusable="False"
                         Margin="0,1"
                         Content="⚙"
+                        Foreground="{Binding QuickInk}"
                         ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.title}"
                         Click="QuickSettings_Click" />
             </StackPanel>

@@ -349,12 +349,12 @@ public partial class DesktopClockWindow : Window
 
     // ---------- 左侧快捷入口 ----------
 
-    /// <summary>点快捷入口里的看板图标：把那个看板置前。</summary>
-    private void QuickBoard_Click(object sender, RoutedEventArgs e)
+    /// <summary>点快捷入口里的图标：便签/性能/AI 看板打开对应看板，番茄时钟开番茄窗。</summary>
+    private void QuickItem_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { DataContext: ClockQuickItem item })
         {
-            _viewModel.OpenBoardFromQuick(item);
+            _viewModel.OpenQuickItem(item);
         }
     }
 

@@ -59,11 +59,26 @@ public partial class AiBoardGuideWindow : Window
         return false;
     }
 
+    /// <summary>
+    /// 点「逛看板市场」时调谁：管理面板把它自己的开窗方法交进来。
+    /// 有这个回调就不再靠 <see cref="Window.Owner"/>——没有 Owner（居中弹出）时市场照样能开。
+    /// </summary>
+    internal Action? OpenMarket { get; set; }
+
     /// <summary>去看板市场：先把引导窗收掉，市场交给管理面板去开（单例和 owner 都在它手上）。</summary>
     private void Market_Click(object sender, RoutedEventArgs e)
     {
         var manager = Owner as ManagerWindow;
+        var openMarket = OpenMarket;
+
         Close();
+
+        if (openMarket is not null)
+        {
+            openMarket();
+            return;
+        }
+
         manager?.OpenMarketWindow();
     }
 

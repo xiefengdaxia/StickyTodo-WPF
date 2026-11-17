@@ -38,7 +38,10 @@ public sealed class BoardRowViewModel : ObservableObject
     });
 
     /// <summary>卡片左侧的类型图标。</summary>
-    public string KindGlyph => Board.Kind switch
+    public string KindGlyph => GlyphFor(Board.Kind);
+
+    /// <summary>类型 → 图标。桌面时钟的快捷入口也用这一套，两处看到的是同一组图形。</summary>
+    public static string GlyphFor(BoardKind kind) => kind switch
     {
         BoardKind.Memo => "✎",
         BoardKind.Calendar => "▦",

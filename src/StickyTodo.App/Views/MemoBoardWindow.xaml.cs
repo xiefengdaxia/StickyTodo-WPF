@@ -244,8 +244,11 @@ public partial class MemoBoardWindow : Window, IStickyWindow, IBoardDataRefresh
 
         switch (PressedKey(e))
         {
-            case Key.X when !shift:
-                e.Handled = CutSelection(target);
+            // Ctrl+X 的主路径是正文框自己的 Editor_PreviewKeyDown（直接对 Editor 调 Cut）。
+            // 隧道从窗口往下走，所以焦点在正文时两边都会收到：这里必须让开，否则会剪两次。
+            // 只有焦点不在任何正文框（点过工具栏按钮、或停在预览的只读文档里）时才在这里补一刀。
+            case Key.X when !shift && Keyboard.FocusedElement is not TextBox:
+                e.Handled = CutEditorSelection();
                 break;
             case Key.C when !shift:
                 e.Handled = CopySelection(target);
@@ -288,15 +291,88 @@ public partial class MemoBoardWindow : Window, IStickyWindow, IBoardDataRefresh
     /// <summary>现在能不能改正文：预览 / 锁定都算不能改。</summary>
     private bool CanEdit => !_viewModel.IsPreview && !_viewModel.IsLocked;
 
-    private bool CutSelection(TextBox target)
+    /// <summary>
+    /// 正文框自己的隧道处理：Ctrl+X 落到这里，直接对 <see cref="Editor"/> 调 <see cref="TextBoxBase.Cut"/>。
+    ///
+    /// 为什么不在窗口级一把抓：Ctrl+X 的默认链路是 <see cref="ApplicationCommands.Cut"/>，
+    /// 命令从焦点元素往上找执行目标，任何一处 CommandBinding 的 CanExecute=false 都会让它被静默吞掉；
+    /// 焦点落在只读的预览文档上时更是连目标都没有。绑在正文框上、直接调 Cut，绕开整条 CanExecute 链路。
+    /// </summary>
+    private void Editor_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (!CanEdit || string.IsNullOrEmpty(target.SelectedText))
+        if (e.Handled
+            || (Keyboard.Modifiers & ModifierKeys.Control) == 0
+            || (Keyboard.Modifiers & ModifierKeys.Shift) != 0
+            || PressedKey(e) != Key.X)
+        {
+            return;
+        }
+
+        e.Handled = CutEditorSelection();
+    }
+
+    /// <summary>
+    /// 剪掉正文里的选区。三种"剪不动"的情况先自证再决定：
+    /// 预览（只读文档）/ 看板锁定 / 正文不可写——直接返回 false，让按键继续走默认逻辑。
+    /// 剩下的情况自己剪：<see cref="TextBoxBase.Cut"/> 在某些环境里会静默失败
+    /// （剪贴板被别的进程占着，异常被 COM 层吞掉），所以剪完还留着选中的文字就
+    /// 退回"先写剪贴板、再删掉选区"，保证按下去一定有结果。
+    /// </summary>
+    private bool CutEditorSelection()
+    {
+        if (_viewModel.IsPreview)
+        {
+            Serilog.Log.Information("[memo] cut -> 跳过：预览模式（文档只读）");
+            return false;
+        }
+
+        if (_viewModel.IsLocked)
+        {
+            Serilog.Log.Information("[memo] cut -> 跳过：看板已锁定");
+            return false;
+        }
+
+        if (!ReferenceEquals(Keyboard.FocusedElement, Editor))
+        {
+            Editor.Focus();
+        }
+
+        var selected = Editor.SelectedText;
+
+        // 留一行日志自证：选中多少字、正文框是不是只读/可用、当前是不是预览/锁定
+        Serilog.Log.Information(
+            "[memo] cut -> 选中={Length} 字 / IsReadOnly={ReadOnly} / IsEnabled={Enabled} / 预览={Preview} / 锁定={Locked}",
+            selected.Length, Editor.IsReadOnly, Editor.IsEnabled, _viewModel.IsPreview, _viewModel.IsLocked);
+
+        if (selected.Length == 0 || Editor.IsReadOnly || !Editor.IsEnabled)
         {
             return false;
         }
 
-        target.Focus();
-        return RunClipboardAction(target.Cut);
+        try
+        {
+            Editor.Cut();
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "[memo] cut -> Editor.Cut() 抛异常，退回先写剪贴板再删");
+        }
+
+        // 剪完选中的还是原来那段 = 没剪掉，自己动手
+        if (Editor.SelectedText == selected)
+        {
+            if (!TrySetClipboard(selected))
+            {
+                Serilog.Log.Warning("[memo] cut -> 剪贴板写入失败，正文保持不变");
+                _viewModel.ErrorText = Loc.T("memo.cutFailed");
+                return true;
+            }
+
+            Editor.SelectedText = string.Empty;
+            Serilog.Log.Information("[memo] cut -> 手动剪切：写剪贴板后删掉 {Length} 字", selected.Length);
+        }
+
+        return true;
     }
 
     private bool CopySelection(TextBox target)

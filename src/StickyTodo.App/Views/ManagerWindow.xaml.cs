@@ -375,10 +375,40 @@ public partial class ManagerWindow : Window
     /// 面板这边能做的是把「怎么让 AI 帮你做一块」讲清楚，所以改成弹引导窗。
     /// （想装现成的可以走市场，见 <see cref="OpenMarketWindow"/>。）
     /// </summary>
-    private void CreateCustom_Click(object sender, RoutedEventArgs e)
+    private void CreateCustom_Click(object sender, RoutedEventArgs e) => ShowAiBoardGuide();
+
+    /// <summary>
+    /// 弹出引导窗。两条坑：
+    /// 1) <c>Owner</c> 只在管理面板真的可见时才挂——面板被收进托盘/刚关掉（句柄已销毁）时
+    ///    设置 Owner 会抛 InvalidOperationException，正好被全局兜底弹成「操作失败」；
+    ///    没有 Owner 时改成就居中弹，位置一样好用。
+    /// 2) 弹窗本身抛异常（图标资源、样式缺失等）只记日志，不让它冒到全局兜底去。
+    /// </summary>
+    private void ShowAiBoardGuide()
     {
-        var guide = new AiBoardGuideWindow { Owner = this };
-        guide.ShowDialog();
+        try
+        {
+            var guide = new AiBoardGuideWindow
+            {
+                // 引导窗里「逛市场」由管理面板去开（市场窗口的单例和 owner 都在这里）
+                OpenMarket = OpenMarketWindow,
+            };
+
+            if (IsVisible)
+            {
+                guide.Owner = this;
+            }
+            else
+            {
+                guide.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            }
+
+            guide.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Error(ex, "[ai-board] 打开 AI 看板引导窗失败");
+        }
     }
 
     private static MarketWindow? _marketWindow;

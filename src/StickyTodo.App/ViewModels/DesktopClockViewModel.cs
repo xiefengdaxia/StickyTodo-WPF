@@ -1,11 +1,13 @@
 using System.Collections.ObjectModel;
 using System.Windows;
+using System.Windows.Media;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using StickyTodo.App.Services;
 using StickyTodo.Core.Abstractions;
 using StickyTodo.Core.Calendar;
 using StickyTodo.Core.Entities;
+using StickyTodo.Core.Localization;
 using StickyTodo.Core.Services;
 using StickyTodo.Weather;
 
@@ -331,22 +333,90 @@ public sealed partial class DesktopClockViewModel : ObservableObject
 
     // ---------------- 左侧快捷入口 ----------------
 
-    /// <summary>快捷入口里列出的一列：当前打开着的看板（按看板列表的顺序）。</summary>
+    /// <summary>
+    /// 快捷入口里的一列，固定顺序：便签看板 → 番茄时钟 → 性能看板 → 所有 AI 看板。
+    /// 不再列「打开中的看板」——那一列会变来变去，想找的东西每次都换位置。
+    /// </summary>
     public ObservableCollection<ClockQuickItem> QuickItems { get; } = new();
 
-    /// <summary>重列快捷入口。看板开着/关掉都要重列一次，否则这一列是旧的。</summary>
+    /// <summary>
+    /// 图标前景色。这一列的底色固定是深色，浅色皮肤的 Brush.Ink 是近黑色，
+    /// 直接用会"图标看不见"：深色皮肤用皮肤的 Ink（本身就是浅色），浅色皮肤用 #E6FFFFFF。
+    /// </summary>
+    [ObservableProperty]
+    private Brush _quickInk = Brushes.White;
+
+    /// <summary>上一次算图标色用的是哪套皮肤：没换皮肤就不重建画刷。</summary>
+    private string _quickInkSkin = string.Empty;
+
+    /// <summary>按当前皮肤深浅挑一个能在深色底上看见的图标色。</summary>
+    private void RefreshQuickInk()
+    {
+        var skin = NoteSkins.Resolve(_settings.Skin);
+        if (string.Equals(skin.Key, _quickInkSkin, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _quickInkSkin = skin.Key;
+
+        var brush = new SolidColorBrush(skin.IsDark ? skin.Ink : Color.FromArgb(0xE6, 0xFF, 0xFF, 0xFF));
+
+        brush.Freeze();
+        QuickInk = brush;
+    }
+
+    /// <summary>重列快捷入口（看板增删、皮肤深浅变了都要重来一遍）。</summary>
     public void ReloadQuickItems()
     {
+        RefreshQuickInk();
+
         QuickItems.Clear();
 
-        foreach (var board in _todos.GetBoards().Where(b => _windows.IsBoardOpen(b.Id)))
+        // 便签、性能：这类看板没有就建一块、有就置前
+        QuickItems.Add(ClockQuickItem.ForKind(BoardKind.Memo, Loc.T("clock.quickMemo")));
+        QuickItems.Add(ClockQuickItem.Pomodoro(Loc.T("clock.quickPomodoro")));
+        QuickItems.Add(ClockQuickItem.ForKind(BoardKind.Performance, Loc.T("clock.quickPerformance")));
+
+        // 所有 AI 看板：一块一块列出来，点哪个开哪个
+        foreach (var board in _todos.GetBoards().Where(b => b.Kind == BoardKind.Custom))
         {
-            QuickItems.Add(new ClockQuickItem(board));
+            QuickItems.Add(ClockQuickItem.ForBoard(board));
         }
     }
 
-    /// <summary>点快捷入口里的图标：把那个看板置前（已经开着，所以只会被激活）。</summary>
-    public void OpenBoardFromQuick(ClockQuickItem item) => _windows.OpenBoard(item.Board);
+    /// <summary>点快捷入口：番茄时钟走托盘那套单例，看板类的没有就建、有就置前。</summary>
+    public void OpenQuickItem(ClockQuickItem item)
+    {
+        switch (item.Action)
+        {
+            case ClockQuickAction.Pomodoro:
+                App.ShowPomodoro();
+                return;
+
+            case ClockQuickAction.Board when item.Board is { } board:
+                _windows.OpenBoard(board);   // 已开着就只激活
+                return;
+
+            default:
+                OpenKind(item.Kind, item.Name);
+                return;
+        }
+    }
+
+    /// <summary>按类型打开看板：有就置前，没有就贴到时钟旁边新建一块。</summary>
+    private void OpenKind(BoardKind kind, string defaultName)
+    {
+        var board = _todos.GetBoards().FirstOrDefault(b => b.Kind == kind);
+
+        if (board is not null)
+        {
+            _windows.OpenBoard(board);
+            return;
+        }
+
+        _windows.OpenBoardBeside(kind, defaultName, _owner);
+    }
 
     /// <summary>
     /// 贴边打开 / 关闭对应看板：没开就建好并贴在时钟旁边，已经开着就关掉。
@@ -410,6 +480,12 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         if (_rotation % 120 == 0)
         {
             _ = RefreshTokensAsync();
+        }
+
+        // 换了皮肤：快捷入口的图标前景色要跟着深浅走（浅色皮肤的 Ink 在深色底上看不见）
+        if (_rotation % 5 == 0)
+        {
+            RefreshQuickInk();
         }
 
         // 用户在看板里改了默认城市：不用等 30 分钟，5 秒内就换过来
@@ -538,21 +614,54 @@ public sealed partial class DesktopClockViewModel : ObservableObject
     }
 }
 
-/// <summary>桌面时钟左侧快捷入口的一行：看板类型图标 + 名称。</summary>
+/// <summary>快捷入口点下去做什么。</summary>
+public enum ClockQuickAction
+{
+    /// <summary>按类型打开看板（没有就建一块）。</summary>
+    Kind,
+
+    /// <summary>打开某一块具体的看板（AI 看板）。</summary>
+    Board,
+
+    /// <summary>打开番茄时钟。</summary>
+    Pomodoro,
+}
+
+/// <summary>桌面时钟左侧快捷入口的一行：类型图标 + 名称 + 点下去要做什么。</summary>
 public sealed class ClockQuickItem
 {
-    public ClockQuickItem(Board board)
+    private ClockQuickItem(string name, string glyph, ClockQuickAction action, BoardKind kind, Board? board)
     {
+        Name = name;
+        Glyph = glyph;
+        Action = action;
+        Kind = kind;
         Board = board;
-        Name = board.Name;
-
-        // 图标刻意复用「看板管理」列表那一套字符，两处看到的是同一组图形
-        Glyph = new BoardRowViewModel(board, pending: 0, done: 0).KindGlyph;
     }
 
-    public Board Board { get; }
+    /// <summary>按看板类型建一行（图标复用「看板管理」那一套字符，两处看到的是同一组图形）。</summary>
+    public static ClockQuickItem ForKind(BoardKind kind, string name) =>
+        new(name, GlyphOf(kind), ClockQuickAction.Kind, kind, board: null);
+
+    /// <summary>某一块具体的看板（AI 看板用它的名字和图标）。</summary>
+    public static ClockQuickItem ForBoard(Board board) =>
+        new(board.Name, GlyphOf(board.Kind), ClockQuickAction.Board, board.Kind, board);
+
+    /// <summary>番茄时钟：窗口不在看板体系里，单列一种动作。</summary>
+    public static ClockQuickItem Pomodoro(string name) =>
+        new(name, "🍅", ClockQuickAction.Pomodoro, BoardKind.Todo, board: null);
+
+    public Board? Board { get; }
 
     public string Name { get; }
 
     public string Glyph { get; }
+
+    public ClockQuickAction Action { get; }
+
+    /// <summary>动作是「按类型打开」时用哪个类型。</summary>
+    public BoardKind Kind { get; }
+
+    /// <summary>类型图标：借 BoardRowViewModel 那一套，省得两处图形走样。</summary>
+    private static string GlyphOf(BoardKind kind) => BoardRowViewModel.GlyphFor(kind);
 }

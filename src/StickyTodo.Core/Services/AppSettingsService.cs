@@ -1,5 +1,6 @@
 using System.Globalization;
 using StickyTodo.Core.Abstractions;
+using StickyTodo.Core.Calendar;
 
 namespace StickyTodo.Core.Services;
 
@@ -594,6 +595,27 @@ public sealed class AppSettingsService
     [
         "双峰", "岳麓", "芙蓉", "苏州", "炎陵", "杭州",
     ];
+
+    /// <summary>
+    /// 导入的节假日/调休（AI 通过 MCP 的 import_holidays 写入，键 <see cref="HolidayImportStore.SettingKey"/>）。
+    /// 覆盖 <see cref="ChineseHolidays"/> 内置数据里同日期区间的条目；写入时立刻装进
+    /// <see cref="ChineseHolidays"/>，日历下次重画就用上新数据。
+    /// </summary>
+    public IReadOnlyList<ImportedHoliday> HolidayImports
+    {
+        get => HolidayImportStore.Parse(GetString(HolidayImportStore.SettingKey, null));
+        set
+        {
+            SetSetting(HolidayImportStore.SettingKey, HolidayImportStore.Serialize(value));
+            ChineseHolidays.SetImported(value);
+        }
+    }
+
+    /// <summary>
+    /// 把库里已经导入的节假日装进 <see cref="ChineseHolidays"/>（进程启动时调一次）。
+    /// 不做在构造函数里：构造时数据库可能还没初始化，读表会抛。
+    /// </summary>
+    public void LoadHolidayImports() => ChineseHolidays.SetImported(HolidayImports);
 
     public static double ClampOpacity(double value)
     {

@@ -24,6 +24,8 @@ public sealed record HolidaySpan(string Name, DateOnly From, DateOnly To);
 /// 数据来自国务院办公厅每年发布的通知（2024 年国办发明电〔2023〕7 号、
 /// 2025 年〔2024〕12 号、2026 年〔2025〕7 号），手工录入，不联网。
 /// 超出已收录年份时退化成"周末休息、工作日上班"。
+/// 内置数据可以用 <see cref="SetImported"/> 导入的数据覆盖（AI 通过 MCP 写入），
+/// 所以这里所有查询都是"先看导入，再看内置"。
 /// </summary>
 public static class ChineseHolidays
 {
@@ -80,12 +82,52 @@ public static class ChineseHolidays
 
     private static readonly HashSet<DateOnly> MakeupSet = MakeupDays.ToHashSet();
 
-    /// <summary>这个日期是不是调休补班日。</summary>
-    public static bool IsMakeupWorkday(DateOnly date) => MakeupSet.Contains(date);
+    /// <summary>
+    /// 导入的数据（AI 通过 MCP 的 import_holidays 写入，落在设置键 calendar.holidays）。
+    /// 非空时优先于上面那两张内置表：同一天命中导入区间，就按导入的 kind 算。
+    /// 整体替换（不是叠加），所以换一份数据只要再调一次 <see cref="SetImported"/>。
+    /// </summary>
+    private static volatile ImportedHoliday[] _imported = [];
 
-    /// <summary>这个日期落在哪段假期里，不在假期则返回 null。</summary>
+    /// <summary>当前生效的导入数据。</summary>
+    public static IReadOnlyList<ImportedHoliday> Imported => _imported;
+
+    /// <summary>换一份导入数据；传 null / 空集合等于清空，回到内置数据。</summary>
+    public static void SetImported(IEnumerable<ImportedHoliday>? entries) =>
+        _imported = entries?.Where(entry => entry is not null).ToArray() ?? [];
+
+    /// <summary>导入数据里这一天是什么性质；这一天没被导入覆盖就返回 null（回落到内置数据）。</summary>
+    private static DayKind? ImportedKindOf(DateOnly date)
+    {
+        foreach (var entry in _imported)
+        {
+            if (entry.Covers(date))
+            {
+                return entry.Kind;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>这个日期是不是调休补班日。</summary>
+    public static bool IsMakeupWorkday(DateOnly date) =>
+        ImportedKindOf(date) is { } imported ? imported == DayKind.MakeupWorkday : MakeupSet.Contains(date);
+
+    /// <summary>这个日期落在哪段假期里，不在假期则返回 null。导入的假期优先。</summary>
     public static HolidaySpan? FindSpan(DateOnly date)
     {
+        foreach (var entry in _imported)
+        {
+            if (!entry.Covers(date))
+            {
+                continue;
+            }
+
+            // 被导入成补班/工作日的日期不算假期（覆盖内置里同名的那一段）
+            return entry.Kind == DayKind.Holiday ? new HolidaySpan(entry.Name, entry.From, entry.End) : null;
+        }
+
         foreach (var span in Spans)
         {
             if (date >= span.From && date <= span.To)
@@ -97,9 +139,14 @@ public static class ChineseHolidays
         return null;
     }
 
-    /// <summary>这一天的性质。补班优先于周末，假期优先于补班。</summary>
+    /// <summary>这一天的性质。补班优先于周末，假期优先于补班；导入的数据压过内置的。</summary>
     public static DayKind KindOf(DateOnly date)
     {
+        if (ImportedKindOf(date) is { } imported)
+        {
+            return imported;
+        }
+
         if (IsMakeupWorkday(date))
         {
             return DayKind.MakeupWorkday;
@@ -113,6 +160,51 @@ public static class ChineseHolidays
         return date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday
             ? DayKind.Weekend
             : DayKind.Workday;
+    }
+
+    /// <summary>
+    /// 某一年的全部安排，一天一条（date / name / kind / 是否来自导入），
+    /// 给 MCP 的 get_holidays 用。同一天既有内置又有导入时只留导入的那条。
+    /// </summary>
+    public static IReadOnlyList<HolidayEntry> EntriesOf(int year)
+    {
+        var entries = new List<HolidayEntry>();
+
+        foreach (var span in Spans)
+        {
+            for (var day = span.From; day <= span.To; day = day.AddDays(1))
+            {
+                if (day.Year == year)
+                {
+                    entries.Add(new HolidayEntry(day, span.Name, DayKind.Holiday, Imported: false));
+                }
+            }
+        }
+
+        foreach (var day in MakeupDays)
+        {
+            if (day.Year == year)
+            {
+                entries.Add(new HolidayEntry(day, "补班", DayKind.MakeupWorkday, Imported: false));
+            }
+        }
+
+        foreach (var entry in _imported)
+        {
+            for (var day = entry.From; day <= entry.End; day = day.AddDays(1))
+            {
+                if (day.Year == year)
+                {
+                    entries.Add(new HolidayEntry(day, entry.Name, entry.Kind, Imported: true));
+                }
+            }
+        }
+
+        return entries
+            .GroupBy(entry => entry.Date)
+            .Select(group => group.OrderByDescending(entry => entry.Imported).First())
+            .OrderBy(entry => entry.Date)
+            .ToList();
     }
 
     /// <summary>
@@ -143,9 +235,12 @@ public static class ChineseHolidays
         return HolidayNameOf(date);
     }
 
-    /// <summary>是否已收录这一年的安排。</summary>
-    public static bool HasYear(int year) => year is >= MinYear and <= MaxYear;
+    /// <summary>是否已收录这一年的安排（内置年份，或导入数据盖到了这一年）。</summary>
+    public static bool HasYear(int year) =>
+        year is >= MinYear and <= MaxYear || _imported.Any(entry => entry.From.Year <= year && entry.End.Year >= year);
 
     /// <summary>收录了哪些年份，给界面提示用。</summary>
-    public static string CoverageText => $"{MinYear}–{MaxYear} 年";
+    public static string CoverageText => _imported.Length > 0
+        ? $"{MinYear}–{MaxYear} 年（另有导入 {_imported.Length} 段）"
+        : $"{MinYear}–{MaxYear} 年";
 }

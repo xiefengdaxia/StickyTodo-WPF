@@ -100,6 +100,17 @@ public partial class App : System.Windows.Application
             ApplyLanguageForCurrentRun();
             _host.Services.GetRequiredService<TodoService>().EnsureDefaultBoard();
 
+            // 导入的节假日（MCP 写入的 calendar.holidays）要在日历画出来之前装进 ChineseHolidays，
+            // 否则开机后第一眼看到的还是内置数据
+            try
+            {
+                _host.Services.GetRequiredService<AppSettingsService>().LoadHolidayImports();
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "[calendar] 读取导入的节假日失败");
+            }
+
             // MCP：先注入采集器再启动接入服务。必须在 RestoreSession 之前——
             // 恢复出来的自定义看板窗口要能拿到采集器订阅数据变化。
             var mcpService = _host.Services.GetRequiredService<StickyTodo.Mcp.McpService>();
@@ -465,6 +476,22 @@ public partial class App : System.Windows.Application
     /// <summary>当前进程的设置服务（工具窗/贴图窗没有 DI 时用它取透明度）。</summary>
     public static AppSettingsService? Settings =>
         (Current as App)?._host?.Services.GetService<AppSettingsService>();
+
+    /// <summary>
+    /// 打开番茄时钟（已经开着就激活）。桌面时钟的快捷入口也走这里——
+    /// 番茄窗的单例在 TrayService 手上，别在别处再 new 一个。
+    /// </summary>
+    public static void ShowPomodoro()
+    {
+        try
+        {
+            (Current as App)?._host?.Services.GetService<TrayService>()?.ShowPomodoro();
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "[pomodoro] 打开番茄时钟失败");
+        }
+    }
 
     /// <summary>按存下来的值给工具窗设整窗透明度（没有单独设置就跟随全局）。</summary>
     public static void ApplyToolWindowOpacity(Window window)

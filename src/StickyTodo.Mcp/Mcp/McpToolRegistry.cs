@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Encodings.Web;
 using StickyTodo.Core.Abstractions;
+using StickyTodo.Core.Calendar;
 using StickyTodo.Core.Entities;
 using StickyTodo.Core.Entitlements;
 using StickyTodo.Core.Pomodoro;
@@ -60,6 +61,7 @@ public sealed class McpToolRegistry
         RegisterNotesAndTags(Add);
         RegisterPomodoro(Add);
         RegisterData(Add);
+        RegisterCalendar(Add);
         RegisterSystem(Add);
         RegisterCustomBoards(Add);
         RegisterMarket(Add);
@@ -634,6 +636,111 @@ public sealed class McpToolRegistry
                     ["models"] = models,
                 });
             });
+    }
+
+    // ---------------- 日历：节假日 / 调休 ----------------
+
+    /// <summary>
+    /// 法定节假日：查（get_holidays）与导入（import_holidays）。
+    /// 查询优先用导入的数据（存设置键 calendar.holidays），同日期区间压过内置的国务院通知数据。
+    /// </summary>
+    private void RegisterCalendar(Action<string, string, JsonObject, Func<JsonObject, CancellationToken, Task<McpToolResult>>> add)
+    {
+        add("get_holidays", "查某一年的中国法定节假日与调休补班（内置数据 + 导入数据，同一天以导入的为准）。", Schema(
+            "该年安排", Obj(Prop("year", PropInt("年份，缺省 = 今年", 1900, 2200)))),
+            async (Args, Ct) =>
+            {
+                var year = OptionalInt(Args, "year") ?? DateTime.Now.Year;
+                var entries = new JsonArray();
+                foreach (var entry in ChineseHolidays.EntriesOf(year))
+                {
+                    entries.Add(new JsonObject
+                    {
+                        ["date"] = entry.Date.ToString("yyyy-MM-dd"),
+                        ["name"] = entry.Name,
+                        ["kind"] = ImportedHoliday.KindTextOf(entry.Kind),
+                        ["imported"] = entry.Imported,
+                    });
+                }
+
+                return Json(new JsonObject
+                {
+                    ["year"] = year,
+                    ["coverage"] = ChineseHolidays.CoverageText,
+                    ["hasYear"] = ChineseHolidays.HasYear(year),
+                    ["count"] = entries.Count,
+                    ["entries"] = entries,
+                });
+            });
+
+        add("import_holidays",
+            "导入节假日/调休安排（覆盖内置数据里同日期区间的条目）。spans=[{name, from, to, kind}]，"
+            + "kind = holiday(放假，默认) / makeup(调休补班) / workday(普通工作日)；"
+            + "整个列表替换上一次导入的内容，传空数组等于清空、回到内置数据。",
+            Schema(
+                "已导入", Obj(Prop("spans", PropArray("假期或补班区间", Obj(
+                    Prop("name", PropStr("名称，如「春节」")),
+                    Prop("from", PropStr("开始日期 yyyy-MM-dd")),
+                    Prop("to", PropStr("结束日期 yyyy-MM-dd，缺省 = from")),
+                    Prop("kind", PropStr("类型：放假 / 补班 / 工作日", "holiday", "makeup", "workday")))))), "spans"),
+            async (Args, Ct) =>
+            {
+                var spans = Arg(Args, "spans") as JsonArray
+                            ?? throw new McpInvalidParamsException("spans 必须是数组，元素形如 {name, from, to, kind}。");
+
+                var entries = new List<ImportedHoliday>(spans.Count);
+                foreach (var node in spans)
+                {
+                    if (node is not JsonObject span)
+                    {
+                        throw new McpInvalidParamsException("spans 里每一项都要是对象 {name, from, to, kind}。");
+                    }
+
+                    var from = ParseHolidayDate(span, "from");
+                    var to = span.ContainsKey("to") ? ParseHolidayDate(span, "to") : from;
+                    var kind = ImportedHoliday.ParseKind(OptionalString(span, "kind"));
+                    entries.Add(new ImportedHoliday(OptionalString(span, "name") ?? "假日", from, to, kind));
+                }
+
+                // 写设置键 calendar.holidays，同时装进 ChineseHolidays（立刻生效）
+                _settings.HolidayImports = entries;
+
+                // 日历开着就重画一遍，否则用户要等下次开窗才看到新数据
+                await RefreshUi();
+
+                var spansJson = new JsonArray();
+                foreach (var entry in entries)
+                {
+                    spansJson.Add(new JsonObject
+                    {
+                        ["name"] = entry.Name,
+                        ["from"] = entry.From.ToString("yyyy-MM-dd"),
+                        ["to"] = entry.End.ToString("yyyy-MM-dd"),
+                        ["kind"] = ImportedHoliday.KindTextOf(entry.Kind),
+                    });
+                }
+
+                return Json(new JsonObject
+                {
+                    ["count"] = entries.Count,
+                    ["storedIn"] = HolidayImportStore.SettingKey,
+                    ["spans"] = spansJson,
+                });
+            });
+    }
+
+    /// <summary>解析导入用的日期（yyyy-MM-dd，也容忍 2026/3/2 这种手写格式）。</summary>
+    private static DateOnly ParseHolidayDate(JsonObject span, string field)
+    {
+        var text = OptionalString(span, field);
+        if (text is not null
+            && (DateOnly.TryParseExact(text, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var exact)
+                || DateOnly.TryParse(text, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out exact)))
+        {
+            return exact;
+        }
+
+        throw new McpInvalidParamsException($"{field} 要写成 yyyy-MM-dd，收到「{text}」。");
     }
 
     // ---------------- 系统 ----------------

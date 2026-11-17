@@ -5,7 +5,10 @@ namespace StickyTodo.Tests;
 /// <summary>
 /// 农历/节气/黄历的算法测试。
 /// 期望值取自公开的历法事实（春节日期、闰月、节气时刻），不依赖任何第三方库。
+/// 这里断言的节假日来自 <see cref="ChineseHolidays"/> 的静态表，而 HolidayImportTests
+/// 会往里装导入数据，所以两个类放进同一个 collection，串行跑。
 /// </summary>
+[Collection("ChineseHolidays")]
 public sealed class LunarCalendarTests
 {
     [Theory]

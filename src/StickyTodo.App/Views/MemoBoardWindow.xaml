@@ -214,6 +214,7 @@
                          AcceptsTab="True"
                          TextWrapping="Wrap"
                          VerticalScrollBarVisibility="Auto"
+                         IsReadOnly="False"
                          IsHitTestVisible="{Binding IsLocked, Converter={StaticResource InverseBool}}"
                          Background="Transparent"
                          BorderThickness="0"
@@ -223,6 +224,7 @@
                          CaretBrush="{DynamicResource Brush.Ink}"
                          SpellCheck.IsEnabled="False"
                          Visibility="{Binding IsPreview, Converter={StaticResource InverseBoolToVis}}"
+                         PreviewKeyDown="Editor_PreviewKeyDown"
                          TextChanged="Editor_TextChanged" />
 
                 <FlowDocumentScrollViewer x:Name="Previewer"
