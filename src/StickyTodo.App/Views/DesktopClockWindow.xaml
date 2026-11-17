@@ -86,9 +86,9 @@
                 </Style>
             </Border.Style>
 
-            <StackPanel Margin="4,6">
+            <StackPanel Margin="4,6" MaxHeight="{Binding ActualHeight, ElementName=NoteRoot}">
                 <!-- 固定顺序：便签 → 番茄时钟 → 性能 → 所有 AI 看板；超过可视高度就在这一列里滚动 -->
-                <ScrollViewer MaxHeight="240" VerticalScrollBarVisibility="Auto"
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled">
                     <ItemsControl ItemsSource="{Binding QuickItems}">
                         <ItemsControl.ItemTemplate>
@@ -96,8 +96,8 @@
                                 <!-- 前景色跟着皮肤深浅走（QuickInk）：这一列底色固定深色，
                                      浅色皮肤的 Brush.Ink 是近黑色，直接继承会"图标看不见" -->
                                 <Button Style="{StaticResource Button.Chrome}"
-                                        Width="30" Height="30"
-                                        FontSize="14"
+                                        Width="26" Height="26"
+                                        FontSize="13"
                                         Focusable="False"
                                         Margin="0,1"
                                         Content="{Binding Glyph}"
@@ -114,7 +114,7 @@
                 <!-- 看板管理 -->
                 <Button x:Name="QuickManageButton"
                         Style="{StaticResource Button.Chrome}"
-                        Width="30" Height="30"
+                        Width="26" Height="26"
                         FontSize="13"
                         Focusable="False"
                         Margin="0,1"
@@ -126,7 +126,7 @@
                 <!-- 设置 -->
                 <Button x:Name="QuickSettingsButton"
                         Style="{StaticResource Button.Chrome}"
-                        Width="30" Height="30"
+                        Width="26" Height="26"
                         FontSize="13"
                         Focusable="False"
                         Margin="0,1"
