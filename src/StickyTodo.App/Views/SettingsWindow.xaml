@@ -428,26 +428,6 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- ===== Token 用量 ===== -->
-                    <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.token}" Style="{StaticResource Text.Section}" Margin="2,4,0,8" />
-
-                    <Border Style="{StaticResource Card}" Margin="0,0,0,14">
-                        <StackPanel>
-                            <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.tokenDb}" FontSize="12.5" Foreground="{DynamicResource Brush.Ink}" />
-                            <TextBox x:Name="TokenDatabaseBox"
-                                     Text="{Binding TokenDatabasePath, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource TextBox.Flat}"
-                                     Margin="0,6,0,0"
-                                     ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.tokenDbTip}"
-                                     LostFocus="TokenDatabaseBox_LostFocus"
-                                     KeyDown="TokenDatabaseBox_KeyDown" />
-                            <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.tokenDbHint}"
-                                       Style="{StaticResource Text.Caption}"
-                                       TextWrapping="Wrap"
-                                       Margin="2,5,0,0" />
-                        </StackPanel>
-                    </Border>
-
                     <!-- ===== 快捷键 ===== -->
                     <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.shortcuts}" Style="{StaticResource Text.Section}" Margin="2,4,0,8" />
 

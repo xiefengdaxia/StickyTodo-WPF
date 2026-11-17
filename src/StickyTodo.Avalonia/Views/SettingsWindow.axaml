@@ -276,22 +276,6 @@
             </StackPanel>
           </Border>
 
-          <!-- Token 用量 -->
-          <TextBlock Text="{loc:Loc settings.token}" Classes="section" Margin="2,4,0,8" />
-
-          <Border Classes="card" Margin="0,0,0,14">
-            <StackPanel>
-              <TextBlock Text="{loc:Loc settings.tokenDb}" FontSize="12.5"
-                         Foreground="{DynamicResource Brush.Ink}" />
-              <TextBox Name="TokenDatabaseBox" Classes="flat" Margin="0,6,0,0"
-                       Text="{Binding TokenDatabasePath, Mode=TwoWay}"
-                       ToolTip.Tip="{loc:Loc settings.tokenDbTip}"
-                       LostFocus="TokenDatabaseBox_LostFocus"
-                       KeyDown="TokenDatabaseBox_KeyDown" />
-              <TextBlock Text="{loc:Loc settings.tokenDbHint}" Classes="caption" TextWrapping="Wrap" Margin="2,5,0,0" />
-            </StackPanel>
-          </Border>
-
           <!-- 快捷键 -->
           <TextBlock Text="{loc:Loc settings.shortcuts}" Classes="section" Margin="2,4,0,8" />
 

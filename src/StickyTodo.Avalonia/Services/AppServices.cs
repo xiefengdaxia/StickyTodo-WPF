@@ -37,9 +37,8 @@ public sealed class AppServices : IDisposable
 
         TokenProvider = useDemoTokenProvider
             ? new DemoTokenStatsProvider()
-            // 多 Agent 聚合：opencode + zcode + codex + workbuddy + claude + gemini + qoder + kimi + pi
-            : Infrastructure.Token.MultiAgentTokenStatsProvider.CreateDefault(
-                string.IsNullOrWhiteSpace(Settings.TokenDatabasePath) ? null : Settings.TokenDatabasePath);
+            // 多 Agent 聚合：opencode + zcode + codex + workbuddy + claude + gemini + qoder + kimi + pi + alma
+            : Infrastructure.Token.MultiAgentTokenStatsProvider.CreateDefault();
 
         PomodoroEngine = new PomodoroEngine();
         Windows = new WindowManager(Todos, Settings, Skin, TokenProvider, Weather, WeatherCache);

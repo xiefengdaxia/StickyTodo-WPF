@@ -408,12 +408,9 @@ public partial class App : System.Windows.Application
                         return TokenProviderOverride;
                     }
 
-                    // 默认读本机 opencode 数据库；设置里填了自定义路径就用它。
-                    // 多 Agent 聚合：opencode + zcode + codex + workbuddy + claude + gemini + qoder + kimi + pi
-                    var settings = sp.GetRequiredService<AppSettingsService>();
-                    var custom = settings.TokenDatabasePath;
-                    return Infrastructure.Token.MultiAgentTokenStatsProvider.CreateDefault(
-                        string.IsNullOrWhiteSpace(custom) ? null : custom);
+                    // 多 Agent 聚合：opencode + zcode + codex + workbuddy + claude + gemini + qoder + kimi + pi + alma
+                    // 各客户端都用自己的默认位置（设置里不再提供自定义路径）
+                    return Infrastructure.Token.MultiAgentTokenStatsProvider.CreateDefault();
                 });
                 services.AddSingleton<Core.Pomodoro.PomodoroEngine>();
                 services.AddSingleton<ViewModels.PomodoroViewModel>();

@@ -158,10 +158,6 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _startupDesktopLevel = true;
 
-    /// <summary>Token 看板要读的 opencode 数据库路径（空=默认位置）。</summary>
-    [ObservableProperty]
-    private string _tokenDatabasePath = string.Empty;
-
     private bool _suppressStartupSync;
 
     /// <summary>把存的值读进 UI（构造后调用一次）。</summary>
@@ -174,7 +170,6 @@ public partial class SettingsViewModel : ObservableObject
             LaunchAtStartup = _autoStart.IsEnabled();
             RestoreSession = _settings.RestoreSession;
             StartupDesktopLevel = _settings.StartupDesktopLevel;
-            TokenDatabasePath = _settings.TokenDatabasePath;
             _settings.AutoStart = LaunchAtStartup;
         }
         finally
@@ -228,32 +223,6 @@ public partial class SettingsViewModel : ObservableObject
 
         _settings.StartupDesktopLevel = value;
         StatusText = value ? Loc.T("settings.desktopLevelOn") : Loc.T("settings.desktopLevelOff");
-    }
-
-    /// <summary>路径失焦/回车时保存；留空表示回到默认位置。</summary>
-    public void CommitTokenDatabasePath()
-    {
-        var text = (TokenDatabasePath ?? string.Empty).Trim();
-
-        if (text.Length == 0)
-        {
-            _settings.TokenDatabasePath = string.Empty;
-            TokenDatabasePath = string.Empty;
-            ErrorText = null;
-            StatusText = Loc.T("settings.tokenDbReset");
-            return;
-        }
-
-        if (!File.Exists(text))
-        {
-            ErrorText = Loc.T("settings.tokenDbInvalid");
-            TokenDatabasePath = _settings.TokenDatabasePath;
-            return;
-        }
-
-        _settings.TokenDatabasePath = text;
-        ErrorText = null;
-        StatusText = Loc.T("settings.tokenDbSaved");
     }
 
     [ObservableProperty]

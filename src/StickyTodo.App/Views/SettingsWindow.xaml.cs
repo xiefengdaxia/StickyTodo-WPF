@@ -102,22 +102,6 @@ public partial class SettingsWindow : Window
         }
     }
 
-    /// <summary>地址框失焦时保存。</summary>
-    private void TokenDatabaseBox_LostFocus(object sender, RoutedEventArgs e) => _viewModel.CommitTokenDatabasePath();
-
-    /// <summary>回车也当保存，顺便把焦点移开。</summary>
-    private void TokenDatabaseBox_KeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key != Key.Enter)
-        {
-            return;
-        }
-
-        _viewModel.CommitTokenDatabasePath();
-        Keyboard.ClearFocus();
-        e.Handled = true;
-    }
-
     /// <summary>
     /// 关闭时只隐藏、不销毁。
     /// 之前没拦这一下：窗口被 Close() 后仍是 DI 单例，下次 ShowSettings 再 Show() 会抛

@@ -102,16 +102,5 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void TokenDatabaseBox_LostFocus(object? sender, RoutedEventArgs e) => _viewModel.CommitTokenDatabasePath();
-
-    private void TokenDatabaseBox_KeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter)
-        {
-            e.Handled = true;
-            _viewModel.CommitTokenDatabasePath();
-        }
-    }
-
     private void Close_Click(object? sender, RoutedEventArgs e) => Close();
 }

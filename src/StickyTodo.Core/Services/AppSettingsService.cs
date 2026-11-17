@@ -62,9 +62,6 @@ public sealed class AppSettingsService
     /// <summary>管理面板看板列表的展示形式：list（行，默认）/ grid（图标网格）。</summary>
     public const string ManagerViewModeKey = "manager.viewMode";
 
-    /// <summary>Token 数据源（opencode 数据库）的自定义路径，空=默认位置。</summary>
-    public const string TokenDatabasePathKey = "token.databasePath";
-
     /// <summary>Token 面板自动刷新间隔（秒），只允许 5 / 15 / 30。</summary>
     public const string TokenRefreshSecondsKey = "token.refreshSeconds";
 
@@ -256,19 +253,6 @@ public sealed class AppSettingsService
     {
         get => string.Equals(GetString(ManagerViewModeKey, null), "grid", StringComparison.OrdinalIgnoreCase);
         set => SetSetting(ManagerViewModeKey, value ? "grid" : "list");
-    }
-
-    /// <summary>
-    /// Token 看板要读的 opencode 数据库路径。空表示用默认位置（~/.local/share/opencode/opencode.db）。
-    /// </summary>
-    public string TokenDatabasePath
-    {
-        get
-        {
-            var raw = GetString(TokenDatabasePathKey, null);
-            return string.IsNullOrWhiteSpace(raw) ? string.Empty : raw.Trim();
-        }
-        set => SetSetting(TokenDatabasePathKey, value.Trim());
     }
 
     /// <summary>Token 面板自动刷新间隔（秒）。只允许 5 / 15 / 30，其它值归一到 15。</summary>
