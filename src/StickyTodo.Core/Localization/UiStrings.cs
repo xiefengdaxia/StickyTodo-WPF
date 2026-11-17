@@ -119,6 +119,7 @@ public static class UiStrings
         // ================= 右键菜单 / 待办操作 =================
         ["menu.open"] = ["打开", "Open", "開く", "열기"],
         ["menu.renameEllipsis"] = ["重命名…", "Rename…", "名前を変更…", "이름 바꾸기…"],
+        ["menu.changeIcon"] = ["换个图标", "Change icon", "アイコンを変更", "아이콘 변경"],
         ["menu.toggleDone"] = ["标记完成 / 撤回", "Toggle done", "完了／未完了を切替", "완료 상태 전환"],
         ["menu.tags"] = ["标签", "Tags", "タグ", "태그"],
         ["menu.clearTags"] = ["清空标签", "Clear tags", "タグを解除", "태그 해제"],

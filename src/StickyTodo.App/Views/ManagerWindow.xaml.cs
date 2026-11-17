@@ -377,23 +377,34 @@ public partial class ManagerWindow : Window
     /// </summary>
     private void CreateCustom_Click(object sender, RoutedEventArgs e) => ShowAiBoardGuide();
 
+    /// <summary>当前开着的引导窗（同一时刻只留一个，连点不会叠出一堆）。</summary>
+    private AiBoardGuideWindow? _guideWindow;
+
     /// <summary>
-    /// 弹出引导窗。两条坑：
-    /// 1) <c>Owner</c> 只在管理面板真的可见时才挂——面板被收进托盘/刚关掉（句柄已销毁）时
-    ///    设置 Owner 会抛 InvalidOperationException，正好被全局兜底弹成「操作失败」；
-    ///    没有 Owner 时改成就居中弹，位置一样好用。
-    /// 2) 弹窗本身抛异常（图标资源、样式缺失等）只记日志，不让它冒到全局兜底去。
+    /// 弹出引导窗。原来「点了没反应」的真因不在 Owner，而在引导窗自己的 XAML：
+    /// 那个示例话术的 <c>TextBox.Text</c> 用的是没有 Path 的 <c>{Binding Converter=…}</c>，
+    /// 而 TextBox.Text 默认双向绑定 → <c>InitializeComponent()</c> 抛
+    /// 「双向绑定需要 Path 或 XPath」，异常被这里的 catch 吃掉，于是界面上什么都看不到。
+    /// 现在 XAML 修好了，并且：非模态 Show + Activate + 短暂置顶（不再用 ShowDialog
+    /// 把整个管理面板禁掉），真出错时除了写日志，还把真实原因弹给用户看。
     /// </summary>
     private void ShowAiBoardGuide()
     {
         try
         {
+            if (_guideWindow is { IsLoaded: true })
+            {
+                _guideWindow.Activate();
+                return;
+            }
+
             var guide = new AiBoardGuideWindow
             {
                 // 引导窗里「逛市场」由管理面板去开（市场窗口的单例和 owner 都在这里）
                 OpenMarket = OpenMarketWindow,
             };
 
+            // Owner 只在管理面板真的可见时才挂：面板收进托盘 / 句柄已销毁时挂 Owner 会抛异常
             if (IsVisible)
             {
                 guide.Owner = this;
@@ -403,11 +414,61 @@ public partial class ManagerWindow : Window
                 guide.WindowStartupLocation = WindowStartupLocation.CenterScreen;
             }
 
-            guide.ShowDialog();
+            guide.Closed += (_, _) =>
+            {
+                if (ReferenceEquals(_guideWindow, guide))
+                {
+                    _guideWindow = null;
+                }
+            };
+
+            _guideWindow = guide;
+            guide.Show();
+            guide.Activate();
+
+            // 短暂置顶：保证它一定浮在管理面板上面，几百毫秒后放开（不长期抢别家窗口）
+            guide.Topmost = true;
+            var restore = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(400),
+            };
+            restore.Tick += (_, _) =>
+            {
+                restore.Stop();
+                guide.Topmost = false;
+            };
+            restore.Start();
         }
         catch (Exception ex)
         {
+            _guideWindow = null;
             Serilog.Log.Error(ex, "[ai-board] 打开 AI 看板引导窗失败");
+
+            // 只记日志的话，用户看到的就是「点了没反应」——必须把真实原因摆出来
+            ShowGuideError(ex);
+        }
+    }
+
+    /// <summary>把引导窗的真实错误弹给用户：XamlParseException 的原因藏在 InnerException 里。</summary>
+    private void ShowGuideError(Exception ex)
+    {
+        var root = ex.GetBaseException();
+        var detail = ReferenceEquals(root, ex)
+            ? ex.Message
+            : $"{ex.Message}{Environment.NewLine}→ {root.Message}";
+
+        try
+        {
+            MessageBox.Show(
+                this,
+                $"{Loc.T("manager.aiGuideTitle")}{Environment.NewLine}{Environment.NewLine}{detail}",
+                "StickyTodo",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+        catch (Exception showError)
+        {
+            Serilog.Log.Error(showError, "[ai-board] 连错误提示都弹不出来");
         }
     }
 
@@ -496,7 +557,13 @@ public partial class ManagerWindow : Window
         if (_contextRow is null)
         {
             e.Handled = true;
+            return;
         }
+
+        // 「换个图标」只对 AI 看板（Custom）有意义，其余类型的图形是固定的
+        RowMenuIcon.Visibility = _contextRow.CanChangeIcon
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     private static T? FindAncestor<T>(DependencyObject? current) where T : DependencyObject
@@ -544,6 +611,102 @@ public partial class ManagerWindow : Window
         }
 
         await DeleteBoardAsync(row.Board);
+    }
+
+    /// <summary>「换个图标」：只对 AI 看板开放（右键菜单里其余行看不到这一项）。</summary>
+    private void RowMenuIcon_Click(object sender, RoutedEventArgs e)
+    {
+        if (MenuRow is not { CanChangeIcon: true } row)
+        {
+            return;
+        }
+
+        ShowIconPicker(row);
+    }
+
+    /// <summary>当前张开的图标选择板（同一时刻只留一个）。</summary>
+    private System.Windows.Controls.Primitives.Popup? _iconPicker;
+
+    /// <summary>
+    /// 图标选择板：12 个预设 emoji 平铺，点一下就写设置并重画这一行。
+    /// 用 <see cref="System.Windows.Controls.Primitives.Popup"/> 而不是新窗口——
+    /// 不需要额外窗口的生命周期，点外面自动收起，列表 / 图标网格两种视图走的是同一份菜单。
+    /// </summary>
+    private void ShowIconPicker(BoardRowViewModel row)
+    {
+        CloseIconPicker();
+
+        var grid = new System.Windows.Controls.WrapPanel { Width = 208, Margin = new Thickness(2) };
+
+        var popup = new System.Windows.Controls.Primitives.Popup
+        {
+            AllowsTransparency = true,
+            StaysOpen = false,
+            Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint,
+            PlacementTarget = BoardList,
+        };
+
+        foreach (var icon in StickyTodo.Core.Services.AppSettingsService.BoardIconPresets)
+        {
+            var button = new Button
+            {
+                Content = icon,
+                Width = 36,
+                Height = 34,
+                FontSize = 15,
+                Margin = new Thickness(2),
+                Style = (Style)FindResource("Button.Ghost"),
+            };
+
+            var chosen = icon;
+            button.Click += (_, _) =>
+            {
+                CloseIconPicker();
+                row.ChangeIcon(chosen);
+            };
+
+            grid.Children.Add(button);
+        }
+
+        popup.Child = new Border
+        {
+            CornerRadius = new CornerRadius(11),
+            Padding = new Thickness(5),
+            Background = (System.Windows.Media.Brush)FindResource("Brush.PaperOpaque"),
+            BorderBrush = (System.Windows.Media.Brush)FindResource("Brush.Line"),
+            BorderThickness = new Thickness(1),
+            Effect = new System.Windows.Media.Effects.DropShadowEffect
+            {
+                BlurRadius = 16,
+                ShadowDepth = 3,
+                Opacity = 0.28,
+                Color = System.Windows.Media.Colors.Black,
+                Direction = 270,
+            },
+            Child = grid,
+        };
+
+        popup.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_iconPicker, popup))
+            {
+                _iconPicker = null;
+            }
+        };
+
+        _iconPicker = popup;
+        popup.IsOpen = true;
+    }
+
+    private void CloseIconPicker()
+    {
+        if (_iconPicker is not { } popup)
+        {
+            return;
+        }
+
+        _iconPicker = null;
+        popup.IsOpen = false;
     }
 
     private async void Delete_Click(object sender, RoutedEventArgs e)

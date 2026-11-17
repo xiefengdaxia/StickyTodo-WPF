@@ -12,11 +12,14 @@ namespace StickyTodo.App.ViewModels;
 /// <summary>看板列表里的一行。</summary>
 public sealed class BoardRowViewModel : ObservableObject
 {
-    public BoardRowViewModel(Board board, int pending, int done)
+    private readonly AppSettingsService? _settings;
+
+    public BoardRowViewModel(Board board, int pending, int done, AppSettingsService? settings = null)
     {
         Board = board;
         Pending = pending;
         Done = done;
+        _settings = settings;
     }
 
     public Board Board { get; }
@@ -37,8 +40,28 @@ public sealed class BoardRowViewModel : ObservableObject
         _ => "manager.kindTodo",
     });
 
-    /// <summary>卡片左侧的类型图标。</summary>
-    public string KindGlyph => GlyphFor(Board.Kind);
+    /// <summary>
+    /// 卡片左侧的类型图标。AI 看板（Custom）的图标可以在管理面板里换，
+    /// 存在设置键 <c>board.{id}.icon</c> 里；没设过仍是 ✨。
+    /// </summary>
+    public string KindGlyph => Board.Kind == BoardKind.Custom && _settings is not null
+        ? _settings.GetBoardIcon(Board.Id)
+        : GlyphFor(Board.Kind);
+
+    /// <summary>只有 AI 看板能换图标（其余类型各有固定图形，换了会认不出来）。</summary>
+    public bool CanChangeIcon => Board.Kind == BoardKind.Custom;
+
+    /// <summary>换图标：写设置 + 通知界面重画（列表和图标网格共用这一个属性）。</summary>
+    public void ChangeIcon(string icon)
+    {
+        if (!CanChangeIcon || _settings is null)
+        {
+            return;
+        }
+
+        _settings.SetBoardIcon(Board.Id, icon);
+        OnPropertyChanged(nameof(KindGlyph));
+    }
 
     /// <summary>类型 → 图标。桌面时钟的快捷入口也用这一套，两处看到的是同一组图形。</summary>
     public static string GlyphFor(BoardKind kind) => kind switch
@@ -195,7 +218,8 @@ public partial class ManagerViewModel : ObservableObject
                 list.Add(new BoardRowViewModel(
                     board,
                     todos.Count(t => !t.IsDone),
-                    todos.Count(t => t.IsDone)));
+                    todos.Count(t => t.IsDone),
+                    _settings));
             }
 
             return list;

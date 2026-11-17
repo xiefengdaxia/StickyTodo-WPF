@@ -210,6 +210,34 @@ public sealed class AppSettingsService
     public void SetBoardChip(string boardId, string chipKey) =>
         SetSetting(BoardChipKey(boardId), chipKey);
 
+    // ---------------- 自定义（AI）看板的图标 ----------------
+
+    /// <summary>AI 看板图标存在这个键下：<c>board.{id}.icon</c>（只存设置，不动数据库表结构）。</summary>
+    public static string BoardIconKey(string boardId) => $"board.{boardId}.icon";
+
+    /// <summary>缺省图标（没设过、值被清掉时都用它）。</summary>
+    public const string DefaultBoardIcon = "✨";
+
+    /// <summary>
+    /// AI 看板可换的预设图标。存的是一个 emoji 字符，管理面板的列表 / 图标网格
+    /// 都直接用这个字符串画，所以不需要额外的图形资源。
+    /// </summary>
+    public static readonly IReadOnlyList<string> BoardIconPresets =
+    [
+        "✨", "🧩", "📊", "📈", "🧠", "🎯", "🔧", "🎨", "🔔", "🚀", "💡", "🗂",
+    ];
+
+    /// <summary>取某个 AI 看板的图标：没设过或存了空值都回落 ✨。</summary>
+    public string GetBoardIcon(string boardId)
+    {
+        var raw = GetString(BoardIconKey(boardId), null);
+        return string.IsNullOrWhiteSpace(raw) ? DefaultBoardIcon : raw.Trim();
+    }
+
+    /// <summary>设某个 AI 看板的图标（传空串等于恢复缺省）。</summary>
+    public void SetBoardIcon(string boardId, string icon) =>
+        SetSetting(BoardIconKey(boardId), icon?.Trim() ?? string.Empty);
+
     /// <summary>看板上次用的是列表还是四象限视图。</summary>
     public static string BoardViewKey(string boardId) => $"board.{boardId}.view";
 

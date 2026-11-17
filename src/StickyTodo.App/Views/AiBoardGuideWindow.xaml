@@ -97,7 +97,7 @@
                              TextWrapping="Wrap"
                              IsReadOnly="True"
                              VerticalContentAlignment="Top"
-                             Text="{Binding Converter={StaticResource Loc}, ConverterParameter=manager.aiGuideSample}" />
+                             Text="{Binding Converter={StaticResource Loc}, ConverterParameter=manager.aiGuideSample, Mode=OneWay}" />
 
                     <Button Grid.Column="1"
                             Margin="10,0,0,0"

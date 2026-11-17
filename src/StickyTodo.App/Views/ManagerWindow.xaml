@@ -390,6 +390,10 @@
                         <ContextMenu>
                             <MenuItem Header="{Binding Converter={StaticResource Loc}, ConverterParameter=menu.open}" Click="RowMenuOpen_Click" />
                             <Separator />
+                            <!-- 换个图标：只有 AI 看板（Custom）才显示，列表 / 图标网格两种视图都能用 -->
+                            <MenuItem x:Name="RowMenuIcon"
+                                      Header="{Binding Converter={StaticResource Loc}, ConverterParameter=menu.changeIcon}"
+                                      Click="RowMenuIcon_Click" />
                             <MenuItem Header="{Binding Converter={StaticResource Loc}, ConverterParameter=menu.renameEllipsis}" Click="RowMenuRename_Click" />
                             <MenuItem Header="{Binding Converter={StaticResource Loc}, ConverterParameter=common.delete}" Click="RowMenuDelete_Click" />
                         </ContextMenu>
