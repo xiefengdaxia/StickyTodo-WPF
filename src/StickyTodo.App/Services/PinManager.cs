@@ -63,11 +63,14 @@ public sealed class PinManager
     }
 
     /// <summary>
-    /// 托盘「录 GIF → 区域」：先出遮罩框选，用户点「录 GIF」才开始录。
+    /// 托盘「录 GIF → 区域」和 F2 都走这里：先出遮罩框选，用户点「录 GIF」才开始录。
+    /// <paramref name="withLastRegionSuggestion"/> 为 true（F2）时，把上次录过的区域
+    /// 当参考底纹 / 「回车沿用」的建议画在遮罩上；托盘里显式点「区域」则要求重新框选。
     /// </summary>
-    public async Task CaptureGifRegionAsync()
+    public async Task CaptureGifRegionAsync(bool withLastRegionSuggestion = false)
     {
-        var overlay = await ShowOverlayAsync(gifMode: true);
+        var suggested = withLastRegionSuggestion ? _gifs?.LastRegionSuggestion : null;
+        var overlay = await ShowOverlayAsync(gifMode: true, suggestedRegion: suggested);
         if (overlay is null)
         {
             return;
@@ -94,7 +97,9 @@ public sealed class PinManager
     /// 抓屏 → 弹遮罩 → 等用户确认。返回遮罩窗口（已确认），取消/在抓屏返回 null。
     /// 整屏 BitBlt 在这台机器上约 100ms：放后台线程抓，UI 不会先冻一下才出遮罩。
     /// </summary>
-    private async Task<SnipOverlayWindow?> ShowOverlayAsync(bool gifMode = false)
+    private async Task<SnipOverlayWindow?> ShowOverlayAsync(
+        bool gifMode = false,
+        System.Drawing.Rectangle? suggestedRegion = null)
     {
         if (_capturing)
         {
@@ -111,7 +116,7 @@ public sealed class PinManager
                 return null;
             }
 
-            var overlay = new SnipOverlayWindow(screenshot, gifMode)
+            var overlay = new SnipOverlayWindow(screenshot, gifMode, suggestedRegion)
             {
                 WindowStartupLocation = WindowStartupLocation.Manual,
             };

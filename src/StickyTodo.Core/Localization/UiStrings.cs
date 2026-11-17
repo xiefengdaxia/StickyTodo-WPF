@@ -506,6 +506,8 @@ public static class UiStrings
     ["gif.fullscreenTip"] = ["不用框选，直接录整块屏幕", "No selection needed — record the whole screen", "範囲選択なしで画面全体を録画します", "선택 없이 화면 전체를 녹화합니다"],
     // 录 GIF 的遮罩上：框选仍是默认，但右下角点一下就能录全屏
     ["gif.regionHint"] = ["拖动鼠标框选区域 · 或点右下角「全屏」直接录整块屏幕 · Esc 取消", "Drag to select a region — or click Full screen at bottom right to record the whole screen · Esc to cancel", "ドラッグで範囲選択 · 右下の「全画面」で画面全体を録画 · Esc でキャンセル", "드래그로 영역 선택 · 오른쪽 아래 '전체 화면'으로 화면 전체 녹화 · Esc 취소"],
+    // 录 GIF 的遮罩上：上次区域只是建议（参考底纹），回车才沿用开录
+    ["gif.lastRegionHint"] = ["上次区域 {0}×{1}，回车沿用", "Last region {0}×{1} — press Enter to reuse", "前回の範囲 {0}×{1} — Enter で再利用", "이전 영역 {0}×{1} — Enter 키로 재사용"],
     // ===== 便签 Markdown / 导出 =====
     ["memo.edit"] = ["编辑", "Edit", "編集", "편집"],
     ["memo.preview"] = ["预览", "Preview", "プレビュー", "미리보기"],

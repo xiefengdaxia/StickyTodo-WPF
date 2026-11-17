@@ -13,7 +13,7 @@ namespace StickyTodo.App.Services;
 /// 三个入口：
 ///   * 托盘「录 GIF → 区域 / 全屏」（默认项是区域）；
 ///   * 截图遮罩工具条上的「录 GIF」（用当前框选）；
-///   * 全局热键 F2（开始/停止，默认先框选，记过的区域直接沿用）/ F4（立即停止）。
+///   * 全局热键 F2（开始/停止，一律先出框选遮罩，上次区域只能「回车沿用」）/ F4（立即停止）。
 /// </summary>
 public sealed class GifRecordingService : IDisposable
 {
@@ -27,7 +27,7 @@ public sealed class GifRecordingService : IDisposable
     private Rectangle? _recordedRegion;
 
     /// <summary>
-    /// 需要用户框选一块区域（F2 第一次用、记下的区域已经不在屏幕上时）。
+    /// 需要用户框选一块区域（F2 每次都走这里）。
     /// 框选 UI 在 <see cref="PinManager"/> 那边，这里只发个信号，由 App 接起来，
     /// 免得两个服务互相持有（PinManager 已经依赖本服务）。
     /// </summary>
@@ -44,7 +44,7 @@ public sealed class GifRecordingService : IDisposable
     /// <summary>已经在倒计时 / 正在录 / 正在生成。</summary>
     private bool IsBusy => _bar is not null || _recorder is { IsBusy: true };
 
-    /// <summary>F2：正在录（或在倒计时/生成）就停，否则按上次的范围开始（默认先框选）。</summary>
+    /// <summary>F2：正在录（或在倒计时/生成）就停，否则一律先出框选遮罩让用户确认区域。</summary>
     public void ToggleRecording()
     {
         if (IsBusy)
@@ -109,33 +109,30 @@ public sealed class GifRecordingService : IDisposable
     public void StartRegion(Rectangle regionPx) => Begin(regionPx);
 
     /// <summary>
-    /// 按上次的方式开始：
-    ///   * 上次是区域（默认）→ 记下的区域还在屏幕上就直接沿用，否则先让用户框选；
-    ///   * 上次是全屏 → 走全屏（多屏会先选屏）。
+    /// 上次记下的区域（已夹进当前虚拟屏、尺寸有效）：只给遮罩当「参考底纹 / 回车沿用」
+    /// 的建议用，不会自己开录。没记过、或记下的区域已经跑出屏幕外，就是 null。
+    /// </summary>
+    public Rectangle? LastRegionSuggestion
+    {
+        get
+        {
+            if (ResolveLastRegion() is not { } remembered)
+            {
+                return null;
+            }
+
+            var region = ClampRegion(remembered, ScreenCaptureService.GetVirtualScreenBounds());
+            return region.Width >= 4 && region.Height >= 4 ? region : null;
+        }
+    }
+
+    /// <summary>
+    /// F2 的开始动作：**一律**先出框选遮罩（gifMode），等用户拖框、点「全屏」或
+    /// 按回车（沿用上次区域）才真正开录。上次记过的区域只当遮罩上的参考建议，
+    /// 不再直接开始录制。
     /// </summary>
     public void StartLastMode()
     {
-        if (!string.Equals(_settings.GifLastMode, AppSettingsService.GifModeRegion, StringComparison.Ordinal))
-        {
-            StartFullScreen();
-            return;
-        }
-
-        if (ResolveLastRegion() is { } remembered)
-        {
-            var screen = ScreenCaptureService.GetVirtualScreenBounds();
-            var region = ClampRegion(remembered, screen);
-
-            // 换过显示器 / 改过分辨率后记下的区域可能整块跑到屏外，那就重新框选
-            if (region.Width >= 4 && region.Height >= 4)
-            {
-                Begin(region);
-                return;
-            }
-
-            Log.Information("[gif] 记下的区域已经不在屏幕里，重新框选");
-        }
-
         if (RegionSelectionRequested is null)
         {
             Log.Warning("[gif] 没有接框选的入口，这次 F2 只能放弃");

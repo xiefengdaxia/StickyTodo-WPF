@@ -78,15 +78,33 @@ public partial class SnipOverlayWindow : Window
     /// <summary>这次遮罩是为「录 GIF」开的（用来露出全屏入口），默认是普通截图。</summary>
     private readonly bool _gifMode;
 
+    /// <summary>
+    /// 上次录过的区域（物理像素）：**只当建议** —— 在遮罩上画成参考底纹，
+    /// 并提示「回车沿用」。不拖框也不按回车的话，不会自己开录。
+    /// </summary>
+    private readonly System.Drawing.Rectangle? _suggestedRegion;
+
+    /// <summary>参考底纹的虚线框（没有建议区域时为 null）。</summary>
+    private Rectangle? _suggestionOutline;
+
     public SnipOverlayWindow(BitmapSource screenshot)
-        : this(screenshot, gifMode: false)
+        : this(screenshot, gifMode: false, suggestedRegion: null)
+    {
+    }
+
+    public SnipOverlayWindow(BitmapSource screenshot, bool gifMode)
+        : this(screenshot, gifMode, suggestedRegion: null)
     {
     }
 
     /// <param name="gifMode">
     /// true = 从「录 GIF」进来：右下角多一个「全屏」按钮，提示文案也会说明可以不框选。
     /// </param>
-    public SnipOverlayWindow(BitmapSource screenshot, bool gifMode)
+    /// <param name="suggestedRegion">
+    /// 上次录过的区域（物理像素）：只画成参考底纹 + 「回车沿用」提示，
+    /// 用户照样可以重新拖框；不传就什么都不显示。
+    /// </param>
+    public SnipOverlayWindow(BitmapSource screenshot, bool gifMode, System.Drawing.Rectangle? suggestedRegion)
     {
         InitializeComponent();
 
@@ -110,6 +128,14 @@ public partial class SnipOverlayWindow : Window
             Hint.Text = StickyTodo.Core.Localization.Loc.T("gif.regionHint");
 
             FullScreenPanel.Visibility = Visibility.Visible;
+
+            // 上次的区域：只当参考底纹 / 预填建议，回车才沿用（不会自动开录）
+            if (suggestedRegion is { } suggested && suggested.Width >= 4 && suggested.Height >= 4)
+            {
+                _suggestedRegion = suggested;
+                LastRegionHint.Text = StickyTodo.Core.Localization.Loc.F(
+                    "gif.lastRegionHint", suggested.Width, suggested.Height);
+            }
         }
 
         // 初始：整屏压暗，没有"亮洞"
@@ -136,6 +162,83 @@ public partial class SnipOverlayWindow : Window
 
         Bright.Clip = rect.Width > 0 && rect.Height > 0 ? new RectangleGeometry(rect) : null;
         Bright.Visibility = rect.Width > 0 && rect.Height > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    // ---------------- 上次区域（参考底纹 / 回车沿用） ----------------
+
+    /// <summary>
+    /// 把上次录过的区域画成参考底纹（虚线框 + 很淡的填充）并露出「回车沿用」提示。
+    /// 只是建议：用户照样可以直接拖一个新的框。
+    /// </summary>
+    private void ShowSuggestion()
+    {
+        if (_suggestedRegion is not { } region)
+        {
+            return;
+        }
+
+        var dip = SuggestedRegionToDip(region);
+        if (dip.Width < 1 || dip.Height < 1)
+        {
+            return;
+        }
+
+        if (_suggestionOutline is null)
+        {
+            var outline = new Rectangle
+            {
+                Stroke = new SolidColorBrush(Color.FromArgb(0x99, 0x3F, 0xA9, 0xF5)),
+                StrokeThickness = 1.5,
+                StrokeDashArray = new DoubleCollection { 5, 4 },
+                Fill = new SolidColorBrush(Color.FromArgb(0x14, 0x3F, 0xA9, 0xF5)),
+                IsHitTestVisible = false,
+            };
+
+            Canvas.SetLeft(outline, dip.X);
+            Canvas.SetTop(outline, dip.Y);
+            outline.Width = dip.Width;
+            outline.Height = dip.Height;
+
+            // 插到最下层：用户开始拖新框时，新选区的边框压在上面
+            SelectionLayer.Children.Insert(0, outline);
+            _suggestionOutline = outline;
+        }
+
+        LastRegionHint.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>用户开始拖新框：把参考底纹和「回车沿用」提示收起来，别和新选区打架。</summary>
+    private void HideSuggestion()
+    {
+        if (_suggestionOutline is { } outline)
+        {
+            SelectionLayer.Children.Remove(outline);
+            _suggestionOutline = null;
+        }
+
+        LastRegionHint.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// 建议区域（屏幕物理像素）换算成遮罩的 DIP 坐标。
+    /// 比例和 <see cref="SelectionScreenRect"/> 反过来用：同一张截图、同一个根元素。
+    /// </summary>
+    private Rect SuggestedRegionToDip(System.Drawing.Rectangle regionPx)
+    {
+        var screen = Services.ScreenCaptureService.GetVirtualScreenBounds();
+
+        var sx = Root.ActualWidth > 0 ? _screenshot.PixelWidth / Root.ActualWidth : 0;
+        var sy = Root.ActualHeight > 0 ? _screenshot.PixelHeight / Root.ActualHeight : 0;
+        if (sx <= 0 || sy <= 0)
+        {
+            return Rect.Empty;
+        }
+
+        return new Rect(
+            (regionPx.X - screen.X) / sx,
+            (regionPx.Y - screen.Y) / sy,
+            regionPx.Width / sx,
+            regionPx.Height / sy);
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -167,6 +270,9 @@ public partial class SnipOverlayWindow : Window
                     ApplyVirtualScreenGeometry(hwnd);
                 }
             }
+
+            // 尺寸定型之后才能把「上次区域」的参考底纹换算到遮罩坐标
+            ShowSuggestion();
         };
 
         PreviewKeyDown += OnPreviewKeyDown;
@@ -388,6 +494,7 @@ public partial class SnipOverlayWindow : Window
         _dragOrigin = point;
         _hasSelection = false;
         ClearAnnotations();
+        HideSuggestion();
         Toolbar.Visibility = Visibility.Collapsed;
         SizeBadge.Visibility = Visibility.Collapsed;
         SelectionBorder.Visibility = Visibility.Collapsed;
@@ -421,13 +528,14 @@ public partial class SnipOverlayWindow : Window
 
             if (_selection.Width < 8 || _selection.Height < 8)
             {
-                // 太小的框当作误点：恢复提示
+                // 太小的框当作误点：恢复提示（有建议区域就把参考底纹也画回来）
                 _selection = Rect.Empty;
                 _hasSelection = false;
                 _hadSelectionBeforeReframe = false;
                 SelectionBorder.Visibility = Visibility.Collapsed;
                 ShowFullDim();
                 Hint.Visibility = Visibility.Visible;
+                ShowSuggestion();
                 return;
             }
 
@@ -767,6 +875,22 @@ public partial class SnipOverlayWindow : Window
                     return;
                 }
 
+                if (_gifMode)
+                {
+                    // 录 GIF：框好了就按框好的录；没框的话回车=沿用上次区域（有建议时）
+                    if (_hasSelection && _selection.Width >= 1 && _selection.Height >= 1)
+                    {
+                        RecordGif();
+                    }
+                    else
+                    {
+                        RecordGifSuggestedRegion();
+                    }
+
+                    e.Handled = true;
+                    return;
+                }
+
                 Pin();
                 e.Handled = true;
                 break;
@@ -846,6 +970,25 @@ public partial class SnipOverlayWindow : Window
         CommitText();
 
         GifRegion = SelectionScreenRect();
+        Result = null;
+        CopiedOnly = false;
+        DialogResult = true;
+    }
+
+    /// <summary>
+    /// 「回车沿用上次区域」：没有框选时，回车把建议区域（上次录过的范围）直接交给录制流程。
+    /// 没有建议区域就什么都不做，遮罩继续等用户框选。
+    /// </summary>
+    public void RecordGifSuggestedRegion()
+    {
+        if (!_gifMode || _suggestedRegion is not { } region)
+        {
+            return;
+        }
+
+        CommitText();
+
+        GifRegion = region;
         Result = null;
         CopiedOnly = false;
         DialogResult = true;
