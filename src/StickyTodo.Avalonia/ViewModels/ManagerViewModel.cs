@@ -64,6 +64,18 @@ public sealed class BoardRowViewModel : ObservableObject
 
     public int Done { get; }
 
+    /// <summary>待办 + 已完成；0 表示这个看板没有任务概念。</summary>
+    public int Total => Pending + Done;
+
+    /// <summary>完成百分比（0–100，取整）。</summary>
+    public double DonePercent => Total == 0 ? 0 : Math.Round(Done * 100.0 / Total);
+
+    /// <summary>只有带待办的看板才画完成度条。</summary>
+    public bool ShowProgress =>
+        !IsMemo && !IsCalendar && !IsToken && !IsToolBoard && Board.Kind != BoardKind.Custom;
+
+    public string PercentText => ShowProgress ? $"{(int)DonePercent}%" : string.Empty;
+
     public string Summary => IsMemo
         ? Loc.T("manager.summaryMemo")
         : IsCalendar

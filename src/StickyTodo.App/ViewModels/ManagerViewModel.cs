@@ -77,6 +77,18 @@ public sealed class BoardRowViewModel : ObservableObject
                         ? Loc.T("manager.summaryCustom")
                         : Loc.F("manager.summaryTodo", Pending, Done);
 
+    /// <summary>待办 + 已完成，0 表示这个看板没有任务概念（工具/自定义看板）。</summary>
+    public int Total => Pending + Done;
+
+    /// <summary>完成百分比（0–100，四舍五入到整数）。</summary>
+    public double DonePercent => Total == 0 ? 0 : Math.Round(Done * 100.0 / Total);
+
+    /// <summary>只有带待办的看板才画完成度条，工具/便签/自定义看板不画。</summary>
+    public bool ShowProgress =>
+        !IsMemo && !IsCalendar && !IsToken && !IsToolBoard && Board.Kind != BoardKind.Custom;
+
+    public string PercentText => ShowProgress ? $"{(int)DonePercent}%" : string.Empty;
+
     public string WindowHint => Board.Window is null ? string.Empty : Loc.T("manager.rememberedGeometry");
 
     /// <summary>语言切换后通知这一行所有拼接文本重算。</summary>

@@ -3,8 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="StickyTodo"
         Icon="/Assets/stickytodo.ico"
-        Height="680" Width="820"
-        MinHeight="580" MinWidth="680"
+        Height="660" Width="760"
+        MinHeight="560" MinWidth="640"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
@@ -18,7 +18,7 @@
             <StackPanel />
         </ItemsPanelTemplate>
         <ItemsPanelTemplate x:Key="BoardTilePanel">
-            <WrapPanel />
+            <UniformGrid Columns="4" />
         </ItemsPanelTemplate>
 
         <!-- 行视图（默认） -->
@@ -85,62 +85,88 @@
                         </Style>
 
 <DataTemplate x:Key="BoardRowTemplate">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
 
-                                <!-- 类型图标方块 -->
-                                <Border Grid.Column="0"
-                                        Width="34" Height="34"
-                                        CornerRadius="9"
-                                        Background="{DynamicResource Brush.AccentSoft}"
-                                        VerticalAlignment="Center"
-                                        Margin="0,0,11,0">
-                                    <TextBlock Text="{Binding KindGlyph}"
-                                               FontSize="15"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               Foreground="{DynamicResource Brush.Accent}" />
-                                </Border>
+        <!-- 类型图标方块 -->
+        <Border Grid.Column="0"
+                Width="34" Height="34"
+                CornerRadius="9"
+                Background="{DynamicResource Brush.AccentSoft}"
+                VerticalAlignment="Center"
+                Margin="0,0,11,0">
+            <TextBlock Text="{Binding KindGlyph}"
+                       FontSize="15"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource Brush.Accent}" />
+        </Border>
 
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding Name}"
-                                                   FontSize="14"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource Brush.Ink}"
-                                                   TextTrimming="CharacterEllipsis" />
-                                        <Border Margin="7,0,0,0"
-                                                Padding="6,1"
-                                                CornerRadius="5"
-                                                VerticalAlignment="Center"
-                                                Background="{DynamicResource Brush.ChipIdle}">
-                                            <TextBlock Text="{Binding KindText}" FontSize="9.5"
-                                                       Foreground="{DynamicResource Brush.InkSoft}" />
-                                        </Border>
-                                    </StackPanel>
-                                    <TextBlock Text="{Binding Summary}"
-                                               Style="{StaticResource Text.Caption}"
-                                               Margin="0,3,0,0" />
-                                </StackPanel>
+        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding Name}"
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource Brush.Ink}"
+                           TextTrimming="CharacterEllipsis" />
+                <Border Margin="7,0,0,0"
+                        Padding="6,1"
+                        CornerRadius="5"
+                        VerticalAlignment="Center"
+                        Background="{DynamicResource Brush.ChipIdle}">
+                    <TextBlock Text="{Binding KindText}" FontSize="9.5"
+                               Foreground="{DynamicResource Brush.InkSoft}" />
+                </Border>
+            </StackPanel>
+            <TextBlock Text="{Binding Summary}"
+                       Style="{StaticResource Text.Caption}"
+                       Margin="0,3,0,0" />
+        </StackPanel>
 
-                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding WindowHint}"
-                                               FontSize="10"
-                                               Foreground="{DynamicResource Brush.Accent}"
-                                               VerticalAlignment="Center"
-                                               Margin="0,0,7,0" />
-                                    <Button Content="✕"
-                                            FontSize="11"
-                                            Style="{StaticResource Button.Link}"
-                                            ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=manager.deleteBoard}"
-                                            Click="DeleteRow_Click" />
-                                </StackPanel>
-                            </Grid>
-                        </DataTemplate>
+        <!-- 完成度读数：顺带把右侧那段空白填掉 -->
+        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,10,0">
+            <StackPanel.Style>
+                <Style TargetType="StackPanel">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding ShowProgress}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </StackPanel.Style>
+            <ProgressBar Width="96" Height="4"
+                         Minimum="0" Maximum="100"
+                         Value="{Binding DonePercent, Mode=OneWay}"
+                         Foreground="{DynamicResource Brush.Accent}"
+                         Background="{DynamicResource Brush.ChipIdle}"
+                         BorderThickness="0"
+                         VerticalAlignment="Center" />
+            <TextBlock Text="{Binding PercentText}"
+                       FontSize="10.5" MinWidth="34" TextAlignment="Right"
+                       VerticalAlignment="Center" Margin="8,0,0,0"
+                       Foreground="{DynamicResource Brush.InkSoft}" />
+        </StackPanel>
+
+        <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+            <TextBlock Text="{Binding WindowHint}"
+                       FontSize="10"
+                       Foreground="{DynamicResource Brush.Accent}"
+                       VerticalAlignment="Center"
+                       Margin="0,0,7,0" />
+            <Button Content="✕"
+                    FontSize="11"
+                    Style="{StaticResource Button.Link}"
+                    ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=manager.deleteBoard}"
+                    Click="DeleteRow_Click" />
+        </StackPanel>
+    </Grid>
+</DataTemplate>
 
         <!-- 图标网格视图 -->
 <Style x:Key="BoardTileItemStyle" TargetType="ListBoxItem">
@@ -151,8 +177,8 @@
         <Setter.Value>
             <ControlTemplate TargetType="ListBoxItem">
                 <Border x:Name="Row"
-                        Width="104" MinHeight="104"
-                        Margin="0,0,10,10"
+                        MinHeight="96"
+                        Margin="4"
                         Padding="10,12"
                         CornerRadius="10"
                         Background="{DynamicResource Brush.Surface}"
@@ -201,7 +227,7 @@
 
         <Grid AllowDrop="False">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="210" />
+                <ColumnDefinition Width="200" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
