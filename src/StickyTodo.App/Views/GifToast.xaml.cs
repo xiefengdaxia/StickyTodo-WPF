@@ -15,14 +15,20 @@ public partial class GifToast : Window
 {
     private readonly byte[] _gif;
     private readonly string? _filePath;
+    private readonly System.Drawing.Rectangle? _anchorRegion;
     private readonly DispatcherTimer _timer;
 
-    public GifToast(byte[] gif, string? filePath)
+    /// <param name="anchorRegion">
+    /// 这次录制的区域（物理像素）：提示条出现在**那块屏**的右下角，
+    /// 而不是主屏；区域贴边时再夹进工作区，保证不会被屏幕边缘切掉。
+    /// </param>
+    public GifToast(byte[] gif, string? filePath, System.Drawing.Rectangle? anchorRegion = null)
     {
         InitializeComponent();
 
         _gif = gif;
         _filePath = filePath;
+        _anchorRegion = anchorRegion;
 
         MessageText.Text = Loc.T("gif.copied");
         SaveButton.Content = Loc.T("gif.save");
@@ -62,11 +68,24 @@ public partial class GifToast : Window
     private static string SizeHint(string? fileName) =>
         string.IsNullOrEmpty(fileName) ? string.Empty : $" · {fileName}";
 
+    /// <summary>
+    /// 贴到录制区域所在那块屏的右下角，再夹进它的工作区
+    /// （任务栏在下面 / 缩放到 150% 时 Right-Bottom 也不一定真能放下）。
+    /// </summary>
     private void MoveToBottomRight()
     {
-        var area = ScreenHelper.GetWorkArea(this);
-        Left = area.Right - ActualWidth - 8;
-        Top = area.Bottom - ActualHeight - 8;
+        var work = OverlayPlacement.WorkAreaFor(
+            _anchorRegion ?? ScreenCaptureService.GetVirtualScreenBounds());
+
+        var size = OverlayPlacement.MeasurePx(this, work);
+
+        OverlayPlacement.ClampToWorkArea(
+            this,
+            new System.Drawing.Rectangle(
+                work.Right - size.Width,
+                work.Bottom - size.Height,
+                size.Width,
+                size.Height));
     }
 
     private void FadeOutAndClose()

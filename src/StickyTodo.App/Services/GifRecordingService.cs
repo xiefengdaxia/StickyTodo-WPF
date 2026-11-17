@@ -23,6 +23,9 @@ public sealed class GifRecordingService : IDisposable
     private GifRecordingBar? _bar;
     private GifToast? _toast;
 
+    /// <summary>最近一次录制的区域（物理像素）：提示条要贴到这块屏上。</summary>
+    private Rectangle? _recordedRegion;
+
     public GifRecordingService(AppSettingsService settings)
     {
         _settings = settings;
@@ -97,6 +100,7 @@ public sealed class GifRecordingService : IDisposable
         var countdown = _settings.GifCountdown;
 
         RememberMode(region, screen);
+        _recordedRegion = region;
         CloseBar();
 
         var recorder = new GifRecorder { Quality = quality };
@@ -167,7 +171,8 @@ public sealed class GifRecordingService : IDisposable
     {
         _toast?.Close();
 
-        var toast = new GifToast(gif, path);
+        // 提示条贴到刚录的那块屏的右下角（区域贴边时会自己夹进工作区）
+        var toast = new GifToast(gif, path, _recordedRegion);
         toast.Closed += (_, _) =>
         {
             if (ReferenceEquals(_toast, toast))

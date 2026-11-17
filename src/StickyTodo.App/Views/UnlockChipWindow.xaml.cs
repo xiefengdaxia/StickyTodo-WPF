@@ -64,9 +64,23 @@ board.Activated += OnBoardActivated;
             return;
         }
 
-        var dips = ClickThrough.ToDips(_anchor, physical);
-        Left = dips.Left + ((dips.Width - Width) / 2);
-        Top = dips.Top + ((dips.Height - Height) / 2);
+        // 依然压在锁定图标正中；但只要整块露在工作区外（贴图贴在屏幕右侧/底部时常见），
+        // 就夹回来，别让「唯一的解锁入口」藏在屏幕外。
+        var anchorPx = new System.Drawing.Rectangle(
+            (int)Math.Round(physical.Left),
+            (int)Math.Round(physical.Top),
+            Math.Max(1, (int)Math.Round(physical.Width)),
+            Math.Max(1, (int)Math.Round(physical.Height)));
+
+        var size = OverlayPlacement.MeasurePx(this, anchorPx);
+
+        OverlayPlacement.ClampToWorkArea(
+            this,
+            new System.Drawing.Rectangle(
+                anchorPx.Left + ((anchorPx.Width - size.Width) / 2),
+                anchorPx.Top + ((anchorPx.Height - size.Height) / 2),
+                size.Width,
+                size.Height));
     }
 
     private void Chip_Click(object sender, MouseButtonEventArgs e)

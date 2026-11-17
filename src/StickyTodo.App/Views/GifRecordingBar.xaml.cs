@@ -14,9 +14,10 @@ namespace StickyTodo.App.Views;
 /// <summary>
 /// 录制中悬浮条：红点（呼吸）+ 计时 + 帧数 + 清晰度 + 倒计时开关 + 停止 / 取消。
 ///
-/// 摆位原则：**别把工具条本身录进去**。优先放在录制区域的上下左右外侧；
-/// 整屏录制时四周没有空位，只能退到离区域中心最远的那个角（这时会被录进去一点，
-/// 这是所有「录屏不录自己」都绕不开的取舍，所以默认是全屏时也尽量缩在最角落）。
+/// 摆位原则：**别把工具条本身录进去**，但「看得见、点得到」优先。优先放在录制区域
+/// 的上方外侧，被屏幕右 / 下边缘挤掉就往左、往内侧翻；整屏录制时四周没有空位，
+/// 就缩进区域内侧左上角（这时会被录进去一点，靠 WDA_EXCLUDEFROMCAPTURE 兜着）。
+/// 具体翻边与夹取见 <see cref="OverlayPlacement"/>。
 /// </summary>
 public partial class GifRecordingBar : Window
 {
@@ -254,82 +255,12 @@ public partial class GifRecordingBar : Window
     // ---------------- 摆位 ----------------
 
     /// <summary>
-    /// 优先放到录制区域外面（上 / 下 / 左 / 右），整屏录制时退到离区域中心最远的角。
-    /// 用像素算、再折成 DIP 赋予 Left/Top：和高 DPI 下 SetWindowPos 的效果一致，
-    /// 而且之后窗口因为文字变化改尺寸时不会跑回屏幕中间。
+    /// 优先放到录制区域上方外侧；上方被屏幕边缘挤掉就往左 / 内侧翻，
+    /// 最后一定夹在区域所在那块屏的工作区里（贴右边 / 贴任务栏都不会跑到屏幕外）。
+    /// 摆位细节见 <see cref="OverlayPlacement"/>。
     /// </summary>
-    private void PlaceAwayFromRegion()
-    {
-        UpdateLayout();
-
-        var handle = new WindowInteropHelper(this).Handle;
-        var scale = handle != IntPtr.Zero ? GetDpiForWindow(handle) / 96.0 : 1.0;
-        if (scale <= 0)
-        {
-            scale = 1;
-        }
-
-        var width = Math.Max(120, (int)Math.Ceiling((ActualWidth > 0 ? ActualWidth : Width) * scale));
-        var height = Math.Max(28, (int)Math.Ceiling((ActualHeight > 0 ? ActualHeight : 40) * scale));
-
-        var screen = ScreenCaptureService.GetVirtualScreenBounds();
-        const int gap = 8;
-
-        var outside = new[]
-        {
-            new Rectangle(_region.Left, _region.Top - height - gap, width, height),
-            new Rectangle(_region.Left, _region.Bottom + gap, width, height),
-            new Rectangle(_region.Left - width - gap, _region.Top, width, height),
-            new Rectangle(_region.Right + gap, _region.Top, width, height),
-        };
-
-        foreach (var candidate in outside)
-        {
-            if (screen.Contains(candidate) && !candidate.IntersectsWith(_region))
-            {
-                Apply(candidate);
-                return;
-            }
-        }
-
-        var corners = new[]
-        {
-            new Rectangle(screen.Left + gap, screen.Top + gap, width, height),
-            new Rectangle(screen.Right - width - gap, screen.Top + gap, width, height),
-            new Rectangle(screen.Left + gap, screen.Bottom - height - gap, width, height),
-            new Rectangle(screen.Right - width - gap, screen.Bottom - height - gap, width, height),
-        };
-
-        var centerX = _region.Left + _region.Width / 2.0;
-        var centerY = _region.Top + _region.Height / 2.0;
-
-        var best = corners[0];
-        var bestDistance = -1.0;
-
-        foreach (var corner in corners)
-        {
-            var dx = corner.Left + corner.Width / 2.0 - centerX;
-            var dy = corner.Top + corner.Height / 2.0 - centerY;
-            var distance = dx * dx + dy * dy;
-
-            if (distance > bestDistance)
-            {
-                bestDistance = distance;
-                best = corner;
-            }
-        }
-
-        Apply(best);
-
-        void Apply(Rectangle rect)
-        {
-            // 屏幕物理像素 → DIP（WPF 的 Left/Top 是 DIP）
-            Left = rect.Left / scale;
-            Top = rect.Top / scale;
-            Log.Debug("[gif] 悬浮条摆到 {X},{Y}（区域 {RX},{RY} {RW}x{RH}）",
-                rect.Left, rect.Top, _region.Left, _region.Top, _region.Width, _region.Height);
-        }
-    }
+    private void PlaceAwayFromRegion() =>
+        OverlayPlacement.PlaceNear(this, _region, OverlaySide.Above);
 
     /// <summary>
     /// 再补一层保险：让 Windows 把这条悬浮条从屏幕捕获里排除掉
@@ -363,9 +294,6 @@ public partial class GifRecordingBar : Window
             Log.Debug(ex, "[gif] 设置显示亲和性失败");
         }
     }
-
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    private static extern uint GetDpiForWindow(IntPtr hwnd);
 
     [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
     [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
