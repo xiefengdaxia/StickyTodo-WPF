@@ -69,16 +69,48 @@ public partial class SnipOverlayWindow : Window
     /// </summary>
     public System.Drawing.Rectangle? GifRegion { get; private set; }
 
+    /// <summary>
+    /// 点了右下角「全屏」：这次不框选，直接按整屏录。
+    /// 调用方看到它非 null 就不用管 <see cref="GifRegion"/>，走和托盘「全屏」一样的入口。
+    /// </summary>
+    public bool GifFullScreenRequested { get; private set; }
+
+    /// <summary>这次遮罩是为「录 GIF」开的（用来露出全屏入口），默认是普通截图。</summary>
+    private readonly bool _gifMode;
+
     public SnipOverlayWindow(BitmapSource screenshot)
+        : this(screenshot, gifMode: false)
+    {
+    }
+
+    /// <param name="gifMode">
+    /// true = 从「录 GIF」进来：右下角多一个「全屏」按钮，提示文案也会说明可以不框选。
+    /// </param>
+    public SnipOverlayWindow(BitmapSource screenshot, bool gifMode)
     {
         InitializeComponent();
 
         _screenshot = screenshot;
+        _gifMode = gifMode;
         Backdrop.Source = screenshot;
         Bright.Source = screenshot;
 
         // 工具条上的「录 GIF」用文案表里的 key，切语言时跟着变
         RecordGifButton.Content = StickyTodo.Core.Localization.Loc.T("gif.record");
+
+        if (gifMode)
+        {
+            var fullScreenTip = StickyTodo.Core.Localization.Loc.T("gif.fullscreenTip");
+
+            FullScreenButton.Content = "▣ " + StickyTodo.Core.Localization.Loc.T("gif.fullscreen");
+            FullScreenButton.ToolTip = fullScreenTip;
+            FullScreenHint.Text = fullScreenTip;
+
+            // 框选仍是默认动作，但提示里写清楚右下角可以直接录全屏
+            Hint.Text = StickyTodo.Core.Localization.Loc.T("gif.regionHint");
+
+            FullScreenPanel.Visibility = Visibility.Visible;
+        }
 
         // 初始：整屏压暗，没有"亮洞"
         ShowFullDim();
@@ -478,7 +510,8 @@ public partial class SnipOverlayWindow : Window
     {
         for (var node = source; node is not null; node = VisualTreeHelper.GetParent(node))
         {
-            if (ReferenceEquals(node, Toolbar))
+            // 右下角的全屏入口也算工具条：点它（含边距）不该被当成框选拖拽
+            if (ReferenceEquals(node, Toolbar) || ReferenceEquals(node, FullScreenPanel))
             {
                 return true;
             }
@@ -534,6 +567,8 @@ public partial class SnipOverlayWindow : Window
     private void Pin_Click(object sender, RoutedEventArgs e) => Pin();
 
     private void RecordGif_Click(object sender, RoutedEventArgs e) => RecordGif();
+
+    private void FullScreen_Click(object sender, RoutedEventArgs e) => RecordGifFullScreen();
 
     // ---------------- 绘制 ----------------
 
@@ -811,6 +846,38 @@ public partial class SnipOverlayWindow : Window
         CommitText();
 
         GifRegion = SelectionScreenRect();
+        Result = null;
+        CopiedOnly = false;
+        DialogResult = true;
+    }
+
+    /// <summary>
+    /// 右下角「全屏」：不框选，直接按整屏录。选区状态全部丢掉，
+    /// 遮罩先关掉（不然会被录进去），录制由 <see cref="Services.GifRecordingService.StartFullScreen"/>
+    /// 接手 —— 多屏选屏、倒计时开关都在那条现成的路径里。
+    /// </summary>
+    public void RecordGifFullScreen()
+    {
+        if (!_gifMode)
+        {
+            return;
+        }
+
+        CommitText();
+
+        _dragging = false;
+        _hasSelection = false;
+        _selection = Rect.Empty;
+        _hadSelectionBeforeReframe = false;
+        _selectionBeforeReframe = Rect.Empty;
+        SelectionBorder.Visibility = Visibility.Collapsed;
+        SizeBadge.Visibility = Visibility.Collapsed;
+        Toolbar.Visibility = Visibility.Collapsed;
+        ClearAnnotations();
+        ShowFullDim();
+
+        GifRegion = null;
+        GifFullScreenRequested = true;
         Result = null;
         CopiedOnly = false;
         DialogResult = true;

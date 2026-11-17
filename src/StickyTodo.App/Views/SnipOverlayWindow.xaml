@@ -153,5 +153,20 @@
                    Foreground="#CCFFFFFF" FontSize="13"
                    HorizontalAlignment="Center" VerticalAlignment="Center"
                    IsHitTestVisible="False" />
+
+        <!-- 录 GIF 专用：右下角常驻的「全屏录制」入口。框选仍是默认，这里不用拖也能直接开录 -->
+        <Border x:Name="FullScreenPanel"
+                HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,18,18"
+                Background="#E6202124" CornerRadius="8" Padding="6,4"
+                BorderBrush="#40FFFFFF" BorderThickness="1"
+                Visibility="Collapsed">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Button x:Name="FullScreenButton" Click="FullScreen_Click" Content="▣ 全屏"
+                        Style="{StaticResource SnipTool}" />
+                <TextBlock x:Name="FullScreenHint" Text="不用框选，直接录整块屏幕"
+                           Foreground="#B0FFFFFF" FontSize="11" VerticalAlignment="Center"
+                           Margin="4,0,4,0" IsHitTestVisible="False" />
+            </StackPanel>
+        </Border>
     </Grid>
 </Window>

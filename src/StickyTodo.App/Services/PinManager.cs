@@ -67,9 +67,17 @@ public sealed class PinManager
     /// </summary>
     public async Task CaptureGifRegionAsync()
     {
-        var overlay = await ShowOverlayAsync();
+        var overlay = await ShowOverlayAsync(gifMode: true);
         if (overlay is null)
         {
+            return;
+        }
+
+        // 遮罩上点了右下角「全屏」：跳过框选，走和托盘「全屏」完全同一条路径
+        if (overlay.GifFullScreenRequested)
+        {
+            Log.Information("[gif] 遮罩上选了全屏录制");
+            _gifs?.StartFullScreen();
             return;
         }
 
@@ -86,7 +94,7 @@ public sealed class PinManager
     /// 抓屏 → 弹遮罩 → 等用户确认。返回遮罩窗口（已确认），取消/在抓屏返回 null。
     /// 整屏 BitBlt 在这台机器上约 100ms：放后台线程抓，UI 不会先冻一下才出遮罩。
     /// </summary>
-    private async Task<SnipOverlayWindow?> ShowOverlayAsync()
+    private async Task<SnipOverlayWindow?> ShowOverlayAsync(bool gifMode = false)
     {
         if (_capturing)
         {
@@ -103,7 +111,7 @@ public sealed class PinManager
                 return null;
             }
 
-            var overlay = new SnipOverlayWindow(screenshot)
+            var overlay = new SnipOverlayWindow(screenshot, gifMode)
             {
                 WindowStartupLocation = WindowStartupLocation.Manual,
             };
