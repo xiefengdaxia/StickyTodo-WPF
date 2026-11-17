@@ -28,114 +28,14 @@
         </Style>
     </Window.Resources>
 
+    <!-- 窗口高度只看时钟本体（NoteRoot）：SizeToContent=Height 量的就是这个 Grid，
+         而快捷列挂在 Canvas 里——Canvas 的期望尺寸恒为 0，图标再多也顶不高窗口 -->
     <Grid>
         <Grid.ColumnDefinitions>
             <!-- 左边这一条固定留给快捷入口：平时滑出去（透明），鼠标移入时钟才滑进来，不会挡住时钟 -->
             <ColumnDefinition Width="44" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
-
-        <!-- ================= 左侧快捷入口：便签 / 番茄 / 性能 / AI 看板 + 看板管理 + 设置 ================= -->
-        <Border x:Name="QuickBar"
-                Grid.Column="0"
-                Width="40"
-                Margin="0,8,0,8"
-                HorizontalAlignment="Left"
-                VerticalAlignment="Center"
-                CornerRadius="12"
-                Background="#CC2B2723"
-                BorderBrush="#33FFFFFF"
-                BorderThickness="1"
-                ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=clock.quick}">
-            <Border.RenderTransform>
-                <TranslateTransform X="-44" />
-            </Border.RenderTransform>
-            <Border.Style>
-                <Style TargetType="Border">
-                    <Setter Property="Opacity" Value="0" />
-                    <Style.Triggers>
-                        <!-- 鼠标进窗口（时钟或这一列）就滑进来；离开就滑出去 -->
-                        <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Window}}"
-                                     Value="True">
-                            <DataTrigger.EnterActions>
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                         To="1" Duration="{StaticResource Motion.Base}"
-                                                         EasingFunction="{StaticResource Motion.Ease}" />
-                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
-                                                         To="0" Duration="{StaticResource Motion.Base}"
-                                                         EasingFunction="{StaticResource Motion.Ease}" />
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </DataTrigger.EnterActions>
-                            <DataTrigger.ExitActions>
-                                <BeginStoryboard>
-                                    <Storyboard>
-                                        <DoubleAnimation Storyboard.TargetProperty="Opacity"
-                                                         To="0" Duration="{StaticResource Motion.Base}"
-                                                         EasingFunction="{StaticResource Motion.Ease}" />
-                                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
-                                                         To="-44" Duration="{StaticResource Motion.Base}"
-                                                         EasingFunction="{StaticResource Motion.Ease}" />
-                                    </Storyboard>
-                                </BeginStoryboard>
-                            </DataTrigger.ExitActions>
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </Border.Style>
-
-            <StackPanel Margin="4,6" MaxHeight="{Binding ActualHeight, ElementName=NoteRoot}">
-                <!-- 固定顺序：便签 → 番茄时钟 → 性能 → 所有 AI 看板；超过可视高度就在这一列里滚动 -->
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled">
-                    <ItemsControl ItemsSource="{Binding QuickItems}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <!-- 前景色跟着皮肤深浅走（QuickInk）：这一列底色固定深色，
-                                     浅色皮肤的 Brush.Ink 是近黑色，直接继承会"图标看不见" -->
-                                <Button Style="{StaticResource Button.Chrome}"
-                                        Width="26" Height="26"
-                                        FontSize="13"
-                                        Focusable="False"
-                                        Margin="0,1"
-                                        Content="{Binding Glyph}"
-                                        Foreground="{Binding DataContext.QuickInk, RelativeSource={RelativeSource AncestorType=Window}}"
-                                        ToolTip="{Binding Name}"
-                                        Click="QuickItem_Click" />
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
-
-                <Border Height="1" Background="#26FFFFFF" Margin="2,4" />
-
-                <!-- 看板管理 -->
-                <Button x:Name="QuickManageButton"
-                        Style="{StaticResource Button.Chrome}"
-                        Width="26" Height="26"
-                        FontSize="13"
-                        Focusable="False"
-                        Margin="0,1"
-                        Content="☰"
-                        Foreground="{Binding QuickInk}"
-                        ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.manage}"
-                        Click="QuickManage_Click" />
-
-                <!-- 设置 -->
-                <Button x:Name="QuickSettingsButton"
-                        Style="{StaticResource Button.Chrome}"
-                        Width="26" Height="26"
-                        FontSize="13"
-                        Focusable="False"
-                        Margin="0,1"
-                        Content="⚙"
-                        Foreground="{Binding QuickInk}"
-                        ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.title}"
-                        Click="QuickSettings_Click" />
-            </StackPanel>
-        </Border>
 
         <Border x:Name="NoteRoot"
                 Grid.Column="1"
@@ -278,5 +178,133 @@
                 </Border>
             </StackPanel>
         </Border>
+
+        <!-- ================= 左侧快捷入口：便签 / 番茄 / 性能 / AI 看板 + 看板管理 + 设置 =================
+             绝对定位的浮层：Canvas 不把子元素的期望尺寸算进自己（Canvas 量出来的永远是 0），
+             所以这一列放进多少图标都不会改变窗口高度；放不下就在列里滚动。
+             ClipToBounds 保证滑出去的那一半不会漏到窗口外面。 -->
+        <Canvas x:Name="QuickLayer"
+                Grid.ColumnSpan="2"
+                ClipToBounds="True">
+            <!-- 尺寸跟着窗口走：Canvas 的子元素不会自动拉伸，套一层跟着 Canvas 大小的 Grid -->
+            <Grid Width="{Binding ActualWidth, ElementName=QuickLayer}"
+                  Height="{Binding ActualHeight, ElementName=QuickLayer}">
+
+                <!-- 高度撑满整块时钟（上下留 8），内容再多也只在列里滚动 -->
+                <Border x:Name="QuickBar"
+                        Width="40"
+                        Margin="0,8"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Stretch"
+                        CornerRadius="12"
+                        Background="#CC2B2723"
+                        BorderBrush="#33FFFFFF"
+                        BorderThickness="1"
+                        ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=clock.quick}">
+                    <Border.RenderTransform>
+                        <TranslateTransform X="-44" />
+                    </Border.RenderTransform>
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Opacity" Value="0" />
+                            <Style.Triggers>
+                                <!-- 鼠标进窗口（时钟或这一列）就滑进来；离开就滑出去 -->
+                                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Window}}"
+                                             Value="True">
+                                    <DataTrigger.EnterActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                 To="1" Duration="{StaticResource Motion.Base}"
+                                                                 EasingFunction="{StaticResource Motion.Ease}" />
+                                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                                                                 To="0" Duration="{StaticResource Motion.Base}"
+                                                                 EasingFunction="{StaticResource Motion.Ease}" />
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </DataTrigger.EnterActions>
+                                    <DataTrigger.ExitActions>
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                 To="0" Duration="{StaticResource Motion.Base}"
+                                                                 EasingFunction="{StaticResource Motion.Ease}" />
+                                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
+                                                                 To="-44" Duration="{StaticResource Motion.Base}"
+                                                                 EasingFunction="{StaticResource Motion.Ease}" />
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </DataTrigger.ExitActions>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+
+                    <!-- 用 Grid 而不是 StackPanel：星号行把剩余高度分给滚动区，
+                         图标放不下就在这一列里滚，而不是把窗口顶高 -->
+                    <Grid Margin="4,6">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- 固定顺序：便签 → 番茄时钟 → 性能 → 所有 AI 看板。
+                             这一列只有 40 宽，默认滚动条会把 26 的图标挤扁，所以不显示滚动条，
+                             放不下的用滚轮翻（Hidden 仍然可以滚）。 -->
+                        <ScrollViewer Grid.Row="0"
+                                      VerticalScrollBarVisibility="Hidden"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl ItemsSource="{Binding QuickItems}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <!-- 前景色跟着皮肤深浅走（QuickInk）：这一列底色固定深色，
+                                             浅色皮肤的 Brush.Ink 是近黑色，直接继承会"图标看不见" -->
+                                        <Button Style="{StaticResource Button.Chrome}"
+                                                Width="26" Height="26"
+                                                FontSize="13"
+                                                Focusable="False"
+                                                Margin="0,1"
+                                                Content="{Binding Glyph}"
+                                                Foreground="{Binding DataContext.QuickInk, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                ToolTip="{Binding Name}"
+                                                Click="QuickItem_Click" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+
+                        <Border Grid.Row="1" Height="1" Background="#26FFFFFF" Margin="2,4" />
+
+                        <!-- 看板管理 -->
+                        <Button x:Name="QuickManageButton"
+                                Grid.Row="2"
+                                Style="{StaticResource Button.Chrome}"
+                                Width="26" Height="26"
+                                FontSize="13"
+                                Focusable="False"
+                                Margin="0,1"
+                                Content="☰"
+                                Foreground="{Binding QuickInk}"
+                                ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.manage}"
+                                Click="QuickManage_Click" />
+
+                        <!-- 设置 -->
+                        <Button x:Name="QuickSettingsButton"
+                                Grid.Row="3"
+                                Style="{StaticResource Button.Chrome}"
+                                Width="26" Height="26"
+                                FontSize="13"
+                                Focusable="False"
+                                Margin="0,1"
+                                Content="⚙"
+                                Foreground="{Binding QuickInk}"
+                                ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.title}"
+                                Click="QuickSettings_Click" />
+                    </Grid>
+                </Border>
+            </Grid>
+        </Canvas>
     </Grid>
 </Window>
