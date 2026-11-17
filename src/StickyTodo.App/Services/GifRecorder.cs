@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
 using Serilog;
@@ -61,6 +60,8 @@ public static class GifQualityPresets
 ///
 /// 抓帧用 GDI 的 CopyFromScreen **直接抓录制区域**：这台机器整屏一次 BitBlt 约 108ms，
 /// 先抓整屏再裁的话 20fps 根本跑不动。抓到的帧按清晰度档位缩放（默认不缩）并转成 BGRA 存内存。
+/// 缩放走 <see cref="GifResampler"/>（Lanczos3 + 轻锐化），比 GDI 的双线性清晰得多。
+/// 编码时开帧差分 / 相同帧合并 / 脏像素剔除，同样时长体积能小一大截。
 ///
 /// 分辨率就是录制区域的**物理像素**：1920×1080 的区域，抓到的位图也是 1920×1080。
 /// 只有「中 / 小文件」两档在原始尺寸更大时才缩到长边 1280 / 960，永远不放大。
@@ -284,26 +285,15 @@ public sealed class GifRecorder : IDisposable
             downscale ? "（按档位缩小）" : "（原始分辨率）");
 
         Bitmap? raw = null;
-        Bitmap? scaled = null;
+
+        // 缩放在托管侧做（Lanczos3 + 轻锐化）：GDI+ 的双线性会让文字边缘糊成一片灰
+        var needsResize = targetWidth != region.Width || targetHeight != region.Height;
 
         try
         {
             raw = new Bitmap(region.Width, region.Height, PixelFormat.Format32bppArgb);
 
-            if (targetWidth != region.Width || targetHeight != region.Height)
-            {
-                scaled = new Bitmap(targetWidth, targetHeight, PixelFormat.Format32bppArgb);
-            }
-
             using var rawGraphics = Graphics.FromImage(raw);
-            using var scaledGraphics = scaled is null ? null : Graphics.FromImage(scaled);
-
-            if (scaledGraphics is not null)
-            {
-                scaledGraphics.InterpolationMode = InterpolationMode.Bilinear;
-                scaledGraphics.PixelOffsetMode = PixelOffsetMode.Half;
-                scaledGraphics.CompositingMode = CompositingMode.SourceCopy;
-            }
 
             var clock = Stopwatch.StartNew();
             var failedFrames = 0;
@@ -329,28 +319,19 @@ public sealed class GifRecorder : IDisposable
                         GifCursorPainter.Draw(rawGraphics, region);
                     }
 
-                    Bitmap source;
-                    if (scaled is not null && scaledGraphics is not null)
-                    {
-                        scaledGraphics.DrawImage(
-                            raw,
-                            new Rectangle(0, 0, targetWidth, targetHeight),
-                            0, 0, raw.Width, raw.Height,
-                            GraphicsUnit.Pixel);
-                        source = scaled;
-                    }
-                    else
-                    {
-                        source = raw;
-                    }
+                    var frameBgra = CopyToBgra(raw);
 
-                    var bgra = CopyToBgra(source);
+                    if (needsResize)
+                    {
+                        frameBgra = GifResampler.Resize(
+                            frameBgra, raw.Width, raw.Height, targetWidth, targetHeight);
+                    }
 
                     // 抽帧只影响帧率，分辨率不动
                     if (thin <= 1 || captured % thin == 0)
                     {
-                        PushFrame(new GifFrame(bgra, targetWidth, targetHeight, interval), frameStart);
-                        bufferedBytes += bgra.Length;
+                        PushFrame(new GifFrame(frameBgra, targetWidth, targetHeight, interval), frameStart);
+                        bufferedBytes += frameBgra.Length;
                     }
 
                     captured++;
@@ -426,7 +407,6 @@ public sealed class GifRecorder : IDisposable
         }
         finally
         {
-            scaled?.Dispose();
             raw?.Dispose();
         }
 
@@ -582,13 +562,16 @@ public sealed class GifRecorder : IDisposable
                 var samples = GifEncoder.SampleFrames(frames, 12);
                 var palette = GifEncoder.BuildPalette(samples, preset.Colors);
 
-                var indexed = new List<(byte[] Indices, int DelayMs)>(count);
-                foreach (var frame in frames)
+                // 录屏的省体积三招：帧差分 / 相同帧合并 / 脏像素剔除（抖动关掉，纯色界面抖动只会涨体积）
+                var options = new GifEncodeOptions
                 {
-                    indexed.Add((GifEncoder.Quantize(palette, frame.Bgra, width, height), frame.DelayMs));
-                }
+                    FrameDiff = true,
+                    MergeIdenticalFrames = true,
+                    LossyThreshold = 8,
+                    Dither = false,
+                };
 
-                var gif = GifEncoder.Encode(width, height, indexed, palette, loopCount: 0);
+                var gif = GifEncoder.Encode(frames, palette, loopCount: 0, options);
 
                 LastSize = new Size(width, height);
 
