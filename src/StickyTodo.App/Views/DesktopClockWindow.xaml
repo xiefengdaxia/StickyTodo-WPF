@@ -260,10 +260,14 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <!-- 前景色跟着皮肤深浅走（QuickInk）：这一列底色固定深色，
-                                             浅色皮肤的 Brush.Ink 是近黑色，直接继承会"图标看不见" -->
+                                             浅色皮肤的 Brush.Ink 是近黑色，直接继承会"图标看不见"。
+                                             字体走 BoardIcons（Segoe UI Symbol + Ideal 排版）：
+                                             彩色 emoji 在这个 26×26 的方格里只露半个笔画。 -->
                                         <Button Style="{StaticResource Button.Chrome}"
                                                 Width="26" Height="26"
                                                 FontSize="13"
+                                                FontFamily="{Binding GlyphFont}"
+                                                TextOptions.TextFormattingMode="Ideal"
                                                 Focusable="False"
                                                 Margin="0,1"
                                                 Content="{Binding Glyph}"

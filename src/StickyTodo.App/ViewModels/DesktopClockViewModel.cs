@@ -84,6 +84,10 @@ public sealed partial class DesktopClockViewModel : ObservableObject
 
         // 看板开了/关了，左侧快捷入口跟着重列
         _windows.BoardsChanged += OnBoardsChanged;
+
+        // 换了看板图标：这一列也要跟着换，不然只有管理面板变了
+        _settings.SettingChanged += OnSettingChanged;
+
         ReloadQuickItems();
     }
 
@@ -93,9 +97,20 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         _speedMonitor?.Dispose();
         _speedMonitor = null;
         _windows.BoardsChanged -= OnBoardsChanged;
+        _settings.SettingChanged -= OnSettingChanged;
     }
 
     private void OnBoardsChanged(object? sender, EventArgs e) => ReloadQuickItems();
+
+    /// <summary>只在「某个 AI 看板的图标」被改写时重列（其余设置跟这一列无关）。</summary>
+    private void OnSettingChanged(string key)
+    {
+        if (key.StartsWith("board.", StringComparison.Ordinal)
+            && key.EndsWith(".icon", StringComparison.Ordinal))
+        {
+            ReloadQuickItems();
+        }
+    }
 
     // ---------- 每秒刷新的时间文本 ----------
 
@@ -378,10 +393,10 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         QuickItems.Add(ClockQuickItem.Pomodoro(Loc.T("clock.quickPomodoro")));
         QuickItems.Add(ClockQuickItem.ForKind(BoardKind.Performance, Loc.T("clock.quickPerformance")));
 
-        // 所有 AI 看板：一块一块列出来，点哪个开哪个
+        // 所有 AI 看板：一块一块列出来，点哪个开哪个（图标就是管理面板里选的那个）
         foreach (var board in _todos.GetBoards().Where(b => b.Kind == BoardKind.Custom))
         {
-            QuickItems.Add(ClockQuickItem.ForBoard(board));
+            QuickItems.Add(ClockQuickItem.ForBoard(board, _settings));
         }
     }
 
@@ -630,38 +645,50 @@ public enum ClockQuickAction
 /// <summary>桌面时钟左侧快捷入口的一行：类型图标 + 名称 + 点下去要做什么。</summary>
 public sealed class ClockQuickItem
 {
-    private ClockQuickItem(string name, string glyph, ClockQuickAction action, BoardKind kind, Board? board)
+    private ClockQuickItem(string name, BoardGlyph icon, ClockQuickAction action, BoardKind kind, Board? board)
     {
         Name = name;
-        Glyph = glyph;
+        Icon = icon;
         Action = action;
         Kind = kind;
         Board = board;
     }
 
-    /// <summary>按看板类型建一行（图标复用「看板管理」那一套字符，两处看到的是同一组图形）。</summary>
+    /// <summary>按看板类型建一行（图标走 <see cref="BoardIcons"/>，和管理面板同一份）。</summary>
     public static ClockQuickItem ForKind(BoardKind kind, string name) =>
-        new(name, GlyphOf(kind), ClockQuickAction.Kind, kind, board: null);
+        new(name, BoardIcons.ForKind(kind), ClockQuickAction.Kind, kind, board: null);
 
-    /// <summary>某一块具体的看板（AI 看板用它的名字和图标）。</summary>
-    public static ClockQuickItem ForBoard(Board board) =>
-        new(board.Name, GlyphOf(board.Kind), ClockQuickAction.Board, board.Kind, board);
+    /// <summary>
+    /// 某一块具体的看板：AI 看板用它自己选的图标（和设置里存的是同一个 key），
+    /// 换图标后管理面板和这一列画出来的仍是同一个字形。
+    /// </summary>
+    public static ClockQuickItem ForBoard(Board board, AppSettingsService? settings = null) =>
+        new(
+            board.Name,
+            board.Kind == BoardKind.Custom && settings is not null
+                ? BoardIcons.Resolve(settings.GetBoardIcon(board.Id))
+                : BoardIcons.ForKind(board.Kind),
+            ClockQuickAction.Board,
+            board.Kind,
+            board);
 
     /// <summary>番茄时钟：窗口不在看板体系里，单列一种动作。</summary>
     public static ClockQuickItem Pomodoro(string name) =>
-        new(name, "🍅", ClockQuickAction.Pomodoro, BoardKind.Todo, board: null);
+        new(name, BoardIcons.Pomodoro, ClockQuickAction.Pomodoro, BoardKind.Todo, board: null);
 
     public Board? Board { get; }
 
     public string Name { get; }
 
-    public string Glyph { get; }
+    public BoardGlyph Icon { get; }
+
+    public string Glyph => Icon.Glyph;
+
+    /// <summary>画 <see cref="Glyph"/> 用的字体（单色符号字体）。</summary>
+    public FontFamily GlyphFont => Icon.Font;
 
     public ClockQuickAction Action { get; }
 
     /// <summary>动作是「按类型打开」时用哪个类型。</summary>
     public BoardKind Kind { get; }
-
-    /// <summary>类型图标：借 BoardRowViewModel 那一套，省得两处图形走样。</summary>
-    private static string GlyphOf(BoardKind kind) => BoardRowViewModel.GlyphFor(kind);
 }

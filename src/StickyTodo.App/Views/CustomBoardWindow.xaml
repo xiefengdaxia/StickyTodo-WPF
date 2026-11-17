@@ -57,7 +57,10 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="✨" FontSize="12" VerticalAlignment="Center" />
+                        <!-- 图标就是管理面板里选的那个（同一个 key、同一份符号字体） -->
+                        <TextBlock Text="{Binding Glyph}" FontFamily="{Binding GlyphFont}"
+                                   TextOptions.TextFormattingMode="Ideal"
+                                   FontSize="12" VerticalAlignment="Center" />
                         <TextBlock Text="{Binding BoardName}" Style="{StaticResource Text.Title}"
                                    Margin="6,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                     </StackPanel>

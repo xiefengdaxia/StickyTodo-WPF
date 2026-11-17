@@ -43,6 +43,13 @@ public sealed class AppSettingsService
         _repository = repository;
     }
 
+    /// <summary>
+    /// 某条设置刚被写进库，参数是设置的完整键（<c>board.{id}.icon</c> 这类）。
+    /// 只给「改完别处要跟着重画」的场景用（比如桌面时钟列的图标），
+    /// 订阅方自己按 key 前缀过滤，别在这里做重活。
+    /// </summary>
+    public event Action<string>? SettingChanged;
+
     public static string BoardTopmostKey(string boardId) => $"board.{boardId}.topmost";
 
     public static string BoardLockedKey(string boardId) => $"board.{boardId}.locked";
@@ -215,19 +222,22 @@ public sealed class AppSettingsService
     /// <summary>AI 看板图标存在这个键下：<c>board.{id}.icon</c>（只存设置，不动数据库表结构）。</summary>
     public static string BoardIconKey(string boardId) => $"board.{boardId}.icon";
 
-    /// <summary>缺省图标（没设过、值被清掉时都用它）。</summary>
-    public const string DefaultBoardIcon = "✨";
+    /// <summary>缺省图标的 key（没设过、值被清掉、存了认不出的值都用它）。</summary>
+    public const string DefaultBoardIcon = "star";
 
     /// <summary>
-    /// AI 看板可换的预设图标。存的是一个 emoji 字符，管理面板的列表 / 图标网格
-    /// 都直接用这个字符串画，所以不需要额外的图形资源。
+    /// AI 看板可换的预设图标 key（18 个）。这里只存 key，不存字符：
+    /// 字符与字体由 App 侧的 <c>BoardIcons</c> 统一映射，
+    /// 同一个 key 在管理面板、桌面时钟列画出来的是同一个字形。
+    /// （旧版本存过 emoji，<c>BoardIcons.Resolve</c> 会把它们折算回 key。）
     /// </summary>
     public static readonly IReadOnlyList<string> BoardIconPresets =
     [
-        "✨", "🧩", "📊", "📈", "🧠", "🎯", "🔧", "🎨", "🔔", "🚀", "💡", "🗂",
+        "star", "grid", "chart", "trend", "bulb", "target", "gear", "palette", "bell",
+        "rocket", "doc", "clock", "heart", "flag", "book", "music", "sun", "moon",
     ];
 
-    /// <summary>取某个 AI 看板的图标：没设过或存了空值都回落 ✨。</summary>
+    /// <summary>取某个 AI 看板的图标 key：没设过或存了空值都回落 <see cref="DefaultBoardIcon"/>。</summary>
     public string GetBoardIcon(string boardId)
     {
         var raw = GetString(BoardIconKey(boardId), null);
@@ -687,6 +697,9 @@ public sealed class AppSettingsService
                 _settingsCache[key] = value;
             }
         }
+
+        // 缓存已经更新完，订阅方这时候读到的就是新值；放在锁外，避免订阅方读设置时自我死锁
+        SettingChanged?.Invoke(key);
     }
 
     private bool GetBool(string key, bool fallback)

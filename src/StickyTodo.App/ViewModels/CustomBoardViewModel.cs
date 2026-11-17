@@ -71,6 +71,30 @@ public partial class CustomBoardViewModel : ObservableObject, IAppearanceHost
     [ObservableProperty]
     private bool _isLocked;
 
+    // ---------------- 标题栏图标 ----------------
+
+    private BoardGlyph Icon => BoardIcons.Resolve(_settings.GetBoardIcon(_board.Id));
+
+    /// <summary>标题栏图标：管理面板里选的那个 key，走 <see cref="BoardIcons"/> 同一份字形。</summary>
+    public string Glyph => Icon.Glyph;
+
+    /// <summary>画 <see cref="Glyph"/> 的字体（单色符号字体）。</summary>
+    public FontFamily GlyphFont => Icon.Font;
+
+    /// <summary>换了图标要重画标题栏；窗口关闭时记得 <see cref="StopIconWatch"/>。</summary>
+    public void StartIconWatch() => _settings.SettingChanged += OnSettingChanged;
+
+    public void StopIconWatch() => _settings.SettingChanged -= OnSettingChanged;
+
+    private void OnSettingChanged(string key)
+    {
+        if (string.Equals(key, AppSettingsService.BoardIconKey(_board.Id), StringComparison.Ordinal))
+        {
+            OnPropertyChanged(nameof(Glyph));
+            OnPropertyChanged(nameof(GlyphFont));
+        }
+    }
+
     public void ToggleTopmost()
     {
         IsTopmost = !IsTopmost;

@@ -102,6 +102,8 @@
                 Margin="0,0,11,0">
             <TextBlock Text="{Binding KindGlyph}"
                        FontSize="15"
+                       FontFamily="{Binding KindGlyphFont}"
+                       TextOptions.TextFormattingMode="Ideal"
                        HorizontalAlignment="Center"
                        VerticalAlignment="Center"
                        Foreground="{DynamicResource Brush.Accent}" />
@@ -202,6 +204,7 @@
 <DataTemplate x:Key="BoardTileTemplate">
     <StackPanel VerticalAlignment="Center">
         <TextBlock Text="{Binding KindGlyph}" FontSize="24"
+                   FontFamily="{Binding KindGlyphFont}" TextOptions.TextFormattingMode="Ideal"
                    HorizontalAlignment="Center" Foreground="{DynamicResource Brush.Accent}" />
         <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" Margin="0,8,0,0"
                    HorizontalAlignment="Center" TextAlignment="Center"

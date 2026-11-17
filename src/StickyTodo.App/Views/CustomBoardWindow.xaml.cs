@@ -44,7 +44,13 @@ public partial class CustomBoardWindow : Window
             await InitializeWebAsync();
             ApplyLockInteraction();
         };
-        Closed += (_, _) => DetachCollector();
+        _viewModel.StartIconWatch();
+
+        Closed += (_, _) =>
+        {
+            DetachCollector();
+            _viewModel.StopIconWatch();
+        };
     }
 
     /// <summary>WindowManager 组装窗口后注入采集器（订阅数据变化 + 刷新按钮用）。</summary>

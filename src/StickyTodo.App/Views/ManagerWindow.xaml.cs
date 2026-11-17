@@ -1,8 +1,10 @@
 ﻿using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media;
 using StickyTodo.App.Services;
 using StickyTodo.App.ViewModels;
 using StickyTodo.Core.Entities;
@@ -539,8 +541,9 @@ public partial class ManagerWindow : Window
     /// <summary>右键先把被点的那张卡片选中，菜单动作才能作用到正确的看板。</summary>
     private void BoardList_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
-        var item = FindAncestor<System.Windows.Controls.ListBoxItem>(e.OriginalSource as DependencyObject);
+        var item = FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject);
         _contextRow = item?.DataContext as BoardRowViewModel;
+        _contextItem = item;
 
         if (item is not null)
         {
@@ -627,38 +630,48 @@ public partial class ManagerWindow : Window
     /// <summary>当前张开的图标选择板（同一时刻只留一个）。</summary>
     private System.Windows.Controls.Primitives.Popup? _iconPicker;
 
+    /// <summary>右键点中的那张卡片：图标选择板贴在它上面弹，菜单收起后它还在。</summary>
+    private ListBoxItem? _contextItem;
+
     /// <summary>
-    /// 图标选择板：12 个预设 emoji 平铺，点一下就写设置并重画这一行。
+    /// 图标选择板：18 个预设图标按 6 列平铺，点一下就写设置并重画这一行。
     /// 用 <see cref="System.Windows.Controls.Primitives.Popup"/> 而不是新窗口——
     /// 不需要额外窗口的生命周期，点外面自动收起，列表 / 图标网格两种视图走的是同一份菜单。
+    /// 图标本身是单色符号 + Segoe UI Symbol（见 <see cref="BoardIcons"/>），
+    /// 每格 44×44，全部 18 个都放得下、点得到。
     /// </summary>
     private void ShowIconPicker(BoardRowViewModel row)
     {
         CloseIconPicker();
 
-        var grid = new System.Windows.Controls.WrapPanel { Width = 208, Margin = new Thickness(2) };
+        const double cell = 44;
+        const double gap = 4;
 
-        var popup = new System.Windows.Controls.Primitives.Popup
-        {
-            AllowsTransparency = true,
-            StaysOpen = false,
-            Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint,
-            PlacementTarget = BoardList,
-        };
+        // 6 列固定列宽：行数只跟预设个数走，不会被窗口宽度挤成"显示不全"
+        var grid = new UniformGrid { Columns = 6, Rows = 0, Margin = new Thickness(gap / 2) };
 
-        foreach (var icon in StickyTodo.Core.Services.AppSettingsService.BoardIconPresets)
+        foreach (var preset in BoardIcons.Presets)
         {
             var button = new Button
             {
-                Content = icon,
-                Width = 36,
-                Height = 34,
-                FontSize = 15,
-                Margin = new Thickness(2),
+                Content = preset.Text,
+                Width = cell - gap,
+                Height = cell - gap,
+                Margin = new Thickness(gap / 2),
+                Padding = new Thickness(0),
+                FontSize = BoardIcons.GlyphSize,
+                FontFamily = preset.Font,
+                Foreground = (System.Windows.Media.Brush)FindResource("Brush.Accent"),
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                ToolTip = preset.Name,
                 Style = (Style)FindResource("Button.Ghost"),
             };
 
-            var chosen = icon;
+            // 符号字体必须按 Ideal 排版：Display 模式对齐像素网格，几何字符会被削掉边角
+            TextOptions.SetTextFormattingMode(button, TextFormattingMode.Ideal);
+
+            var chosen = preset.Key;
             button.Click += (_, _) =>
             {
                 CloseIconPicker();
@@ -667,6 +680,28 @@ public partial class ManagerWindow : Window
 
             grid.Children.Add(button);
         }
+
+        // 3 行 44 刚好 136；屏幕再矮就在板子里滚，不会有画不出来的图标
+        var scroller = new ScrollViewer
+        {
+            Content = grid,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            MaxHeight = 3 * cell + gap * 2,
+            Focusable = false,
+        };
+
+        // 贴着点中的那张卡片摊开（没有具体卡片时退回整个列表）
+        var anchor = _contextItem ?? (UIElement)BoardList;
+
+        var popup = new System.Windows.Controls.Primitives.Popup
+        {
+            AllowsTransparency = true,
+            StaysOpen = false,
+            Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom,
+            HorizontalOffset = 12,
+            PlacementTarget = anchor,
+        };
 
         popup.Child = new Border
         {
@@ -683,11 +718,13 @@ public partial class ManagerWindow : Window
                 Color = System.Windows.Media.Colors.Black,
                 Direction = 270,
             },
-            Child = grid,
+            Child = scroller,
         };
 
         popup.Closed += (_, _) =>
         {
+            _contextItem = null;
+
             if (ReferenceEquals(_iconPicker, popup))
             {
                 _iconPicker = null;
@@ -695,7 +732,18 @@ public partial class ManagerWindow : Window
         };
 
         _iconPicker = popup;
-        popup.IsOpen = true;
+
+        // 点菜单的那一下鼠标还按着，立刻 IsOpen 会被 StaysOpen=false 当场关掉，
+        // 排到下一轮输入消息里再开，弹窗才留得住
+        Dispatcher.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.Input,
+            new Action(() =>
+            {
+                if (ReferenceEquals(_iconPicker, popup))
+                {
+                    popup.IsOpen = true;
+                }
+            }));
     }
 
     private void CloseIconPicker()

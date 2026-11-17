@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
+using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using StickyTodo.App.Services;
 using StickyTodo.Core.Entities;
@@ -42,11 +43,17 @@ public sealed class BoardRowViewModel : ObservableObject
 
     /// <summary>
     /// 卡片左侧的类型图标。AI 看板（Custom）的图标可以在管理面板里换，
-    /// 存在设置键 <c>board.{id}.icon</c> 里；没设过仍是 ✨。
+    /// 存在设置键 <c>board.{id}.icon</c> 里；没设过是缺省 key <c>star</c>。
+    /// 字形与字体都从 <see cref="BoardIcons"/> 取，和桌面时钟列画的一样。
     /// </summary>
-    public string KindGlyph => Board.Kind == BoardKind.Custom && _settings is not null
-        ? _settings.GetBoardIcon(Board.Id)
-        : GlyphFor(Board.Kind);
+    private BoardGlyph Icon => Board.Kind == BoardKind.Custom && _settings is not null
+        ? BoardIcons.Resolve(_settings.GetBoardIcon(Board.Id))
+        : BoardIcons.ForKind(Board.Kind);
+
+    public string KindGlyph => Icon.Glyph;
+
+    /// <summary>画 <see cref="KindGlyph"/> 用的字体（单色符号字体，不是彩色 emoji）。</summary>
+    public FontFamily KindGlyphFont => Icon.Font;
 
     /// <summary>只有 AI 看板能换图标（其余类型各有固定图形，换了会认不出来）。</summary>
     public bool CanChangeIcon => Board.Kind == BoardKind.Custom;
@@ -61,22 +68,8 @@ public sealed class BoardRowViewModel : ObservableObject
 
         _settings.SetBoardIcon(Board.Id, icon);
         OnPropertyChanged(nameof(KindGlyph));
+        OnPropertyChanged(nameof(KindGlyphFont));
     }
-
-    /// <summary>类型 → 图标。桌面时钟的快捷入口也用这一套，两处看到的是同一组图形。</summary>
-    public static string GlyphFor(BoardKind kind) => kind switch
-    {
-        BoardKind.Memo => "✎",
-        BoardKind.Calendar => "▦",
-        BoardKind.Token => "◎",
-        BoardKind.Weather => "🌤",
-        BoardKind.WorldClock => "🌍",
-        BoardKind.DesktopClock => "🕔",
-        BoardKind.NetworkSpeed => "📶",
-        BoardKind.Performance => "📈",
-        BoardKind.Custom => "✨",
-        _ => "✓",
-    };
 
     public bool IsMemo => Board.Kind == BoardKind.Memo;
 
