@@ -46,8 +46,14 @@
                                    Margin="6,0,0,0" VerticalAlignment="Center" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Button x:Name="PinButton" Style="{StaticResource Button.Chrome}" Content="📌" FontSize="11"
+                                ToolTip="置顶（其它窗口不会盖住它）" />
+                        <Button x:Name="LockButton" Style="{StaticResource Button.Chrome}" Content="🔓" FontSize="11"
+                                ToolTip="锁定穿透（锁定后点不到，用同一位置的小锁解锁）" />
                         <Button Style="{StaticResource Button.Chrome}" Content="🎨" FontSize="11"
                                 ToolTip="皮肤与透明度" Click="Appearance_Click" />
+                        <Button x:Name="ManageButton" Style="{StaticResource Button.Chrome}" Content="☰" FontSize="11"
+                                ToolTip="看板管理" />
                         <Button Style="{StaticResource Button.Chrome}" Content="✕" FontSize="11"
                                 ToolTip="关闭" Click="Close_Click" />
                     </StackPanel>

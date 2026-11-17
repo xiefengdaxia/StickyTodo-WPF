@@ -215,7 +215,7 @@ public sealed class McpProtocolHandlerTests : DatabaseTestBase
     {
         Assert.Equal("custom", BoardKinds.ToStorage(BoardKind.Custom));
         Assert.Equal(BoardKind.Custom, BoardKinds.Parse("custom"));
-        Assert.Equal("自定义看板", BoardKinds.DisplayName(BoardKind.Custom));
+        Assert.Equal("AI 看板", BoardKinds.DisplayName(BoardKind.Custom));
         Assert.False(BoardKinds.IsToolBoard(BoardKind.Custom));
     }
 

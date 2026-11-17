@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -78,6 +79,10 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         _timer.Start();
         _ = LoadWeatherAsync();
         _ = RefreshNetworkSpeedAsync();
+
+        // 看板开了/关了，左侧快捷入口跟着重列
+        _windows.BoardsChanged += OnBoardsChanged;
+        ReloadQuickItems();
     }
 
     public void Stop()
@@ -85,7 +90,10 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         _timer.Stop();
         _speedMonitor?.Dispose();
         _speedMonitor = null;
+        _windows.BoardsChanged -= OnBoardsChanged;
     }
+
+    private void OnBoardsChanged(object? sender, EventArgs e) => ReloadQuickItems();
 
     // ---------- 每秒刷新的时间文本 ----------
 
@@ -321,6 +329,25 @@ public sealed partial class DesktopClockViewModel : ObservableObject
     /// <summary>点网速区域：打开网速看板；已经开着就关掉。</summary>
     public void ToggleNetworkSpeedBoard() => ToggleBoard(BoardKind.NetworkSpeed, "网速");
 
+    // ---------------- 左侧快捷入口 ----------------
+
+    /// <summary>快捷入口里列出的一列：当前打开着的看板（按看板列表的顺序）。</summary>
+    public ObservableCollection<ClockQuickItem> QuickItems { get; } = new();
+
+    /// <summary>重列快捷入口。看板开着/关掉都要重列一次，否则这一列是旧的。</summary>
+    public void ReloadQuickItems()
+    {
+        QuickItems.Clear();
+
+        foreach (var board in _todos.GetBoards().Where(b => _windows.IsBoardOpen(b.Id)))
+        {
+            QuickItems.Add(new ClockQuickItem(board));
+        }
+    }
+
+    /// <summary>点快捷入口里的图标：把那个看板置前（已经开着，所以只会被激活）。</summary>
+    public void OpenBoardFromQuick(ClockQuickItem item) => _windows.OpenBoard(item.Board);
+
     /// <summary>
     /// 贴边打开 / 关闭对应看板：没开就建好并贴在时钟旁边，已经开着就关掉。
     /// </summary>
@@ -509,4 +536,23 @@ public sealed partial class DesktopClockViewModel : ObservableObject
         WeatherLine = $"{city} 暂无天气数据";
         WeatherDetail = outcome.Error ?? "60 秒后自动重试";
     }
+}
+
+/// <summary>桌面时钟左侧快捷入口的一行：看板类型图标 + 名称。</summary>
+public sealed class ClockQuickItem
+{
+    public ClockQuickItem(Board board)
+    {
+        Board = board;
+        Name = board.Name;
+
+        // 图标刻意复用「看板管理」列表那一套字符，两处看到的是同一组图形
+        Glyph = new BoardRowViewModel(board, pending: 0, done: 0).KindGlyph;
+    }
+
+    public Board Board { get; }
+
+    public string Name { get; }
+
+    public string Glyph { get; }
 }

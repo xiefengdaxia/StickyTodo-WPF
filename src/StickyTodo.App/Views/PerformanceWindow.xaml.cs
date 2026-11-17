@@ -25,6 +25,8 @@ public partial class PerformanceWindow : Window
         InitializeComponent();
         DataContext = viewModel;
 
+        ToolBoardChrome.Attach(this, board, PinButton, LockButton, ManageButton);
+
         Loaded += (_, _) => App.ApplyToolWindowOpacity(this);
 
         Loaded += (_, _) =>

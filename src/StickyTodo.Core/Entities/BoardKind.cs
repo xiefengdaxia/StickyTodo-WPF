@@ -66,7 +66,7 @@ public static class BoardKinds
         BoardKind.DesktopClock => "桌面时钟",
         BoardKind.NetworkSpeed => "网速",
         BoardKind.Performance => "性能",
-        BoardKind.Custom => "自定义看板",
+        BoardKind.Custom => "AI 看板",
         _ => "待办看板",
     };
 

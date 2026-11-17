@@ -118,7 +118,7 @@
                             </TextBlock>
                         </Button>
                         <Button Style="{StaticResource Button.Chrome}" Content="🎨" FontSize="11" ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.appearance}" Click="Appearance_Click" />
-                        <Button Style="{StaticResource Button.Chrome}" Content="⋯" FontSize="13" ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.manage}" Click="OpenManager_Click" />
+                        <Button Style="{StaticResource Button.Chrome}" Content="☰" FontSize="11" ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.manage}" Click="OpenManager_Click" />
                         <Button Style="{StaticResource Button.Chrome}" Content="✕" FontSize="11" ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.close}" Click="Close_Click" />
                     </StackPanel>
                 </Grid>

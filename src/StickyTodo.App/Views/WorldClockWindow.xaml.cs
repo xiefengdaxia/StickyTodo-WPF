@@ -19,6 +19,8 @@ public partial class WorldClockWindow : Window
         InitializeComponent();
         DataContext = viewModel;
 
+        ToolBoardChrome.Attach(this, board, PinButton, LockButton, ManageButton);
+
         // 位置在窗口可见之前就摆好（SourceInitialized 时句柄已建、还没画出来），
         // 放到 Loaded 里会先闪一下默认位置
         SourceInitialized += (_, _) =>

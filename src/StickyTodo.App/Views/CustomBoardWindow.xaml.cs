@@ -503,6 +503,10 @@ public partial class CustomBoardWindow : Window
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 
+    /// <summary>标题栏 ☰：打开看板管理面板（和其它看板同一个入口）。</summary>
+    private void OpenManager_Click(object sender, RoutedEventArgs e) =>
+        (System.Windows.Application.Current.MainWindow as ManagerWindow)?.ShowAndActivate();
+
     // ---------------- 外观：皮肤 + 透明度（🎨 按钮，与待办/便签看板共用一套菜单） ----------------
 
     private void Appearance_Click(object sender, RoutedEventArgs e)

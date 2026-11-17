@@ -285,6 +285,14 @@ public sealed class AppSettingsService
 
     /// <summary>便签默认置顶，符合“贴纸感”。</summary>
     public bool GetBoardTopmost(string boardId) => GetBool(BoardTopmostKey(boardId), true);
+
+    /// <summary>
+    /// 这个看板的置顶状态有没有被用户显式设过。
+    /// 工具窗原先没有置顶概念，靠它区分"没设过（保持原样）"和"用户点过 📌"。
+    /// </summary>
+    public bool HasBoardTopmost(string boardId) =>
+        !string.IsNullOrWhiteSpace(GetString(BoardTopmostKey(boardId), null));
+
     public void SetBoardTopmost(string boardId, bool value) =>
         SetSetting(BoardTopmostKey(boardId), value ? "1" : "0");
 

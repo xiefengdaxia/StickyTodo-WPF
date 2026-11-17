@@ -205,6 +205,12 @@
                                 Click="Appearance_Click" />
 
                         <Button Style="{StaticResource Button.Chrome}"
+                                Content="☰"
+                                FontSize="11"
+                                ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.manageAndTags}"
+                                Click="OpenManager_Click" />
+
+                        <Button Style="{StaticResource Button.Chrome}"
                                 Content="🔍"
                                 FontSize="11"
                                 ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=board.searchTip}"
@@ -226,12 +232,6 @@
                                 </ContextMenu>
                             </Button.ContextMenu>
                         </Button>
-
-                        <Button Style="{StaticResource Button.Chrome}"
-                                Content="⋯"
-                                FontSize="13"
-                                ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.manageAndTags}"
-                                Click="OpenManager_Click" />
 
                         <Button Style="{StaticResource Button.Chrome}"
                                 Content="✕"

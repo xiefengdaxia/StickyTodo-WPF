@@ -91,7 +91,7 @@ public sealed class TodoService
         var board = GetBoard(boardId) ?? throw new InvalidOperationException("看板不存在。");
         if (board.Kind != BoardKind.Custom)
         {
-            throw new InvalidOperationException("只有自定义看板才能保存 HTML/采集脚本。");
+            throw new InvalidOperationException("只有 AI 看板才能保存 HTML/采集脚本。");
         }
 
         _repository.SaveCustomContent(

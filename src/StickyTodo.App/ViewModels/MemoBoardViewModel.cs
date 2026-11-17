@@ -156,7 +156,13 @@ public partial class MemoBoardViewModel : ObservableObject, IAppearanceHost, ISe
             ErrorText = null;
             var text = Content;
             var note = await Task.Run(() => _service.SaveNote(BoardId, text));
-            IsDirty = false;
+
+            // 存盘期间又敲了几个字：脏标记得留着，否则这次的改动既不落库、也不会再触发保存
+            if (Content == text)
+            {
+                IsDirty = false;
+            }
+
             UpdateStatus(note.UpdatedAt);
         }
         catch (Exception ex)

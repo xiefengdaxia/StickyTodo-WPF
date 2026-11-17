@@ -21,6 +21,8 @@ public partial class WeatherWindow : Window
         InitializeComponent();
         DataContext = viewModel;
 
+        ToolBoardChrome.Attach(this, board, PinButton, LockButton, ManageButton);
+
         if (viewModel.Cities.Count > 0)
         {
             // 打开时选中默认城市（没设过就是第一个）

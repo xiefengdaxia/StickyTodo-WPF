@@ -21,6 +21,12 @@ public partial class DesktopClockWindow : Window
         InitializeComponent();
         DataContext = viewModel;
 
+        // 置顶 / 锁定 / 看板管理与其它看板同一套（🔒 锁上就是整窗鼠标穿透）
+        _pinned = App.Settings is { } clockSettings
+                  && clockSettings.HasBoardTopmost(board.Id)
+                  && clockSettings.GetBoardTopmost(board.Id);
+        ToolBoardChrome.Attach(this, board, PinButton, LockButton, ManageButton, OnTopmostChanged);
+
         // 点天气/日历要把看板贴到这个窗口旁边，所以得知道自己是谁
         viewModel.AttachWindow(this);
 
@@ -63,6 +69,13 @@ public partial class DesktopClockWindow : Window
     /// </summary>
     private void EmbedIntoDesktop()
     {
+        // 用户手动点了 📌 置顶：就别再把它嵌回桌面层，否则一失焦"置顶"就失效
+        if (_pinned)
+        {
+            Topmost = true;
+            return;
+        }
+
         // 先脱离置顶带，再插到桌面层后面；反过来会被 SetWindowPos 抬回非置顶带顶部
         if (Topmost)
         {
@@ -95,6 +108,20 @@ public partial class DesktopClockWindow : Window
 
     /// <summary>用户手动拖过之后不再自动贴角。</summary>
     private bool _userMoved;
+
+    /// <summary>用户把时钟置顶了：此时不再往桌面层里嵌（嵌进去就压不到别的窗口上面）。</summary>
+    private bool _pinned;
+
+    private void OnTopmostChanged(bool pinned)
+    {
+        _pinned = pinned;
+
+        // 取消置顶时重新按原来的方式沉回桌面层
+        if (!pinned)
+        {
+            EmbedIntoDesktop();
+        }
+    }
 
     /// <summary>回归用：把挂件当前内容收成一行日志。</summary>
     internal string DescribeForTest() =>
@@ -304,6 +331,37 @@ public partial class DesktopClockWindow : Window
 
         return null;
     }
+
+    // ---------- 标题栏按钮 ----------
+
+    private void Appearance_Click(object sender, RoutedEventArgs e)
+    {
+        if (System.Windows.Application.Current is App app)
+        {
+            app.ShowWeatherAppearanceMenu(this, sender as FrameworkElement);
+        }
+    }
+
+    private void Manage_Click(object sender, RoutedEventArgs e) => OpenManager();
+
+    private static void OpenManager() =>
+        (System.Windows.Application.Current.MainWindow as ManagerWindow)?.ShowAndActivate();
+
+    // ---------- 左侧快捷入口 ----------
+
+    /// <summary>点快捷入口里的看板图标：把那个看板置前。</summary>
+    private void QuickBoard_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: ClockQuickItem item })
+        {
+            _viewModel.OpenBoardFromQuick(item);
+        }
+    }
+
+    private void QuickManage_Click(object sender, RoutedEventArgs e) => OpenManager();
+
+    private void QuickSettings_Click(object sender, RoutedEventArgs e) =>
+        (System.Windows.Application.Current as App)?.ShowSettings();
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 }

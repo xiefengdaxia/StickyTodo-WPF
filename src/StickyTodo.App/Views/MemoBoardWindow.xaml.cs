@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
@@ -61,7 +62,7 @@ public partial class MemoBoardWindow : Window, IStickyWindow, IBoardDataRefresh
         _windows = windows;
         DataContext = viewModel;
 
-        AttachEditingCommands();
+        AttachEditingKeys();
         AttachModeWatcher();
 
         _saveTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(800) };
@@ -193,62 +194,112 @@ public partial class MemoBoardWindow : Window, IStickyWindow, IBoardDataRefresh
 
     // ---------------- 剪切 / 复制 / 粘贴 / 全选 / 撤销 / 重做 ----------------
 
+    /// <summary>最后一次拿到焦点的正文框（焦点跑到标题栏按钮/预览文档上时，编辑命令还落在它身上）。</summary>
+    private TextBox? _lastEditTarget;
+
     /// <summary>
-    /// 窗口级接管编辑命令。
-    ///
-    /// WPF 的 Ctrl+X 走 <see cref="ApplicationCommands.Cut"/>，命令是「从焦点元素往上冒泡」找
-    /// 执行目标的：只有焦点正好在 TextBox 上，才由 TextBoxBase 自己的类级 CommandBinding 接住。
-    /// 便签窗口里焦点经常不在正文上（点过标题栏 / 顶部按钮 / 底栏之后焦点落在 Button 或窗口本身；
-    /// 预览模式焦点还在只读文档上），这时 Cut 找不到目标，被静默丢掉——
-    /// 表现就是「Ctrl+C / Ctrl+V 有时好使，Ctrl+X 干脆没反应」。
-    ///
-    /// 这里在窗口级同时挂 CommandBinding 和 KeyBinding，把 6 个编辑命令固定路由到正文控件
-    /// （预览模式则路由到只读文档的选区），不再依赖「焦点恰好落在谁身上」。
-    /// 其它按键（F1 截图等）一概不碰。
+    /// 挂上编辑键接管：隧道阶段的 <see cref="Window.PreviewKeyDown"/> + 记住最后编辑的正文框。
     /// </summary>
-    private void AttachEditingCommands()
+    private void AttachEditingKeys()
     {
-        BindEditingCommand(ApplicationCommands.Cut, Key.X, CutSelection);
-        BindEditingCommand(ApplicationCommands.Copy, Key.C, CopySelection);
-        BindEditingCommand(ApplicationCommands.Paste, Key.V, PasteClipboard);
-        BindEditingCommand(ApplicationCommands.SelectAll, Key.A, SelectAllContent);
-        BindEditingCommand(ApplicationCommands.Undo, Key.Z, UndoEdit);
-        BindEditingCommand(ApplicationCommands.Redo, Key.Y, RedoEdit);
+        PreviewKeyDown += Window_PreviewKeyDown;
+
+        AddHandler(Keyboard.GotKeyboardFocusEvent,
+            new KeyboardFocusChangedEventHandler((_, e) =>
+            {
+                if (e.NewFocus is TextBox box && ReferenceEquals(Window.GetWindow(box), this))
+                {
+                    _lastEditTarget = box;
+                }
+            }),
+            handledEventsToo: true);
     }
 
-    private void BindEditingCommand(RoutedUICommand command, Key key, Func<bool> action)
+    /// <summary>
+    /// 编辑键一律在这里亲手执行，不走 CommandBinding / KeyBinding。
+    ///
+    /// 为什么：Ctrl+X 在 WPF 里是 <see cref="ApplicationCommands.Cut"/>，命令从焦点元素往上冒泡
+    /// 找执行目标，能不能执行由那条 CommandBinding 的 CanExecute 决定。焦点不在正文上
+    /// （点过标题栏 / 顶部按钮 / 底栏，或焦点落在预览的只读文档里）时，Cut 要么找不到目标，
+    /// 要么被别的绑定判成 CanExecute=false，按键就被静默吞掉——表现正是「Ctrl+X 没反应」。
+    /// 窗口级 CommandBinding / KeyBinding 也治不了它：它们同样要经过 CanExecute 这道闸。
+    ///
+    /// PreviewKeyDown 是隧道阶段，比命令翻译更早；直接调 <see cref="TextBox"/> 的
+    /// Cut/Copy/Paste/SelectAll/Undo/Redo 再 e.Handled = true，绕开整条 CanExecute 链路，
+    /// 焦点在谁身上都落到正文上。其它按键（F1 截图、F2 录屏等）一概不碰。
+    /// </summary>
+    private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        CommandBindings.Add(new CommandBinding(command, (_, e) =>
-        {
-            if (action())
-            {
-                e.Handled = true;
-            }
-        }));
+        var modifiers = Keyboard.Modifiers;
 
-        InputBindings.Add(new KeyBinding(command, key, ModifierKeys.Control));
+        // 只认 Ctrl（允许再加 Shift：Ctrl+Shift+Z 也算重做），其余组合键放给系统
+        if ((modifiers & ModifierKeys.Control) == 0 ||
+            (modifiers & ~(ModifierKeys.Control | ModifierKeys.Shift)) != 0)
+        {
+            return;
+        }
+
+        var shift = (modifiers & ModifierKeys.Shift) != 0;
+        var target = ResolveEditTarget();
+
+        switch (PressedKey(e))
+        {
+            case Key.X when !shift:
+                e.Handled = CutSelection(target);
+                break;
+            case Key.C when !shift:
+                e.Handled = CopySelection(target);
+                break;
+            case Key.V when !shift:
+                e.Handled = PasteClipboard(target);
+                break;
+            case Key.A when !shift:
+                e.Handled = SelectAllContent(target);
+                break;
+            case Key.Z:
+                e.Handled = shift ? RedoEdit(target) : UndoEdit(target);
+                break;
+            case Key.Y when !shift:
+                e.Handled = RedoEdit(target);
+                break;
+        }
+    }
+
+    /// <summary>输入法/系统键会把真正的键藏在 SystemKey / ImeProcessedKey 里。</summary>
+    private static Key PressedKey(KeyEventArgs e) => e.Key switch
+    {
+        Key.System => e.SystemKey,
+        Key.ImeProcessed => e.ImeProcessedKey,
+        _ => e.Key,
+    };
+
+    /// <summary>焦点在正文里就用它；否则用最后一次编辑过的正文，都没有就落到主编辑框。</summary>
+    private TextBox ResolveEditTarget()
+    {
+        if (Keyboard.FocusedElement is TextBox focused && ReferenceEquals(Window.GetWindow(focused), this))
+        {
+            _lastEditTarget = focused;
+            return focused;
+        }
+
+        return _lastEditTarget ?? Editor;
     }
 
     /// <summary>现在能不能改正文：预览 / 锁定都算不能改。</summary>
     private bool CanEdit => !_viewModel.IsPreview && !_viewModel.IsLocked;
 
-    private bool CutSelection()
+    private bool CutSelection(TextBox target)
     {
-        if (!CanEdit)
+        if (!CanEdit || string.IsNullOrEmpty(target.SelectedText))
         {
             return false;
         }
 
-        if (Editor.SelectionLength == 0)
-        {
-            return false;
-        }
-
-        Editor.Cut();
-        return true;
+        target.Focus();
+        return RunClipboardAction(target.Cut);
     }
 
-    private bool CopySelection()
+    private bool CopySelection(TextBox target)
     {
         if (_viewModel.IsPreview)
         {
@@ -256,28 +307,27 @@ public partial class MemoBoardWindow : Window, IStickyWindow, IBoardDataRefresh
             return true;
         }
 
-        if (Editor.SelectionLength == 0)
+        if (string.IsNullOrEmpty(target.SelectedText))
         {
             return false;
         }
 
-        Editor.Copy();
-        return true;
+        return RunClipboardAction(target.Copy);
     }
 
-    private bool PasteClipboard()
+    private bool PasteClipboard(TextBox target)
     {
-        // 焦点本来就在正文里：让 TextBox 自己处理，免得粘两遍
-        if (!CanEdit || Editor.IsKeyboardFocusWithin || !HasClipboardText())
+        if (!CanEdit || !HasClipboardText())
         {
             return false;
         }
 
-        Editor.Paste();
-        return true;
+        // 先聚焦再粘：不聚焦也粘得进去，但光标得跟过去，接着才好继续敲
+        target.Focus();
+        return RunClipboardAction(target.Paste);
     }
 
-    private bool SelectAllContent()
+    private bool SelectAllContent(TextBox target)
     {
         if (_viewModel.IsPreview)
         {
@@ -291,8 +341,8 @@ public partial class MemoBoardWindow : Window, IStickyWindow, IBoardDataRefresh
             return true;
         }
 
-        Editor.SelectAll();
-        Editor.Focus();
+        target.Focus();
+        target.SelectAll();
         return true;
     }
 
@@ -309,26 +359,46 @@ public partial class MemoBoardWindow : Window, IStickyWindow, IBoardDataRefresh
         }
     }
 
-    private bool UndoEdit()
+    /// <summary>
+    /// 剪贴板同时只能被一个进程占着：别的程序正好开着它，Cut/Copy/Paste 会抛 COMException。
+    /// 这种时候按键已经由我们接管了，绝不能让它冒出去把窗口崩掉——记一笔、底栏给提示，就当处理过。
+    /// </summary>
+    private bool RunClipboardAction(Action action)
     {
-        // 焦点在正文里就走 TextBox 自己的撤销栈，别撤销两次
-        if (!CanEdit || Editor.IsKeyboardFocusWithin || !Editor.CanUndo)
+        try
         {
-            return false;
+            action();
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "[memo] 剪贴板操作失败");
+            _viewModel.ErrorText = ex.Message;
         }
 
-        Editor.Undo();
         return true;
     }
 
-    private bool RedoEdit()
+    private bool UndoEdit(TextBox target)
     {
-        if (!CanEdit || Editor.IsKeyboardFocusWithin || !Editor.CanRedo)
+        if (!CanEdit || !target.CanUndo)
         {
             return false;
         }
 
-        Editor.Redo();
+        target.Focus();
+        target.Undo();
+        return true;
+    }
+
+    private bool RedoEdit(TextBox target)
+    {
+        if (!CanEdit || !target.CanRedo)
+        {
+            return false;
+        }
+
+        target.Focus();
+        target.Redo();
         return true;
     }
 

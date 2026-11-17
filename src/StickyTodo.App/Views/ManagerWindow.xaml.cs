@@ -370,12 +370,26 @@ public partial class ManagerWindow : Window
     private async void CreatePerformance_Click(object sender, RoutedEventArgs e) =>
         await CreateBoardAsync(BoardKind.Performance);
 
-    private async void CreateCustom_Click(object sender, RoutedEventArgs e) =>
-        await CreateBoardAsync(BoardKind.Custom);
+    /// <summary>
+    /// 「+ AI 看板」不再直接建一块空看板：AI 看板的 HTML 和取数脚本是 AI 通过 MCP 写的，
+    /// 面板这边能做的是把「怎么让 AI 帮你做一块」讲清楚，所以改成弹引导窗。
+    /// （想装现成的可以走市场，见 <see cref="OpenMarketWindow"/>。）
+    /// </summary>
+    private void CreateCustom_Click(object sender, RoutedEventArgs e)
+    {
+        var guide = new AiBoardGuideWindow { Owner = this };
+        guide.ShowDialog();
+    }
 
     private static MarketWindow? _marketWindow;
 
-    private void Market_Click(object sender, RoutedEventArgs e)
+    private void Market_Click(object sender, RoutedEventArgs e) => OpenMarketWindow();
+
+    /// <summary>
+    /// 打开看板市场（左侧「🧩 看板市场」按钮和 AI 看板引导窗里的入口都走这里，
+    /// 单例窗口和 owner 都归管理面板管）。
+    /// </summary>
+    internal void OpenMarketWindow()
     {
         if (_marketWindow is { IsLoaded: true })
         {

@@ -6,7 +6,7 @@
 
 > 借鉴了同类工具的产品形态（多看板、一板一窗、重复任务、日历），但**代码、UI、文案、配色全部为原创实现**，没有复制任何第三方程序的反编译产物、资源文件或私有接口。
 
-## ✨ 亮点：AI 自定义看板（MCP 接入）
+## ✨ 亮点：AI 看板（MCP 接入）
 
 **让 AI 把数据画在你的桌面上。** 应用内置 MCP 服务端（设置页一键开启，只监听 127.0.0.1 + 令牌鉴权），AI 客户端可以创建/关闭看板、增删待办、控制番茄钟、查天气与 Token 用量、改设置、截屏——共 **32 个工具**；还能创建 **UI 完全由 AI 编写的 HTML 看板**，配一个 AI 写的采集脚本定时去网站/服务器抓数据回填（跑在 Jint 沙盒里，只放行 HTTP；脚本还能用 `mcp(tool, args)` 直接调本机 MCP 工具，进程内调用、脚本拿不到令牌——AI 用量热力图看板就是这么读 token 用量的）。下面 6 块看板全部由 AI 生成，全部放在 `market/` 里，管理面板 → 看板市场一键安装：
 
@@ -325,7 +325,7 @@ dotnet run --project tools/IconGen -c Release -- src/StickyTodo.App/Assets/stick
 
 **看板**
 - 一个看板一个独立窗口，可同时开多个；再从托盘/管理面板打开同一个看板会激活已有窗口
-- **看板类型**：待办看板（清单）、便签看板（一整张纸，边写边自动保存）、日历看板（月视图）、Token 用量看板，以及 **AI 自定义看板**（HTML 面板 + 采集脚本，见下方「MCP 接入」）
+- **看板类型**：待办看板（清单）、便签看板（一整张纸，边写边自动保存）、日历看板（月视图）、Token 用量看板，以及 **AI 看板**（HTML 面板 + 采集脚本，见下方「MCP 接入」）
 - 窗口位置与大小按看板分别记忆（重启后回到原位）；换显示器后自动夹回可见区域
 - **贴边吸附**：拖到屏幕边缘、或靠近其它便签窗口时自动对齐（纸面边缘对齐，排除投影留白）
 - 管理面板：新建待办/便签/日历看板、重命名、删除、双击打开，显示类型与待办数
@@ -338,7 +338,7 @@ dotnet run --project tools/IconGen -c Release -- src/StickyTodo.App/Assets/stick
 - 设置页勾选「启用 MCP 接口」（或托盘菜单）后，本机 AI 客户端（ZCode / Claude 等）即可通过 MCP 协议操作应用；端点**只监听 127.0.0.1**，Bearer 令牌鉴权，设置页一键生成接入配置片段
 - 传输两种都支持：**Streamable HTTP**（`http://127.0.0.1:52700/mcp`，端口被占自动顺延）与 **stdio 桥**（`StickyTodo.exe --mcp`，给 Claude Desktop 这类只支持 stdio 的客户端；应用没运行时桥会把它自动拉起来）
 - **32 个工具**：看板增删开关、待办 CRUD / 截止 / 提醒 / 重复规则、便签、标签、番茄钟、天气、Token 用量、桌面截屏（PNG）、托盘通知、读取/修改设置（皮肤、透明度、护眼等即时生效），以及**看板市场**（`list_market` 列出市场看板、`install_market_board` 安装市场看板）
-- **AI 自定义看板**：`create_custom_board(html, script)` —— UI 是 AI 写的完整 HTML（WebView2 渲染，运行时缺失时降级为文本显示），数据由 AI 写的 **JS 采集脚本**定时抓取：脚本跑在 Jint 沙盒里，只有 `http_get / http_post / http` 三个网络函数（碰不到文件和进程），带内存、语句数与超时限额；另有 `mcp(tool, args)` 可以在脚本里直调本机 MCP 工具（如 `mcp('list_todos', {})`），返回已解析对象（进程内调用，脚本拿不到令牌）；`push_custom_data` 可以不经网络直接把数据推上墙
+- **AI 看板**：`create_custom_board(html, script)` —— UI 是 AI 写的完整 HTML（WebView2 渲染，运行时缺失时降级为文本显示），数据由 AI 写的 **JS 采集脚本**定时抓取：脚本跑在 Jint 沙盒里，只有 `http_get / http_post / http` 三个网络函数（碰不到文件和进程），带内存、语句数与超时限额；另有 `mcp(tool, args)` 可以在脚本里直调本机 MCP 工具（如 `mcp('list_todos', {})`），返回已解析对象（进程内调用，脚本拿不到令牌）；`push_custom_data` 可以不经网络直接把数据推上墙
 - **背景透明度 / 整窗透明度 / 皮肤都能按这块看板单独设**（🎨 菜单）
 - MCP 改了数据之后，所有打开着的看板窗口会自动重读，屏幕上的列表立刻是最新的
 - 示例看板（年度进度 / AI 用量热力图 / 站点探针 / 空气质量环 / 昼夜时钟 / 打字机诗句）源码在 `market/`：一个看板一个目录，各含 `board.json` 清单 + `board.html` 界面 + `preview.png` 预览图，AI 用量热力图 / 站点探针 / 空气质量环 / 打字机诗句 另带 `board.js` 采集脚本；管理面板 → 看板市场可一键安装与卸载
@@ -484,7 +484,7 @@ setting(key PRIMARY KEY, value)
 - Token 用量看板读的是**本机 opencode 的 SQLite 数据库**，是本地文件读取，同样不联网、不发送任何数据。
 - 没有账号体系、没有云同步、没有埋点。
 - 联网只有两处，而且都得你点一下才发生：**天气**（Open-Meteo 免费接口）和**检查更新**（GitHub releases API，只读公开信息）。两处都不带身份、不上报任何本机数据。
-- **MCP 接入**是本机回环（只监听 127.0.0.1 + Bearer 令牌），不算出站联网；自定义看板的采集脚本与天气同类——按你/AI 配置的数据源出站取数，应用不内置任何上报。
+- **MCP 接入**是本机回环（只监听 127.0.0.1 + Bearer 令牌），不算出站联网；AI 看板的采集脚本与天气同类——按你/AI 配置的数据源出站取数，应用不内置任何上报。
 - 宿主刻意用 `new HostBuilder()` 而不是 `Host.CreateDefaultBuilder()`：后者会去读 `appsettings.json` / 环境变量 / 命令行配置，这里配置来源全部关闭，行为只由代码决定。
 - 可执行的保证：`tests/StickyTodo.Tests/NoNetworkTests.cs` 断言 **Core 与 Infrastructure 程序集的引用列表里没有** `System.Net.Http` / `System.Net.Sockets` / `System.Net.Requests` / `System.Net.WebClient`。一旦有人往这两层加回网络依赖，测试立刻失败。天气与检查更新各自单独成层（`StickyTodo.Weather` / `StickyTodo.Updates`），主工程只依赖它们的抽象结果。
 
@@ -606,9 +606,9 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 
 **M12（已完成）**
 - [x] **MCP 接入**：本地服务端（只监听 127.0.0.1 + Bearer 令牌；TcpListener 手写最小 HTTP，避开 HTTP.SYS 的 URLACL 权限坑）+ Streamable HTTP 与 stdio 桥双传输；32 个工具覆盖看板 / 待办 / 便签 / 标签 / 番茄钟 / 天气 / Token 用量 / 截屏 / 通知 / 设置修改 / 看板市场；MCP 改完数据所有打开的看板自动刷新
-- [x] **AI 自定义看板**：新看板类型——UI 是 AI 写的完整 HTML（WebView2 渲染，运行时缺失降级文本），数据由 AI 写的 JS 采集脚本定时抓取；脚本跑在 Jint 沙盒（只放行 http_get / http_post / http，内存 / 语句 / 超时限额）；`push_custom_data` 免网络直推；采集结果缓存，窗口重开即刻有值；看板标题栏有「刷新数据」按钮
+- [x] **AI 看板**：新看板类型——UI 是 AI 写的完整 HTML（WebView2 渲染，运行时缺失降级文本），数据由 AI 写的 JS 采集脚本定时抓取；脚本跑在 Jint 沙盒（只放行 http_get / http_post / http，内存 / 语句 / 超时限额）；`push_custom_data` 免网络直推；采集结果缓存，窗口重开即刻有值；看板标题栏有「刷新数据」按钮
 - [x] **看板市场**：`market/` 目录即市场，一个文件夹 = 一个看板包（board.json + html + 采集脚本 + 预览图）；管理面板一键安装/卸载，AI 也能通过 MCP 的 `install_market_board` 自己装；采集脚本新增 `mcp(tool, args)`，可在脚本里进程内直调本机 MCP 工具（脚本拿不到令牌）
-- [x] **背景透明度按看板独立**：🎨 菜单里背景与整窗透明度都只作用于当前看板（各带「跟随全局」），自定义看板窗口也接入同一套外观菜单；`board.{id}.bgOpacity` 落库
+- [x] **背景透明度按看板独立**：🎨 菜单里背景与整窗透明度都只作用于当前看板（各带「跟随全局」），AI 看板窗口也接入同一套外观菜单；`board.{id}.bgOpacity` 落库
 - [x] 数据库 schema 升到 v8（board 表 `custom_html` / `custom_script` / `custom_interval`）
 
 **M8（已完成）**
