@@ -251,6 +251,8 @@
                     </Border>
 
                     <!-- ===== MCP 接入 ===== -->
+                    <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.mcp}" Style="{StaticResource Text.Section}" Margin="2,4,0,8" />
+
                     <Border Style="{StaticResource Card}" Margin="0,0,0,14">
                         <StackPanel>
                             <CheckBox Style="{StaticResource CheckBox.Labeled}" FontSize="13" FontWeight="SemiBold"
@@ -274,6 +276,7 @@
                                            FontSize="12.5" VerticalAlignment="Center"
                                            Foreground="{DynamicResource Brush.Ink}" />
                                 <TextBox Grid.Column="1" x:Name="McpPortBox"
+                                         Style="{StaticResource TextBox.Flat}"
                                          Text="{Binding McpPortText, UpdateSourceTrigger=Explicit}"
                                          LostFocus="McpPortBox_LostFocus" KeyDown="McpPortBox_KeyDown"
                                          FontSize="12.5" VerticalContentAlignment="Center" />
@@ -281,11 +284,13 @@
                                            FontSize="12.5" VerticalAlignment="Center"
                                            Foreground="{DynamicResource Brush.Ink}" />
                                 <TextBox Grid.Column="4" Text="{Binding McpTokenText}"
+                                         Style="{StaticResource TextBox.Flat}"
                                          IsReadOnly="True" FontSize="11.5"
-                                         VerticalContentAlignment="Center" Background="#22FFFFFF" />
+                                         VerticalContentAlignment="Center" />
                                 <Button Grid.Column="5" Margin="6,0,0,0"
+                                        Style="{StaticResource Button.Ghost}"
                                         Content="{Binding Converter={StaticResource Loc}, ConverterParameter=settings.mcpCopyToken}"
-                                        Command="{Binding CopyMcpTokenCommand}" Cursor="Hand" />
+                                        Command="{Binding CopyMcpTokenCommand}" />
                             </Grid>
 
                             <TextBlock Text="{Binding McpEndpointText}"
@@ -298,9 +303,9 @@
                                        FontSize="12.5" FontWeight="SemiBold"
                                        Foreground="{DynamicResource Brush.Ink}" Margin="2,0,0,5" />
                             <TextBox Text="{Binding McpConfigText}"
+                                     Style="{StaticResource TextBox.Flat}"
                                      IsReadOnly="True" FontSize="11" FontFamily="Consolas"
-                                     TextWrapping="Wrap" MaxHeight="180" VerticalScrollBarVisibility="Auto"
-                                     Background="#22FFFFFF" />
+                                     TextWrapping="Wrap" MaxHeight="180" VerticalScrollBarVisibility="Auto" />
                             <Grid Margin="0,6,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -311,8 +316,9 @@
                                            Style="{StaticResource Text.Caption}" TextWrapping="Wrap"
                                            VerticalAlignment="Center" />
                                 <Button Grid.Column="1" Margin="8,0,0,0"
+                                        Style="{StaticResource Button.Ghost}"
                                         Content="{Binding Converter={StaticResource Loc}, ConverterParameter=menu.mcpCopyConfig}"
-                                        Command="{Binding CopyMcpConfigCommand}" Cursor="Hand" />
+                                        Command="{Binding CopyMcpConfigCommand}" />
                             </Grid>
                         </StackPanel>
                     </Border>

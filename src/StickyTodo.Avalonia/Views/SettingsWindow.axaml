@@ -165,6 +165,8 @@
           </Border>
 
           <!-- MCP 接入 -->
+          <TextBlock Text="{loc:Loc settings.mcp}" Classes="section" Margin="2,4,0,8" />
+
           <Border Classes="card" Margin="0,0,0,14">
             <StackPanel>
               <CheckBox Classes="labeled" FontSize="13" FontWeight="SemiBold"
@@ -176,14 +178,14 @@
               <Grid Margin="2,0,2,6" ColumnDefinitions="Auto,70,16,Auto,*,Auto">
                 <TextBlock Text="{loc:Loc settings.mcpPort}" FontSize="12.5" VerticalAlignment="Center"
                            Foreground="{DynamicResource Brush.Ink}" />
-                <TextBox Grid.Column="1" Name="McpPortBox" Text="{Binding McpPortText}"
+                <TextBox Grid.Column="1" Name="McpPortBox" Classes="flat" Text="{Binding McpPortText}"
                          FontSize="12.5" VerticalContentAlignment="Center"
                          LostFocus="McpPortBox_LostFocus" KeyDown="McpPortBox_KeyDown" />
                 <TextBlock Grid.Column="3" Text="{loc:Loc settings.mcpToken}" FontSize="12.5"
                            VerticalAlignment="Center" Foreground="{DynamicResource Brush.Ink}" />
-                <TextBox Grid.Column="4" Text="{Binding McpTokenText}" IsReadOnly="True" FontSize="11.5"
-                         VerticalContentAlignment="Center" Background="#22FFFFFF" />
-                <Button Grid.Column="5" Margin="6,0,0,0" Classes="chrome"
+                <TextBox Grid.Column="4" Classes="flat" Text="{Binding McpTokenText}" IsReadOnly="True" FontSize="11.5"
+                         VerticalContentAlignment="Center" />
+                <Button Grid.Column="5" Margin="6,0,0,0" Classes="ghost"
                         Content="{loc:Loc settings.mcpCopyToken}" Command="{Binding CopyMcpTokenCommand}" />
               </Grid>
 
@@ -199,7 +201,7 @@
               <Grid Margin="0,6,0,0" ColumnDefinitions="*,Auto">
                 <TextBlock Text="{loc:Loc settings.mcpWebView2Hint}" Classes="caption" TextWrapping="Wrap"
                            VerticalAlignment="Center" />
-                <Button Grid.Column="1" Margin="8,0,0,0" Classes="chrome"
+                <Button Grid.Column="1" Margin="8,0,0,0" Classes="ghost"
                         Content="{loc:Loc menu.mcpCopyConfig}" Command="{Binding CopyMcpConfigCommand}" />
               </Grid>
             </StackPanel>
