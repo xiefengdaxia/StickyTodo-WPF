@@ -93,7 +93,7 @@ public sealed class AppSettingsService
     /// <summary>开始录制前是否走 3 秒倒计时（默认开，方便先切到要录的窗口）。</summary>
     public const string GifCountdownKey = "gif.countdown";
 
-    /// <summary>上次用的录制范围：fullscreen / region（F2 直接沿用）。</summary>
+    /// <summary>上次用的录制范围：fullscreen / region（F2 直接沿用；没记过按 region）。</summary>
     public const string GifLastModeKey = "gif.lastMode";
 
     /// <summary>上次录制的区域（屏幕物理像素，x,y,w,h），region 模式下 F2 沿用。</summary>
@@ -106,6 +106,17 @@ public sealed class AppSettingsService
     public const string GifQualityHigh = "high";
 
     public const string DefaultGifQuality = GifQualityMedium;
+
+    /// <summary>录整块屏幕（单屏直接录，多屏先选屏）。</summary>
+    public const string GifModeFullScreen = "fullscreen";
+
+    /// <summary>录用户框选的一块区域。</summary>
+    public const string GifModeRegion = "region";
+
+    /// <summary>
+    /// 默认区域录制：录整屏出来的 GIF 太大也没重点，所以 F2 和托盘的默认入口都先让用户框选。
+    /// </summary>
+    public const string DefaultGifMode = GifModeRegion;
 
     /// <summary>GIF 清晰度档位（低/中/高）。认不出的值一律回落中档。</summary>
     public string GifQuality
@@ -126,13 +137,11 @@ public sealed class AppSettingsService
         set => SetSetting(GifCountdownKey, value ? "1" : "0");
     }
 
-    /// <summary>上次的录制范围（fullscreen / region），默认全屏。</summary>
+    /// <summary>上次的录制范围（fullscreen / region），没记过按 <see cref="DefaultGifMode"/>（region）。</summary>
     public string GifLastMode
     {
-        get => string.Equals(GetString(GifLastModeKey, null), "region", StringComparison.OrdinalIgnoreCase)
-            ? "region"
-            : "fullscreen";
-        set => SetSetting(GifLastModeKey, string.Equals(value, "region", StringComparison.OrdinalIgnoreCase) ? "region" : "fullscreen");
+        get => ResolveGifMode(GetString(GifLastModeKey, null));
+        set => SetSetting(GifLastModeKey, ResolveGifMode(value));
     }
 
     /// <summary>上次录制的区域，"x,y,w,h"（屏幕物理像素）。没记录或格式不对返回 null。</summary>
@@ -153,6 +162,15 @@ public sealed class AppSettingsService
         GifQualityHigh => GifQualityHigh,
         _ => DefaultGifQuality,
     };
+
+    /// <summary>
+    /// 录制范围归一化：只认 fullscreen / region。
+    /// 键缺省（首次使用、老版本升级上来）一律返回 region —— 默认先框选，不再一上屏就录。
+    /// </summary>
+    public static string ResolveGifMode(string? mode) =>
+        string.Equals(mode?.Trim(), GifModeFullScreen, StringComparison.OrdinalIgnoreCase)
+            ? GifModeFullScreen
+            : DefaultGifMode;
 
     /// <summary>
     /// 界面语言（存储键如 zh-CN / en / ja / ko）。无法识别时回落简体中文。

@@ -114,6 +114,12 @@ public sealed class GifRecorder : IDisposable
     /// <summary>清晰度档位（low / medium / high）。下一次 <see cref="Start"/> 生效。</summary>
     public string Quality { get; set; } = GifQualityPresets.Medium;
 
+    /// <summary>
+    /// 是否把鼠标指针画进帧里（默认开）。看演示动效时没有指针就看不出「点了哪里」。
+    /// 下一次 <see cref="Start"/> 生效。
+    /// </summary>
+    public bool CaptureCursor { get; set; } = true;
+
     /// <summary>正在抓帧。</summary>
     public bool IsRecording
     {
@@ -222,12 +228,14 @@ public sealed class GifRecorder : IDisposable
         Rectangle region;
         GifQualityPreset preset;
         ManualResetEvent stop;
+        bool drawCursor;
 
         lock (_gate)
         {
             region = _region;
             preset = _preset;
             stop = _stop!;
+            drawCursor = CaptureCursor;
         }
 
         var scale = Math.Min(1d, MaxDimension / (double)Math.Max(region.Width, region.Height));
@@ -270,6 +278,12 @@ public sealed class GifRecorder : IDisposable
                     // 每帧都新建 Graphics 太慢，复用；CopyFromScreen 本身会整块覆盖
                     rawGraphics.CopyFromScreen(
                         region.Left, region.Top, 0, 0, region.Size, CopyPixelOperation.SourceCopy);
+
+                    // 指针在缩放之前画进原图：它会跟着整幅画面一起缩，比例才对得上
+                    if (drawCursor)
+                    {
+                        GifCursorPainter.Draw(rawGraphics, region);
+                    }
 
                     Bitmap source;
                     if (scaled is not null && scaledGraphics is not null)
@@ -508,4 +522,217 @@ public sealed class GifRecorder : IDisposable
             thread.Join(TimeSpan.FromSeconds(2));
         }
     }
+}
+
+/// <summary>
+/// 把鼠标指针画进帧里。
+///
+/// 每帧的顺序：GetCursorInfo 拿当前光标 + 屏幕位置（GDI 的 CopyFromScreen 不包含指针），
+/// CopyIcon 拷一份句柄（系统随时可能把光标换掉），GetIconInfo 拿热区，
+/// 再把图标画到「屏幕位置 − 热区」处 —— 指针尖端就正好落在用户实际点的那个像素上。
+///
+/// 几点细节：
+///   * 坐标全程是物理像素（进程是 PerMonitorV2），多屏的负坐标原样代进去，
+///     换算成区域坐标只是减一个 region.X/Y；
+///   * 图标按自身位图尺寸（32×32 的小光标、48×48 的大光标）绘制，不缩放，热区不用跟着换算；
+///   * 光标整块都在录制区域外就不画，压到边上的部分由 GDI 自己裁；
+///   * GetIconInfo 交出来的两张位图、CopyIcon 拷出来的句柄都得自己释放，否则每帧漏一点 GDI 句柄。
+/// </summary>
+internal static class GifCursorPainter
+{
+    private const int CursorShowing = 0x0001;
+    private const int DiNormal = 0x0003;
+    private const int SmCxCursor = 13;
+    private const int SmCyCursor = 14;
+
+    /// <summary>失败过一次就不再试（远程桌面 / 无头会话里这些 API 会一直失败，别每帧刷日志）。</summary>
+    private static bool _unsupported;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct CursorInfo
+    {
+        public int Size;
+        public int Flags;
+        public IntPtr Handle;
+        public Point Position;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct IconInfo
+    {
+        [MarshalAs(UnmanagedType.Bool)] public bool IsIcon;
+        public int HotspotX;
+        public int HotspotY;
+        public IntPtr MaskBitmap;
+        public IntPtr ColorBitmap;
+    }
+
+    /// <summary>GDI BITMAP：只用它读宽高（图标位图的真实像素尺寸）。</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    private struct GdiBitmap
+    {
+        public int Type;
+        public int Width;
+        public int Height;
+        public int WidthBytes;
+        public ushort Planes;
+        public ushort BitsPerPixel;
+        public IntPtr Bits;
+    }
+
+    /// <summary>把当前指针画到 <paramref name="graphics"/> 上（对应屏幕区域 <paramref name="region"/>，物理像素）。</summary>
+    public static void Draw(Graphics graphics, Rectangle region)
+    {
+        if (_unsupported)
+        {
+            return;
+        }
+
+        try
+        {
+            DrawCore(graphics, region);
+        }
+        catch (Exception ex)
+        {
+            _unsupported = true;
+            Log.Debug(ex, "[gif] 画鼠标指针失败，后续帧不再尝试");
+        }
+    }
+
+    private static void DrawCore(Graphics graphics, Rectangle region)
+    {
+        var info = new CursorInfo { Size = Marshal.SizeOf<CursorInfo>() };
+        if (!GetCursorInfo(ref info) || (info.Flags & CursorShowing) == 0 || info.Handle == IntPtr.Zero)
+        {
+            // 光标没在显示（正在换光标、触屏操作、已移出所有屏幕）
+            return;
+        }
+
+        // GetCursorPos 比 CursorInfo 里的位置更跟手（拖动窗口时光标会被系统夹住，这里以实际位置为准）
+        if (!GetCursorPos(out var position))
+        {
+            position = info.Position;
+        }
+
+        var cursor = CopyIcon(info.Handle);
+        if (cursor == IntPtr.Zero)
+        {
+            return;
+        }
+
+        try
+        {
+            if (!GetIconInfo(cursor, out var icon))
+            {
+                return;
+            }
+
+            try
+            {
+                var (width, height) = MeasureIcon(icon);
+
+                // 热区是图标内部坐标：减掉它，图标左上角就落在「光标位置」的左上侧
+                var left = position.X - icon.HotspotX;
+                var top = position.Y - icon.HotspotY;
+                var bounds = new Rectangle(left, top, width, height);
+
+                if (!bounds.IntersectsWith(region))
+                {
+                    return;
+                }
+
+                var hdc = graphics.GetHdc();
+                try
+                {
+                    DrawIconEx(
+                        hdc,
+                        bounds.X - region.X,
+                        bounds.Y - region.Y,
+                        cursor,
+                        width,
+                        height,
+                        0,
+                        IntPtr.Zero,
+                        DiNormal);
+                }
+                finally
+                {
+                    graphics.ReleaseHdc(hdc);
+                }
+            }
+            finally
+            {
+                // GetIconInfo 把这两张位图的所有权交了出来，必须自己删
+                if (icon.MaskBitmap != IntPtr.Zero)
+                {
+                    DeleteObject(icon.MaskBitmap);
+                }
+
+                if (icon.ColorBitmap != IntPtr.Zero)
+                {
+                    DeleteObject(icon.ColorBitmap);
+                }
+            }
+        }
+        finally
+        {
+            DestroyIcon(cursor);
+        }
+    }
+
+    /// <summary>图标位图的真实像素尺寸（48×48 大光标也是它自己的尺寸，画的时候不缩放）。</summary>
+    private static (int Width, int Height) MeasureIcon(in IconInfo icon)
+    {
+        if (icon.ColorBitmap != IntPtr.Zero
+            && GetObject(icon.ColorBitmap, Marshal.SizeOf<GdiBitmap>(), out var color) != 0
+            && color.Width > 0 && color.Height > 0)
+        {
+            return (color.Width, color.Height);
+        }
+
+        // 单色光标只有掩码位图：高度是图标的两倍（上半 AND 层、下半 XOR 层）
+        if (icon.MaskBitmap != IntPtr.Zero
+            && GetObject(icon.MaskBitmap, Marshal.SizeOf<GdiBitmap>(), out var mask) != 0
+            && mask.Width > 0 && mask.Height > 0)
+        {
+            return (mask.Width, Math.Max(1, mask.Height / 2));
+        }
+
+        // 兜底：系统光标尺寸（已经按当前 DPI 缩放过）
+        return (Math.Max(1, GetSystemMetrics(SmCxCursor)), Math.Max(1, GetSystemMetrics(SmCyCursor)));
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetCursorInfo(ref CursorInfo info);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetCursorPos(out Point point);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr CopyIcon(IntPtr icon);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool DestroyIcon(IntPtr icon);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetIconInfo(IntPtr icon, out IconInfo info);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool DrawIconEx(
+        IntPtr hdc, int x, int y, IntPtr icon, int width, int height, int step, IntPtr flickerFreeBrush, int flags);
+
+    [DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int index);
+
+    [DllImport("gdi32.dll", EntryPoint = "GetObjectW", SetLastError = true)]
+    private static extern int GetObject(IntPtr handle, int size, out GdiBitmap bitmap);
+
+    [DllImport("gdi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool DeleteObject(IntPtr handle);
 }

@@ -429,7 +429,7 @@ public sealed class TrayService : IDisposable
         });
         menu.Items.Add(closePins);
 
-        // GIF 录屏：展开后选「全屏 / 区域」，区域走截图遮罩的「录 GIF」按钮
+        // GIF 录屏：展开后选「区域 / 全屏」；区域是默认项（加粗，直接展开菜单敲回车也是它）
         var gifs = _services.GetRequiredService<GifRecordingService>();
 
         var recordGif = new WinForms.ToolStripMenuItem(Loc.T("gif.record"))
@@ -438,6 +438,18 @@ public sealed class TrayService : IDisposable
             ShowShortcutKeys = true,
         };
 
+        var gifRegion = new WinForms.ToolStripMenuItem(Loc.T("gif.region"))
+        {
+            // 默认项：排第一个 + 加粗（ContextMenuStrip 没有 DefaultItem，靠字体表达）
+            Font = new System.Drawing.Font("Microsoft YaHei UI", 9f, System.Drawing.FontStyle.Bold),
+        };
+        gifRegion.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        {
+            _menu?.Close();
+            _ = pins.CaptureGifRegionAsync();
+        });
+        recordGif.DropDownItems.Add(gifRegion);
+
         var gifFullScreen = new WinForms.ToolStripMenuItem(Loc.T("gif.fullscreen"));
         gifFullScreen.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(() =>
         {
@@ -445,14 +457,6 @@ public sealed class TrayService : IDisposable
             gifs.StartFullScreen();
         });
         recordGif.DropDownItems.Add(gifFullScreen);
-
-        var gifRegion = new WinForms.ToolStripMenuItem(Loc.T("gif.region"));
-        gifRegion.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(() =>
-        {
-            _menu?.Close();
-            _ = pins.CaptureGifRegionAsync();
-        });
-        recordGif.DropDownItems.Add(gifRegion);
 
         recordGif.DropDownItems.Add(new WinForms.ToolStripSeparator());
 

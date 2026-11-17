@@ -500,6 +500,9 @@ public static class UiStrings
     ["gif.save"] = ["另存为", "Save as", "名前を付けて保存", "다른 이름으로 저장"],
     ["gif.start"] = ["开始录制", "Start recording", "録画開始", "녹화 시작"],
     ["gif.hint"] = ["F1 截图 · F2 录 GIF · F4 停止", "F1 snip · F2 record GIF · F4 stop", "F1 スクショ · F2 GIF 録画 · F4 停止", "F1 캡처 · F2 GIF 녹화 · F4 중지"],
+    ["gif.pickScreen"] = ["选择要录的屏幕", "Choose a screen to record", "録画する画面を選ぶ", "녹화할 화면 선택"],
+    ["gif.pickScreenHint"] = ["点击屏幕开始录制 · Esc 取消", "Click a screen to start · Esc to cancel", "画面をクリックで開始 · Esc でキャンセル", "화면을 클릭하면 시작 · Esc 취소"],
+    ["gif.primaryScreen"] = ["主屏", "Primary", "メイン", "주 화면"],
     // ===== 便签 Markdown / 导出 =====
     ["memo.edit"] = ["编辑", "Edit", "編集", "편집"],
     ["memo.preview"] = ["预览", "Preview", "プレビュー", "미리보기"],

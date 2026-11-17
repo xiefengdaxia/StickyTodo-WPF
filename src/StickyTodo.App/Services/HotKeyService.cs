@@ -45,7 +45,7 @@ public sealed class HotKeyService : IDisposable
     /// <summary>把上一次的截图再贴一张（默认 F3）。</summary>
     public static string PinAgainHotKey => "F3";
 
-    /// <summary>开始/停止 GIF 录制（默认 F2，沿用上次的范围）。</summary>
+    /// <summary>开始/停止 GIF 录制（默认 F2，沿用上次的范围；没记过就先框选区域）。</summary>
     public static string RecordGifHotKey => "F2";
 
     /// <summary>立即停止 GIF 录制（默认 F4）。</summary>

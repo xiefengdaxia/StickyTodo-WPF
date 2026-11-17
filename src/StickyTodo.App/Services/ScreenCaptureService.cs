@@ -3,6 +3,7 @@ using System.Drawing.Imaging;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media.Imaging;
+using WinForms = System.Windows.Forms;
 
 namespace StickyTodo.App.Services;
 
@@ -14,6 +15,31 @@ namespace StickyTodo.App.Services;
 /// </summary>
 public static class ScreenCaptureService
 {
+    /// <summary>一块屏幕（物理像素）。多屏录全屏时用来选屏。</summary>
+    public readonly record struct ScreenTarget(int Index, Rectangle Bounds, bool IsPrimary, string DeviceName)
+    {
+        /// <summary>"1920×1080" 这种分辨率文案（× 用乘号，别用字母 x）。</summary>
+        public string Resolution => $"{Bounds.Width}×{Bounds.Height}";
+    }
+
+    /// <summary>
+    /// 枚举所有屏幕（物理像素）。序号从 1 开始、按显示设置里的顺序，
+    /// 和「设置 → 显示」里的编号一致，用户不用猜哪块是几号。
+    /// </summary>
+    public static IReadOnlyList<ScreenTarget> GetScreens()
+    {
+        var all = WinForms.Screen.AllScreens;
+        var screens = new List<ScreenTarget>(all.Length);
+
+        for (var i = 0; i < all.Length; i++)
+        {
+            var screen = all[i];
+            screens.Add(new ScreenTarget(i + 1, screen.Bounds, screen.Primary, screen.DeviceName));
+        }
+
+        return screens;
+    }
+
     /// <summary>虚拟桌面在屏幕像素下的矩形。</summary>
     public static Rectangle GetVirtualScreenBounds()
     {

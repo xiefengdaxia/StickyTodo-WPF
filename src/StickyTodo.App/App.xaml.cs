@@ -617,6 +617,10 @@ public partial class App : System.Windows.Application
         var pins = _host.Services.GetRequiredService<PinManager>();
         var gifs = _host.Services.GetRequiredService<GifRecordingService>();
 
+        // F2 第一次用（或记下的区域已经不在屏幕上）时没有可以沿用的范围：
+        // 直接走截图遮罩让用户框一块，不再先把整个屏幕录下来
+        gifs.RegionSelectionRequested += () => _ = pins.CaptureGifRegionAsync();
+
         var registered = hotKeys.Attach(
             host,
             onNewTodo: windows.OpenDefaultBoardForNewTodo,
