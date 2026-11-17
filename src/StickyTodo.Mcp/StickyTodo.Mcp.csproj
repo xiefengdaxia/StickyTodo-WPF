@@ -6,7 +6,7 @@
     <LangVersion>latest</LangVersion>
     <RootNamespace>StickyTodo.Mcp</RootNamespace>
     <!-- serverInfo.version 显示用；发布脚本 -p:Version 也会覆盖 -->
-    <Version>1.7.20</Version>
+    <Version>1.7.21</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>

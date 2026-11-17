@@ -10,7 +10,7 @@
         Topmost="True"
         WindowStartupLocation="Manual"
         FontFamily="Microsoft YaHei UI"
-        UseLayoutRounding="True"
+        UseLayoutRounding="False"
         Cursor="Cross">
     <Window.Resources>
         <!-- 深色浮动工具条上的按钮：不跟随皮肤，保证在任意截图背景上都看得清 -->

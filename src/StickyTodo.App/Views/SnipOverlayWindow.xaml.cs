@@ -8,6 +8,14 @@ using System.Windows.Shapes;
 namespace StickyTodo.App.Views;
 
 /// <summary>
+/// 覆盖层必须**像素级**贴住整个虚拟屏，否则截图和真实桌面会错开几个像素
+/// （任务栏、屏幕右缘被切）。两件事一起做才能对齐：
+/// 1) 拦 WM_GETMINMAXINFO —— Windows 默认把普通窗口的「最大跟踪尺寸」限制在单屏，
+///    多屏（尤其是横向拼接）时窗口会被悄悄缩小，右侧就被截掉；
+/// 2) 用 SetWindowPos 按像素矩形摆位，再按窗口自己的 DPI 折算成 WPF 的 DIP 尺寸。
+/// </summary>
+
+/// <summary>
 /// 截图覆盖层：铺满整个虚拟桌面，拖拽选区，然后在选区内画画 / 画线 / 框选 / 加文字。
 ///
 /// 截图是在窗口出现**之前**抓好的，所以覆盖层自己不会被抓进去；
@@ -96,22 +104,206 @@ public partial class SnipOverlayWindow : Window
         // 铺满整个虚拟桌面（多显示器也是一整块）
         if (!_exactSizeForTest)
         {
-            Left = SystemParameters.VirtualScreenLeft;
-            Top = SystemParameters.VirtualScreenTop;
-            Width = SystemParameters.VirtualScreenWidth;
-            Height = SystemParameters.VirtualScreenHeight;
+            var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if (hwnd != IntPtr.Zero)
+            {
+                System.Windows.Interop.HwndSource.FromHwnd(hwnd)?.AddHook(WndProc);
+                ApplyVirtualScreenGeometry(hwnd);
+            }
         }
 
         Loaded += (_, _) =>
         {
             Activate();
             Focus();
+
+            // Show 之后 DPI/位置才定型，这里再压一遍像素矩形，避免被 WPF 二次缩放
+            if (!_exactSizeForTest)
+            {
+                var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+                if (hwnd != IntPtr.Zero)
+                {
+                    ApplyVirtualScreenGeometry(hwnd);
+                }
+            }
         };
 
         PreviewKeyDown += OnPreviewKeyDown;
         MouseLeftButtonDown += OnMouseDown;
         MouseMove += OnMouseMove;
         MouseLeftButtonUp += OnMouseUp;
+
+        // WPF 在照片加载/布局收尾时可能再改一次窗口尺寸，漂了就压回去
+        SizeChanged += (_, _) =>
+        {
+            if (_exactSizeForTest || !_geometryApplied || _resyncCount >= 3)
+            {
+                return;
+            }
+
+            var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if (hwnd == IntPtr.Zero)
+            {
+                return;
+            }
+
+            var bounds = Services.ScreenCaptureService.GetVirtualScreenBounds();
+            var scale = GetDpiForWindow(hwnd) / 96.0;
+            if (scale <= 0)
+            {
+                scale = 1;
+            }
+
+            if (Math.Abs(ActualWidth * scale - bounds.Width) < 0.5 &&
+                Math.Abs(ActualHeight * scale - bounds.Height) < 0.5)
+            {
+                return;
+            }
+
+            _resyncCount++;
+            Serilog.Log.Information("[snip] 窗口尺寸漂移 {W}x{H}（DIP，第 {N} 次），重新对齐虚拟屏",
+                ActualWidth, ActualHeight, _resyncCount);
+            ApplyVirtualScreenGeometry(hwnd);
+        };
+
+        // 覆盖层可能跨两块 DPI 不同的屏：DPI 一变就重算像素矩形
+        DpiChanged += (_, _) =>
+        {
+            if (_exactSizeForTest)
+            {
+                return;
+            }
+
+            var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if (hwnd != IntPtr.Zero)
+            {
+                ApplyVirtualScreenGeometry(hwnd);
+            }
+        };
+    }
+
+    // ---------------- 铺满虚拟屏（像素级） ----------------
+
+    private const int WmGetMinMaxInfo = 0x0024;
+    private const int SwpNoActivate = 0x0010;
+
+    private static readonly IntPtr HwndTopmost = new(-1);
+
+    /// <summary>
+    /// Windows 会把普通窗口的最大尺寸限制在「单屏 + 边框」；多屏横向拼接时窗口被缩小，
+    /// 截图右侧就缺一条。这里把最大跟踪尺寸直接改成整个虚拟屏。
+    /// </summary>
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg != WmGetMinMaxInfo)
+        {
+            return IntPtr.Zero;
+        }
+
+        var bounds = Services.ScreenCaptureService.GetVirtualScreenBounds();
+        var info = System.Runtime.InteropServices.Marshal.PtrToStructure<MinMaxInfo>(lParam);
+        info.MaxPosition = new NativePoint(bounds.Left, bounds.Top);
+        info.MaxSize = new NativePoint(bounds.Width, bounds.Height);
+        info.MaxTrackSize = new NativePoint(bounds.Width, bounds.Height);
+        System.Runtime.InteropServices.Marshal.StructureToPtr(info, lParam, true);
+        handled = true;
+        return IntPtr.Zero;
+    }
+
+    /// <summary>像素矩形已经压准过一次（之后才允许尺寸漂移纠正）。</summary>
+    private bool _geometryApplied;
+
+    /// <summary>尺寸漂移的纠正次数上限，防止和 WPF 的布局互相拉扯。</summary>
+    private int _resyncCount;
+
+    /// <summary>
+    /// 按虚拟屏的像素矩形摆窗口。WPF 的 Width/Height 是 DIP，会再用**窗口当时的 DPI**
+    /// 换算回像素；如果拿创建时的 DPI 算，窗口跨到另一块缩放不同的屏上就会被二次缩放
+    /// （实测 2592px 变成 2160px）。所以：先以当前 DPI 设 DIP，再用 SetWindowPos 定像素，
+    /// 最后回读一次 GetWindowRect，不一致就再压一遍。
+    /// </summary>
+    private void ApplyVirtualScreenGeometry(IntPtr hwnd)
+    {
+        var bounds = Services.ScreenCaptureService.GetVirtualScreenBounds();
+        var scale = GetDpiForWindow(hwnd) / 96.0;
+        if (scale <= 0)
+        {
+            scale = 1;
+        }
+
+        Left = bounds.Left / scale;
+        Top = bounds.Top / scale;
+        Width = bounds.Width / scale;
+        Height = bounds.Height / scale;
+
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            SetWindowPos(hwnd, HwndTopmost, bounds.Left, bounds.Top, bounds.Width, bounds.Height, SwpNoActivate);
+
+            if (!GetWindowRect(hwnd, out var rect))
+            {
+                return;
+            }
+
+            var actualW = rect.Right - rect.Left;
+            var actualH = rect.Bottom - rect.Top;
+            if (rect.Left == bounds.Left && rect.Top == bounds.Top &&
+                actualW == bounds.Width && actualH == bounds.Height)
+            {
+                Serilog.Log.Information(
+                    "[snip] 覆盖层对齐虚拟屏: 期望 {W}x{H} @ {X},{Y} · 实际 {AW}x{AH} @ {AX},{AY} · dpi={Dpi} · 尝试 {Attempt}",
+                    bounds.Width, bounds.Height, bounds.Left, bounds.Top,
+                    actualW, actualH, rect.Left, rect.Top, GetDpiForWindow(hwnd), attempt + 1);
+                _geometryApplied = true;
+                return;
+            }
+
+            Serilog.Log.Warning(
+                "[snip] 覆盖层尺寸不对: 实际 {AW}x{AH} @ {AX},{AY}，期望 {W}x{H} @ {X},{Y} · dpi={Dpi}",
+                actualW, actualH, rect.Left, rect.Top,
+                bounds.Width, bounds.Height, bounds.Left, bounds.Top, GetDpiForWindow(hwnd));
+        }
+    }
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public NativePoint(int x, int y)
+        {
+            X = x;
+            Y = y;
+        }
+
+        public int X;
+        public int Y;
+    }
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct MinMaxInfo
+    {
+        public NativePoint Reserved;
+        public NativePoint MaxSize;
+        public NativePoint MaxPosition;
+        public NativePoint MinTrackSize;
+        public NativePoint MaxTrackSize;
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr hwnd);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(IntPtr hwnd, IntPtr insertAfter, int x, int y, int cx, int cy, uint flags);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr hwnd, out NativeRect rect);
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct NativeRect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
     }
 
     // ---------------- 选区 ----------------
