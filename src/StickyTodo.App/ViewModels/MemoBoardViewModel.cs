@@ -53,20 +53,94 @@ public partial class MemoBoardViewModel : ObservableObject, IAppearanceHost, ISe
     [ObservableProperty]
     private double _windowOpacity = 1.0;
 
+    /// <summary>
+    /// true = 预览（只读 FlowDocument），false = 编辑（原来的 TextBox）。
+    /// 切换只动显示，正文一个字都不动。
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsEditing))]
+    private bool _isPreview;
+
+    /// <summary>底部那行一次性提示（比如「已导出：…」）。</summary>
+    [ObservableProperty]
+    private string? _noticeText;
+
+    public bool IsEditing => !IsPreview;
+
+    public string EditTabText => Loc.T("memo.edit");
+
+    public string PreviewTabText => Loc.T("memo.preview");
+
+    /// <summary>编辑模式下的 Markdown 语法提示（文案已经在 UiStrings 里）。</summary>
+    public string MarkdownHint => Loc.T("memo.mdHint");
+
     /// <summary>文字变了就交给窗口去 debounce 保存，这里只负责记状态。</summary>
     public bool IsDirty { get; private set; }
 
     public async Task LoadAsync()
     {
+        // 本地还有没落库的编辑（800ms 防抖窗口里，或者刚剪切完）：
+        // 这时候用库里的旧正文覆盖，用户看到的就是「改了一下自己又变回去了」。
+        if (IsDirty)
+        {
+            return;
+        }
+
         var note = await Task.Run(() => _service.GetNote(BoardId));
-        Content = note?.Content ?? string.Empty;
+
+        if (note is null)
+        {
+            // 这张便签从来没有正文记录 = 第一次打开：预填一段示例，
+            // 顺手把 Markdown / 公式 / mermaid / 表格的样子演示一遍。
+            Content = MarkdownRenderer.SampleDocument;
+            IsDirty = true;
+            StatusText = Loc.T("memo.unsaved");
+            await SaveIfDirtyAsync();
+            return;
+        }
+
+        Content = note.Content;
         IsDirty = false;
-        UpdateStatus(note?.UpdatedAt);
+        UpdateStatus(note.UpdatedAt);
+    }
+
+    /// <summary>切换编辑 / 预览。正文不动，只是换个显示方式。</summary>
+    public void SetPreview(bool preview) => IsPreview = preview;
+
+    /// <summary>底部提示（导出成功之类），下一次编辑/保存时会被状态行覆盖掉。</summary>
+    public void SetNotice(string? text) => NoticeText = text;
+
+    /// <summary>
+    /// 再开一张便签：和管理面板「新建便签」走同一条路（<see cref="TodoService.CreateBoard"/> +
+    /// <see cref="WindowManager.OpenBoard"/>），只是不起名字对话框，直接用默认名加序号。
+    /// 建不出来（比如看板数已到上限）返回 null，错误照旧显示在底栏。
+    /// </summary>
+    public Board? CreateSiblingMemo()
+    {
+        try
+        {
+            ErrorText = null;
+
+            var name = Loc.T("manager.newMemoDefault");
+            var index = _service.GetBoards().Count(b => b.Kind == BoardKind.Memo) + 1;
+            if (index > 1)
+            {
+                name = $"{name} {index}";
+            }
+
+            return _service.CreateBoard(name, BoardKind.Memo);
+        }
+        catch (Exception ex)
+        {
+            ErrorText = ex.Message;
+            return null;
+        }
     }
 
     public void MarkDirty()
     {
         IsDirty = true;
+        NoticeText = null;
         StatusText = Loc.T("memo.saving");
     }
 

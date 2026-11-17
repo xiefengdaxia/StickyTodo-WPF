@@ -77,6 +77,75 @@ public sealed class AppSettingsService
     /// <summary>番茄钟计数对应的日期（用来跨天清零）。</summary>
     public const string PomodoroCountDateKey = "pomodoro.countDate";
 
+    // ---------------- GIF 录屏 ----------------
+
+    /// <summary>GIF 清晰度：low / medium / high。帧率、分辨率、色数一起决定文件大小。</summary>
+    public const string GifQualityKey = "gif.quality";
+
+    /// <summary>开始录制前是否走 3 秒倒计时（默认开，方便先切到要录的窗口）。</summary>
+    public const string GifCountdownKey = "gif.countdown";
+
+    /// <summary>上次用的录制范围：fullscreen / region（F2 直接沿用）。</summary>
+    public const string GifLastModeKey = "gif.lastMode";
+
+    /// <summary>上次录制的区域（屏幕物理像素，x,y,w,h），region 模式下 F2 沿用。</summary>
+    public const string GifLastRegionKey = "gif.lastRegion";
+
+    public const string GifQualityLow = "low";
+
+    public const string GifQualityMedium = "medium";
+
+    public const string GifQualityHigh = "high";
+
+    public const string DefaultGifQuality = GifQualityMedium;
+
+    /// <summary>GIF 清晰度档位（低/中/高）。认不出的值一律回落中档。</summary>
+    public string GifQuality
+    {
+        get => GetString(GifQualityKey, null).Trim().ToLowerInvariant() switch
+        {
+            GifQualityLow => GifQualityLow,
+            GifQualityHigh => GifQualityHigh,
+            _ => DefaultGifQuality,
+        };
+        set => SetSetting(GifQualityKey, ResolveGifQuality(value));
+    }
+
+    /// <summary>录制前 3 秒倒计时，默认开。</summary>
+    public bool GifCountdown
+    {
+        get => GetBool(GifCountdownKey, true);
+        set => SetSetting(GifCountdownKey, value ? "1" : "0");
+    }
+
+    /// <summary>上次的录制范围（fullscreen / region），默认全屏。</summary>
+    public string GifLastMode
+    {
+        get => string.Equals(GetString(GifLastModeKey, null), "region", StringComparison.OrdinalIgnoreCase)
+            ? "region"
+            : "fullscreen";
+        set => SetSetting(GifLastModeKey, string.Equals(value, "region", StringComparison.OrdinalIgnoreCase) ? "region" : "fullscreen");
+    }
+
+    /// <summary>上次录制的区域，"x,y,w,h"（屏幕物理像素）。没记录或格式不对返回 null。</summary>
+    public string? GifLastRegion
+    {
+        get
+        {
+            var raw = GetString(GifLastRegionKey, null);
+            return string.IsNullOrWhiteSpace(raw) ? null : raw.Trim();
+        }
+        set => SetSetting(GifLastRegionKey, value?.Trim() ?? string.Empty);
+    }
+
+    /// <summary>清晰度取值归一化。</summary>
+    public static string ResolveGifQuality(string? quality) => quality?.Trim().ToLowerInvariant() switch
+    {
+        GifQualityLow => GifQualityLow,
+        GifQualityHigh => GifQualityHigh,
+        _ => DefaultGifQuality,
+    };
+
     /// <summary>
     /// 界面语言（存储键如 zh-CN / en / ja / ko）。无法识别时回落简体中文。
     /// </summary>

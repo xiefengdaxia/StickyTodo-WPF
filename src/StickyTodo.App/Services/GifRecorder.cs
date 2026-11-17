@@ -1,0 +1,511 @@
+using System.Diagnostics;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
+using Serilog;
+using StickyTodo.Core.Media;
+
+namespace StickyTodo.App.Services;
+
+/// <summary>
+/// 一档清晰度：帧率 / 单帧最长边 / 色数。三者一起决定 GIF 的体积与观感。
+/// </summary>
+public readonly record struct GifQualityPreset(int Fps, int MaxDimension, int Colors)
+{
+    /// <summary>这一档的抓帧间隔（毫秒）。</summary>
+    public int IntervalMs => Math.Max(16, 1000 / Math.Max(1, Fps));
+}
+
+/// <summary>清晰度档位名（与设置里的取值一一对应）。</summary>
+public static class GifQualityPresets
+{
+    public const string Low = "low";
+    public const string Medium = "medium";
+    public const string High = "high";
+
+    public static string Normalize(string? quality) => quality?.Trim().ToLowerInvariant() switch
+    {
+        Low => Low,
+        High => High,
+        _ => Medium,
+    };
+
+    public static GifQualityPreset Resolve(string? quality) => Normalize(quality) switch
+    {
+        // 小文件：8fps / 480px / 64 色 —— 发群里、贴 issue 够用
+        Low => new GifQualityPreset(8, 480, 64),
+
+        // 高清：20fps / 720px / 256 色 —— 演示动效、鼠标轨迹看得清
+        High => new GifQualityPreset(20, 720, 256),
+
+        // 标准：12fps / 640px / 128 色
+        _ => new GifQualityPreset(12, 640, 128),
+    };
+}
+
+/// <summary>
+/// GIF 录屏引擎（只管抓帧和编码，不碰任何窗口）。
+///
+/// 抓帧用 GDI 的 CopyFromScreen **直接抓录制区域**：这台机器整屏一次 BitBlt 约 108ms，
+/// 先抓整屏再裁的话 20fps 根本跑不动。抓到的帧立刻按清晰度缩放并转成 BGRA 存内存。
+///
+/// 上限：最长 30 秒 / 300 帧 / 单帧最长边 720px / 帧数据 320MB，最先到的那条自动停
+/// （GIF 越大越没用，聊天软件基本都在 8-10MB 开始不耐烦）。
+///
+/// 线程模型：抓帧和编码都在后台线程，完成时通过事件回到调用方；
+/// <see cref="FrameTick"/> 是从抓帧线程抛出来的，UI 侧自己 Dispatcher 切回去。
+/// </summary>
+public sealed class GifRecorder : IDisposable
+{
+    /// <summary>最多录多少帧。</summary>
+    public const int MaxFrames = 300;
+
+    /// <summary>单帧最长边上限（像素）。</summary>
+    public const int MaxDimension = 720;
+
+    /// <summary>最长录制时长。</summary>
+    public static readonly TimeSpan MaxDuration = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// 帧数据的内存上限。每帧是整幅 BGRA：整屏 720px 一帧约 2MB，300 帧就是 600MB，
+    /// 8G 内存的机器上会很难看，所以再加一道总字节数的闸（到顶就当录满，正常出图）。
+    /// </summary>
+    public const long MaxBufferBytes = 320L * 1024 * 1024;
+
+    /// <summary>GIF 的延时是 1/100 秒，低于 2 会被一些播放器当 0 处理成 10。</summary>
+    private const int MinFrameDelayMs = 20;
+
+    private const int MaxFrameDelayMs = 1000;
+
+    private enum RecordState
+    {
+        Idle,
+        Recording,
+        Encoding,
+    }
+
+    private readonly object _gate = new();
+
+    private readonly List<GifFrame> _frames = new();
+
+    /// <summary>每帧开始抓取的时间点（毫秒），用来算真实帧间隔。</summary>
+    private readonly List<int> _timeMarks = new();
+
+    private RecordState _state = RecordState.Idle;
+    private Thread? _thread;
+    private ManualResetEvent? _stop;
+    private Rectangle _region;
+    private GifQualityPreset _preset;
+    private bool _discard;
+
+    /// <summary>抓帧进度（已录时长），从抓帧线程触发。</summary>
+    public event Action<TimeSpan>? FrameTick;
+
+    /// <summary>抓帧结束、开始建调色板与编码（UI 可以显示「正在生成…」）。</summary>
+    public event Action? EncodingStarted;
+
+    /// <summary>编码完成，参数是 GIF 字节。</summary>
+    public event Action<byte[]>? Finished;
+
+    /// <summary>出错（区域非法 / 一帧都没抓到 / 编码异常）。</summary>
+    public event Action<string>? Failed;
+
+    /// <summary>清晰度档位（low / medium / high）。下一次 <see cref="Start"/> 生效。</summary>
+    public string Quality { get; set; } = GifQualityPresets.Medium;
+
+    /// <summary>正在抓帧。</summary>
+    public bool IsRecording
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _state == RecordState.Recording;
+            }
+        }
+    }
+
+    /// <summary>在抓帧或在编码（这段时间不要开第二次录制）。</summary>
+    public bool IsBusy
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _state != RecordState.Idle;
+            }
+        }
+    }
+
+    /// <summary>已经录到的帧数。</summary>
+    public int FrameCount
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _frames.Count;
+            }
+        }
+    }
+
+    /// <summary>开始录制一块屏幕区域（物理像素）。返回 false 表示没能开始。</summary>
+    public bool Start(Rectangle regionPx, string? quality = null)
+    {
+        lock (_gate)
+        {
+            if (_state != RecordState.Idle)
+            {
+                return false;
+            }
+
+            if (regionPx.Width < 2 || regionPx.Height < 2)
+            {
+                Serilog.Log.Warning("[gif] 录制区域太小：{Width}x{Height}", regionPx.Width, regionPx.Height);
+                return false;
+            }
+
+            _region = regionPx;
+            _preset = GifQualityPresets.Resolve(quality ?? Quality);
+            Quality = GifQualityPresets.Normalize(quality ?? Quality);
+            _frames.Clear();
+            _timeMarks.Clear();
+            _discard = false;
+            _stop = new ManualResetEvent(false);
+            _state = RecordState.Recording;
+
+            _thread = new Thread(CaptureLoop)
+            {
+                IsBackground = true,
+                Name = "gif-capture",
+            };
+            _thread.Start();
+        }
+
+        Log.Information(
+            "[gif] 开始录制 {Width}x{Height} @ {X},{Y} · 清晰度 {Quality}（{Fps}fps / 最长边 {Max}px / {Colors}色）",
+            regionPx.Width, regionPx.Height, regionPx.X, regionPx.Y, Quality,
+            _preset.Fps, _preset.MaxDimension, _preset.Colors);
+
+        return true;
+    }
+
+    /// <summary>停止抓帧，随后自动进入编码 → <see cref="Finished"/>。</summary>
+    public void Stop() => SignalStop(discard: false);
+
+    /// <summary>放弃这次录制（不编码、不出图）。</summary>
+    public void Cancel() => SignalStop(discard: true);
+
+    private void SignalStop(bool discard)
+    {
+        lock (_gate)
+        {
+            if (_state != RecordState.Recording)
+            {
+                return;
+            }
+
+            if (discard)
+            {
+                _discard = true;
+            }
+
+            _stop?.Set();
+        }
+    }
+
+    // ---------------- 抓帧 ----------------
+
+    private void CaptureLoop()
+    {
+        Rectangle region;
+        GifQualityPreset preset;
+        ManualResetEvent stop;
+
+        lock (_gate)
+        {
+            region = _region;
+            preset = _preset;
+            stop = _stop!;
+        }
+
+        var scale = Math.Min(1d, MaxDimension / (double)Math.Max(region.Width, region.Height));
+        var targetWidth = scale < 1 ? Math.Max(2, (int)Math.Round(region.Width * scale)) : region.Width;
+        var targetHeight = scale < 1 ? Math.Max(2, (int)Math.Round(region.Height * scale)) : region.Height;
+        var interval = preset.IntervalMs;
+
+        Bitmap? raw = null;
+        Bitmap? scaled = null;
+
+        try
+        {
+            raw = new Bitmap(region.Width, region.Height, PixelFormat.Format32bppArgb);
+
+            if (scale < 1)
+            {
+                scaled = new Bitmap(targetWidth, targetHeight, PixelFormat.Format32bppArgb);
+            }
+
+            using var rawGraphics = Graphics.FromImage(raw);
+            using var scaledGraphics = scaled is null ? null : Graphics.FromImage(scaled);
+
+            if (scaledGraphics is not null)
+            {
+                scaledGraphics.InterpolationMode = InterpolationMode.Bilinear;
+                scaledGraphics.PixelOffsetMode = PixelOffsetMode.Half;
+                scaledGraphics.CompositingMode = CompositingMode.SourceCopy;
+            }
+
+            var clock = Stopwatch.StartNew();
+            var failedFrames = 0;
+            long bufferedBytes = 0;
+
+            while (!stop.WaitOne(0))
+            {
+                var frameStart = (int)clock.ElapsedMilliseconds;
+
+                try
+                {
+                    // 每帧都新建 Graphics 太慢，复用；CopyFromScreen 本身会整块覆盖
+                    rawGraphics.CopyFromScreen(
+                        region.Left, region.Top, 0, 0, region.Size, CopyPixelOperation.SourceCopy);
+
+                    Bitmap source;
+                    if (scaled is not null && scaledGraphics is not null)
+                    {
+                        scaledGraphics.DrawImage(
+                            raw,
+                            new Rectangle(0, 0, targetWidth, targetHeight),
+                            0, 0, raw.Width, raw.Height,
+                            GraphicsUnit.Pixel);
+                        source = scaled;
+                    }
+                    else
+                    {
+                        source = raw;
+                    }
+
+                    var bgra = CopyToBgra(source);
+                    PushFrame(new GifFrame(bgra, targetWidth, targetHeight, interval), frameStart);
+                    bufferedBytes += bgra.Length;
+                    failedFrames = 0;
+                }
+                catch (Exception ex)
+                {
+                    failedFrames++;
+
+                    // 偶发失败（切用户、锁屏、UAC 弹窗）跳过这一帧；连续失败就别硬撑了
+                    if (failedFrames >= 15)
+                    {
+                        Log.Warning(ex, "[gif] 连续抓帧失败，停止录制");
+                        break;
+                    }
+                }
+
+                FrameTick?.Invoke(clock.Elapsed);
+
+                int count;
+                lock (_gate)
+                {
+                    count = _frames.Count;
+                }
+
+                if (count >= MaxFrames)
+                {
+                    Log.Information("[gif] 达到 {Max} 帧上限，自动停止", MaxFrames);
+                    break;
+                }
+
+                if (clock.Elapsed >= MaxDuration)
+                {
+                    Log.Information("[gif] 达到 {Seconds} 秒上限，自动停止", (int)MaxDuration.TotalSeconds);
+                    break;
+                }
+
+                if (bufferedBytes >= MaxBufferBytes)
+                {
+                    Log.Information("[gif] 帧数据达到 {Mb} MB 上限，自动停止", MaxBufferBytes / (1024 * 1024));
+                    break;
+                }
+
+                var wait = interval - (int)(clock.ElapsedMilliseconds - frameStart);
+                if (wait > 0)
+                {
+                    stop.WaitOne(wait);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "[gif] 抓帧线程异常");
+            lock (_gate)
+            {
+                _state = RecordState.Idle;
+            }
+
+            Failed?.Invoke("抓屏失败：" + ex.Message);
+            return;
+        }
+        finally
+        {
+            scaled?.Dispose();
+            raw?.Dispose();
+        }
+
+        bool discard;
+        List<GifFrame> frames;
+
+        lock (_gate)
+        {
+            discard = _discard;
+            frames = BuildTimedFramesLocked();
+            _state = discard ? RecordState.Idle : RecordState.Encoding;
+        }
+
+        if (discard)
+        {
+            Log.Information("[gif] 已放弃这次录制（{Frames} 帧）", frames.Count);
+            return;
+        }
+
+        if (frames.Count == 0)
+        {
+            lock (_gate)
+            {
+                _state = RecordState.Idle;
+            }
+
+            Log.Warning("[gif] 一帧都没抓到");
+            Failed?.Invoke("一帧都没抓到，请重试");
+            return;
+        }
+
+        EncodingStarted?.Invoke();
+        Encode(frames);
+    }
+
+    /// <summary>按抓帧时间点算出每帧的真实延时（抓帧慢的时候 GIF 也不会变快）。</summary>
+    private List<GifFrame> BuildTimedFramesLocked()
+    {
+        var frames = new List<GifFrame>(_frames.Count);
+        var nominal = Math.Clamp(_preset.IntervalMs, MinFrameDelayMs, MaxFrameDelayMs);
+
+        for (var i = 0; i < _frames.Count; i++)
+        {
+            var delay = nominal;
+            if (i + 1 < _frames.Count && i + 1 < _timeMarks.Count)
+            {
+                delay = Math.Clamp(_timeMarks[i + 1] - _timeMarks[i], MinFrameDelayMs, MaxFrameDelayMs);
+            }
+
+            frames.Add(_frames[i] with { DelayMs = delay });
+        }
+
+        return frames;
+    }
+
+    private void PushFrame(GifFrame frame, int timeMark)
+    {
+        lock (_gate)
+        {
+            _frames.Add(frame);
+            _timeMarks.Add(timeMark);
+        }
+    }
+
+    private static byte[] CopyToBgra(Bitmap bitmap)
+    {
+        var width = bitmap.Width;
+        var height = bitmap.Height;
+        var rect = new Rectangle(0, 0, width, height);
+        var data = bitmap.LockBits(rect, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+
+        try
+        {
+            var buffer = new byte[width * height * 4];
+            var rowBytes = width * 4;
+            var stride = Math.Abs(data.Stride);
+            var row = new byte[stride];
+
+            for (var y = 0; y < height; y++)
+            {
+                Marshal.Copy(IntPtr.Add(data.Scan0, y * data.Stride), row, 0, stride);
+                Buffer.BlockCopy(row, 0, buffer, y * rowBytes, rowBytes);
+            }
+
+            return buffer;
+        }
+        finally
+        {
+            bitmap.UnlockBits(data);
+        }
+    }
+
+    // ---------------- 编码 ----------------
+
+    private void Encode(List<GifFrame> frames)
+    {
+        var preset = _preset;
+        var width = frames[0].Width;
+        var height = frames[0].Height;
+        var count = frames.Count;
+
+        // 都在后台线程做：建调色板 + 量化 + LZW，300 帧要一两秒，不能卡 UI
+        Task.Run(() =>
+        {
+            var watch = Stopwatch.StartNew();
+
+            try
+            {
+                var samples = GifEncoder.SampleFrames(frames, 12);
+                var palette = GifEncoder.BuildPalette(samples, preset.Colors);
+
+                var indexed = new List<(byte[] Indices, int DelayMs)>(count);
+                foreach (var frame in frames)
+                {
+                    indexed.Add((GifEncoder.Quantize(palette, frame.Bgra, width, height), frame.DelayMs));
+                }
+
+                var gif = GifEncoder.Encode(width, height, indexed, palette, loopCount: 0);
+
+                lock (_gate)
+                {
+                    _state = RecordState.Idle;
+                }
+
+                Log.Information(
+                    "[gif] 编码完成：{Frames} 帧 {Width}x{Height} · {Colors}色 · {Size} KB（{Ms} ms）",
+                    count, width, height, palette.ColorCount, gif.Length / 1024, watch.ElapsedMilliseconds);
+
+                Finished?.Invoke(gif);
+            }
+            catch (Exception ex)
+            {
+                lock (_gate)
+                {
+                    _state = RecordState.Idle;
+                }
+
+                Log.Error(ex, "[gif] 编码失败");
+                Failed?.Invoke("GIF 生成失败：" + ex.Message);
+            }
+        });
+    }
+
+    public void Dispose()
+    {
+        Cancel();
+
+        Thread? thread;
+        lock (_gate)
+        {
+            thread = _thread;
+        }
+
+        if (thread is not null && thread.IsAlive)
+        {
+            thread.Join(TimeSpan.FromSeconds(2));
+        }
+    }
+}

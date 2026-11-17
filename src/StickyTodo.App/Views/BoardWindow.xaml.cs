@@ -613,6 +613,68 @@ public partial class BoardWindow : Window, IStickyWindow, IBoardDataRefresh
         }
     }
 
+    // ---------------- 导出 ----------------
+
+    /// <summary>点标题栏的 ⤓：把三个导出选项弹在按钮下面。</summary>
+    private void ExportTodos_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { ContextMenu: { } menu } element)
+        {
+            return;
+        }
+
+        menu.PlacementTarget = element;
+        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+        menu.IsOpen = true;
+        e.Handled = true;
+    }
+
+    private async void ExportTodosMarkdown_Click(object sender, RoutedEventArgs e) =>
+        await ExportTodosAsync(ExportFormat.Markdown);
+
+    private async void ExportTodosCsv_Click(object sender, RoutedEventArgs e) =>
+        await ExportTodosAsync(ExportFormat.Csv);
+
+    private async void ExportTodosJson_Click(object sender, RoutedEventArgs e) =>
+        await ExportTodosAsync(ExportFormat.Json);
+
+    /// <summary>
+    /// 导出当前看板的待办（全部，不受标签/视图筛选影响）。
+    /// 先把正在编辑的行提交掉，免得导出的还是改之前的标题。
+    /// </summary>
+    private async Task ExportTodosAsync(ExportFormat format)
+    {
+        try
+        {
+            _viewModel.ErrorText = null;
+            await CommitEditingRowsAsync();
+
+            var rows = await Task.Run(() => _viewModel.BuildExportRows());
+            var path = ExportService.AskSavePath(this, _viewModel.BoardName, format);
+            if (path is null)
+            {
+                return;
+            }
+
+            var text = format switch
+            {
+                ExportFormat.Csv => ExportService.TodosCsv(rows),
+                ExportFormat.Json => ExportService.TodosJson(rows),
+                _ => ExportService.TodosMarkdown(rows),
+            };
+
+            // JSON 不带 BOM（规范），其它几种带上，Windows 记事本 / Excel 才不乱码
+            var bom = format != ExportFormat.Json;
+            await Task.Run(() => ExportService.WriteText(path, text, bom));
+
+            _viewModel.NoticeText = Loc.F("memo.exported", path);
+        }
+        catch (Exception ex)
+        {
+            _viewModel.ErrorText = ex.Message;
+        }
+    }
+
     private UnlockChipWindow? _unlockChip;
 
     /// <summary>给回归用：锁定交互诊断（穿透是否生效、解锁徽标是否浮出、是否置顶）。</summary>

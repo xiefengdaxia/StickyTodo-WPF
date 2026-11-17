@@ -52,6 +52,10 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost, ISessio
     [ObservableProperty]
     private string? _errorText;
 
+    /// <summary>底部那行一次性提示（比如「已导出：…」），下次数据变化就被状态行盖掉。</summary>
+    [ObservableProperty]
+    private string? _noticeText;
+
     /// <summary>
     /// 表格末尾那行「空白行」的文本。在这里回车/失焦即新增一条，
     /// 因此不再需要单独的输入框和「添加」按钮。
@@ -641,6 +645,9 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost, ISessio
                 ? Loc.F("board.itemCount", visible.Count)
                 : Loc.F("board.itemCountInTag", visible.Count, filterName);
 
+        // 数据一刷新，上一次的「已导出…」就不再是最新的了
+        NoticeText = null;
+
         RebuildQuadrants();
 
         return;
@@ -781,6 +788,27 @@ public partial class BoardViewModel : ObservableObject, IAppearanceHost, ISessio
 
         var due = DueDateText.Describe(item.DueAt, DateTimeOffset.Now);
         return due.Length > 0 && due.Contains(keyword, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// 导出用：当前看板全部待办（不受标签 / 视图筛选影响）的快照，带标签名。
+    /// 直接读库，所以导出的一定是落库后的最新内容。
+    /// </summary>
+    public IReadOnlyList<TodoExportRow> BuildExportRows()
+    {
+        var items = _service.GetTodos(BoardId);
+
+        return items.Select(item => new TodoExportRow(
+                item.Id,
+                item.Title,
+                item.IsDone,
+                item.DueAt,
+                item.Note,
+                TagsOf(item.Id)
+                    .Where(id => _tagsById.ContainsKey(id))
+                    .Select(id => _tagsById[id].Name)
+                    .ToList()))
+            .ToList();
     }
 
     private string TagTextOf(string todoId)

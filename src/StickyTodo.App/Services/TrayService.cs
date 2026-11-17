@@ -429,6 +429,50 @@ public sealed class TrayService : IDisposable
         });
         menu.Items.Add(closePins);
 
+        // GIF 录屏：展开后选「全屏 / 区域」，区域走截图遮罩的「录 GIF」按钮
+        var gifs = _services.GetRequiredService<GifRecordingService>();
+
+        var recordGif = new WinForms.ToolStripMenuItem(Loc.T("gif.record"))
+        {
+            ShortcutKeyDisplayString = HotKeyService.RecordGifHotKey,
+            ShowShortcutKeys = true,
+        };
+
+        var gifFullScreen = new WinForms.ToolStripMenuItem(Loc.T("gif.fullscreen"));
+        gifFullScreen.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        {
+            _menu?.Close();
+            gifs.StartFullScreen();
+        });
+        recordGif.DropDownItems.Add(gifFullScreen);
+
+        var gifRegion = new WinForms.ToolStripMenuItem(Loc.T("gif.region"));
+        gifRegion.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        {
+            _menu?.Close();
+            _ = pins.CaptureGifRegionAsync();
+        });
+        recordGif.DropDownItems.Add(gifRegion);
+
+        recordGif.DropDownItems.Add(new WinForms.ToolStripSeparator());
+
+        // 热键提示放在子菜单里，平时不占地方（F1 截图 · F2 录 GIF · F4 停止）
+        recordGif.DropDownItems.Add(new WinForms.ToolStripMenuItem(Loc.T("gif.hint")) { Enabled = false });
+
+        menu.Items.Add(recordGif);
+
+        var stopGif = new WinForms.ToolStripMenuItem(Loc.T("gif.stop"))
+        {
+            ShortcutKeyDisplayString = HotKeyService.StopRecordHotKey,
+            ShowShortcutKeys = true,
+        };
+        stopGif.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        {
+            _menu?.Close();
+            gifs.StopRecording();
+        });
+        menu.Items.Add(stopGif);
+
         menu.Items.Add(new WinForms.ToolStripSeparator());
 
         _boardsMenu = new WinForms.ToolStripMenuItem(Loc.T("tray.boards"));

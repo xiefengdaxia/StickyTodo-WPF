@@ -15,6 +15,8 @@ public sealed class HotKeyService : IDisposable
     private const int IdLockActive = 0x6103;
     private const int IdSnip = 0x6104;
     private const int IdPinAgain = 0x6105;
+    private const int IdRecordGif = 0x6106;
+    private const int IdStopRecord = 0x6107;
 
     private const uint ModAlt = 0x0001;
     private const uint ModControl = 0x0002;
@@ -24,7 +26,9 @@ public sealed class HotKeyService : IDisposable
     private const uint VkH = 0x48;
     private const uint VkL = 0x4C;
     private const uint VkF1 = 0x70;
+    private const uint VkF2 = 0x71;
     private const uint VkF3 = 0x72;
+    private const uint VkF4 = 0x73;
 
     private HwndSource? _source;
     private nint _handle;
@@ -41,13 +45,21 @@ public sealed class HotKeyService : IDisposable
     /// <summary>把上一次的截图再贴一张（默认 F3）。</summary>
     public static string PinAgainHotKey => "F3";
 
+    /// <summary>开始/停止 GIF 录制（默认 F2，沿用上次的范围）。</summary>
+    public static string RecordGifHotKey => "F2";
+
+    /// <summary>立即停止 GIF 录制（默认 F4）。</summary>
+    public static string StopRecordHotKey => "F4";
+
     public int Attach(
         Window window,
         Action onNewTodo,
         Action onToggleBoards,
         Action onLockActive,
         Action? onSnip = null,
-        Action? onPinAgain = null)
+        Action? onPinAgain = null,
+        Action? onRecordGif = null,
+        Action? onStopRecord = null)
     {
         // 主窗体可能一直没显示过（上次有看板时我们不弹它），这时
         // PresentationSource.FromVisual 是 null，直接 return 会让所有全局快捷键静默失效。
@@ -70,15 +82,19 @@ public sealed class HotKeyService : IDisposable
         registered += Register(IdToggleBoards, "显示/隐藏", VkH, ModControl | ModAlt) ? 1 : 0;
         registered += Register(IdLockActive, "锁定看板", VkL, ModControl | ModAlt) ? 1 : 0;
 
-        // F1 / F3 不带修饰键
+        // F1 / F2 / F3 / F4 不带修饰键
         registered += Register(IdSnip, "截图", VkF1, 0) ? 1 : 0;
+        registered += Register(IdRecordGif, "录 GIF", VkF2, 0) ? 1 : 0;
         registered += Register(IdPinAgain, "再贴一张", VkF3, 0) ? 1 : 0;
+        registered += Register(IdStopRecord, "停止录制", VkF4, 0) ? 1 : 0;
 
         _onNewTodo = onNewTodo;
         _onToggleBoards = onToggleBoards;
         _onLockActive = onLockActive;
         _onSnip = onSnip;
         _onPinAgain = onPinAgain;
+        _onRecordGif = onRecordGif;
+        _onStopRecord = onStopRecord;
 
         return registered;
     }
@@ -88,6 +104,8 @@ public sealed class HotKeyService : IDisposable
     private Action? _onLockActive;
     private Action? _onSnip;
     private Action? _onPinAgain;
+    private Action? _onRecordGif;
+    private Action? _onStopRecord;
 
     /// <summary>注册一个全局热键；失败（被别的程序占用）时记一条警告，返回 false。</summary>
     private bool Register(int id, string name, uint key, uint modifiers)
@@ -133,6 +151,14 @@ public sealed class HotKeyService : IDisposable
                 _onPinAgain?.Invoke();
                 handled = true;
                 break;
+            case IdRecordGif:
+                _onRecordGif?.Invoke();
+                handled = true;
+                break;
+            case IdStopRecord:
+                _onStopRecord?.Invoke();
+                handled = true;
+                break;
         }
 
         return nint.Zero;
@@ -150,6 +176,8 @@ public sealed class HotKeyService : IDisposable
         UnregisterHotKey(_handle, IdLockActive);
         UnregisterHotKey(_handle, IdSnip);
         UnregisterHotKey(_handle, IdPinAgain);
+        UnregisterHotKey(_handle, IdRecordGif);
+        UnregisterHotKey(_handle, IdStopRecord);
 
         _source?.RemoveHook(WndProc);
         _source = null;

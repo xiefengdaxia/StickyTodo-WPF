@@ -392,6 +392,7 @@ public partial class App : System.Windows.Application
                 services.AddSingleton<TrayService>();
                 services.AddSingleton<ReminderPump>();
                 services.AddSingleton<HotKeyService>();
+                services.AddSingleton<GifRecordingService>();
                 services.AddSingleton<PinManager>();
                 services.AddSingleton<EyeCareFilter>();
                 services.AddSingleton<EyeGammaService>();
@@ -587,6 +588,7 @@ public partial class App : System.Windows.Application
         var hotKeys = _host!.Services.GetRequiredService<HotKeyService>();
         var windows = _host.Services.GetRequiredService<WindowManager>();
         var pins = _host.Services.GetRequiredService<PinManager>();
+        var gifs = _host.Services.GetRequiredService<GifRecordingService>();
 
         var registered = hotKeys.Attach(
             host,
@@ -594,13 +596,17 @@ public partial class App : System.Windows.Application
             onToggleBoards: windows.ToggleBoardsVisibility,
             onLockActive: () => windows.ToggleActiveLock(),
             onSnip: () => _ = pins.CaptureAndPinAsync(),
-            onPinAgain: () => pins.PinLast());
+            onPinAgain: () => pins.PinLast(),
+            onRecordGif: gifs.ToggleRecording,
+            onStopRecord: gifs.StopRecording);
 
         Log.Information(
-            "全局快捷键已注册 {Count}/5：{New} 新建待办 / {Toggle} 显示隐藏 / {Lock} 锁定当前看板 / {Snip} 截图 / {Pin} 再贴一张",
+            "全局快捷键已注册 {Count}/7：{New} 新建待办 / {Toggle} 显示隐藏 / {Lock} 锁定当前看板 / {Snip} 截图 / "
+            + "{Pin} 再贴一张 / {RecordGif} 录 GIF（开始/停止）/ {StopRecord} 立即停止录制",
             registered,
             HotKeyService.NewTodoHotKey, HotKeyService.ToggleBoardsHotKey, HotKeyService.LockActiveHotKey,
-            HotKeyService.SnipHotKey, HotKeyService.PinAgainHotKey);
+            HotKeyService.SnipHotKey, HotKeyService.PinAgainHotKey,
+            HotKeyService.RecordGifHotKey, HotKeyService.StopRecordHotKey);
     }
 
 #if DEBUG
@@ -655,6 +661,7 @@ public partial class App : System.Windows.Application
                 _host.Services.GetService<WindowManager>()?.CloseAll();
                 _host.Services.GetService<StickyTodo.Mcp.McpService>()?.Dispose();
                 _host.Services.GetService<TrayService>()?.Dispose();
+                _host.Services.GetService<GifRecordingService>()?.Dispose();
                 _host.Services.GetService<EyeCareFilter>()?.Dispose();
                 _host.Services.GetService<EyeGammaService>()?.Dispose();
                 _memoryTrimmer?.Dispose();

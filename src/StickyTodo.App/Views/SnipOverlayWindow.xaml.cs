@@ -63,6 +63,12 @@ public partial class SnipOverlayWindow : Window
     /// <summary>点「贴图」后的成品图；取消时为 null。</summary>
     public BitmapSource? Result { get; private set; }
 
+    /// <summary>
+    /// 点「录 GIF」时的选区（**屏幕物理像素**）；没点过就是 null。
+    /// 调用方看到它非 null 就跳过贴图，直接开录。
+    /// </summary>
+    public System.Drawing.Rectangle? GifRegion { get; private set; }
+
     public SnipOverlayWindow(BitmapSource screenshot)
     {
         InitializeComponent();
@@ -70,6 +76,9 @@ public partial class SnipOverlayWindow : Window
         _screenshot = screenshot;
         Backdrop.Source = screenshot;
         Bright.Source = screenshot;
+
+        // 工具条上的「录 GIF」用文案表里的 key，切语言时跟着变
+        RecordGifButton.Content = StickyTodo.Core.Localization.Loc.T("gif.record");
 
         // 初始：整屏压暗，没有"亮洞"
         ShowFullDim();
@@ -524,6 +533,8 @@ public partial class SnipOverlayWindow : Window
 
     private void Pin_Click(object sender, RoutedEventArgs e) => Pin();
 
+    private void RecordGif_Click(object sender, RoutedEventArgs e) => RecordGif();
+
     // ---------------- 绘制 ----------------
 
     private void StartDrawing(Point point, MouseButtonEventArgs e)
@@ -785,6 +796,52 @@ public partial class SnipOverlayWindow : Window
 
     /// <summary>用户是不是只选择了「截图」（不要贴到桌面）。</summary>
     public bool CopiedOnly { get; private set; }
+
+    /// <summary>
+    /// 工具栏「录 GIF」：把当前框选交给录制流程，遮罩立刻关掉（不然工具条会被录进去）。
+    /// 不做合成、不进剪贴板 —— 录制由 <see cref="Services.GifRecordingService"/> 接手。
+    /// </summary>
+    public void RecordGif()
+    {
+        if (!_hasSelection || _selection.Width < 1 || _selection.Height < 1)
+        {
+            return;
+        }
+
+        CommitText();
+
+        GifRegion = SelectionScreenRect();
+        Result = null;
+        CopiedOnly = false;
+        DialogResult = true;
+    }
+
+    /// <summary>
+    /// 选区换算成屏幕**物理像素**的矩形（GDI 抓屏要的就是这个坐标系）。
+    /// 遮罩是铺在整个虚拟屏上的，所以「选区 × 截图/窗口 的像素比」再加虚拟屏原点即可。
+    /// </summary>
+    private System.Drawing.Rectangle SelectionScreenRect()
+    {
+        var bounds = Services.ScreenCaptureService.GetVirtualScreenBounds();
+        var sx = ScaleX;
+        var sy = ScaleY;
+
+        var x = bounds.Left + (int)Math.Round(_selection.X * sx);
+        var y = bounds.Top + (int)Math.Round(_selection.Y * sy);
+        var width = Math.Max(4, (int)Math.Round(_selection.Width * sx));
+        var height = Math.Max(4, (int)Math.Round(_selection.Height * sy));
+
+        // 越界坐标不要送给 CopyFromScreen（多屏拼接时容易算出界）
+        var right = Math.Min(bounds.Right, x + width);
+        var bottom = Math.Min(bounds.Bottom, y + height);
+        x = Math.Clamp(x, bounds.Left, bounds.Right);
+        y = Math.Clamp(y, bounds.Top, bounds.Bottom);
+
+        return new System.Drawing.Rectangle(
+            x, y,
+            Math.Max(4, right - x),
+            Math.Max(4, bottom - y));
+    }
 
     /// <summary>
     /// 把图片放进剪贴板：大图要几百毫秒，放独立 STA 线程后台做，

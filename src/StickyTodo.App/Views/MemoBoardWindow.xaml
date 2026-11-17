@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="{Binding BoardName}"
         Icon="/Assets/stickytodo.ico"
-        Width="380" Height="420"
+        Width="380" Height="440"
         MinWidth="240" MinHeight="180"
         WindowStyle="None"
         AllowsTransparency="True"
@@ -16,6 +16,19 @@
         UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Display">
 
+    <Window.Resources>
+        <!-- 预览用的只读文档视图：跟纸面同色、不要边框和工具栏，只要滚动条 -->
+        <Style x:Key="Preview.Surface" TargetType="FlowDocumentScrollViewer">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="14,10,8,10" />
+            <Setter Property="IsToolBarVisible" Value="False" />
+            <Setter Property="IsSelectionEnabled" Value="True" />
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+        </Style>
+    </Window.Resources>
+
     <Border x:Name="NoteRoot"
             Effect="{Binding CurrentOpacity, Converter={StaticResource PaperShadow}}"
             Margin="10"
@@ -27,10 +40,12 @@
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
+            <!-- 标题栏：拖动区 + 悬浮按钮（＋ 新建便签 / ⤓ 导出） -->
             <Border Grid.Row="0"
                     Background="{Binding PaperDeepBrush}"
                     CornerRadius="11,11,0,0"
@@ -118,31 +133,104 @@
                         </Button>
 
                         <Button Style="{StaticResource Button.Chrome}" Content="🎨" FontSize="11" ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.appearance}" Click="Appearance_Click" />
+
+                        <!-- 导出：点一下弹出 Markdown / HTML / 纯文本 三个选项 -->
+                        <Button x:Name="ExportButton"
+                                Style="{StaticResource Button.Chrome}"
+                                Content="⤓"
+                                FontSize="12"
+                                ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=memo.export}"
+                                Click="Export_Click">
+                            <Button.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="{Binding Converter={StaticResource Loc}, ConverterParameter=memo.exportMarkdown}"
+                                              Click="ExportMarkdown_Click" />
+                                    <MenuItem Header="{Binding Converter={StaticResource Loc}, ConverterParameter=memo.exportHtml}"
+                                              Click="ExportHtml_Click" />
+                                    <MenuItem Header="{Binding Converter={StaticResource Loc}, ConverterParameter=memo.exportText}"
+                                              Click="ExportText_Click" />
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                        </Button>
+
+                        <!-- ＋ 再开一张便签：复用「新建便签看板」那条路，不经过管理面板 -->
+                        <Button Style="{StaticResource Button.Chrome}"
+                                Content="＋"
+                                FontSize="12"
+                                ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=memo.newMemo}"
+                                Click="NewMemo_Click" />
+
                         <Button Style="{StaticResource Button.Chrome}" Content="⋯" FontSize="13" ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.manage}" Click="OpenManager_Click" />
                         <Button Style="{StaticResource Button.Chrome}" Content="✕" FontSize="11" ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=chrome.close}" Click="Close_Click" />
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <!-- 整块就是一张纸：无边框输入，边写边存 -->
-            <TextBox x:Name="Editor"
-                     Grid.Row="1"
-                     Text="{Binding Content, UpdateSourceTrigger=PropertyChanged}"
-                     AcceptsReturn="True"
-                     AcceptsTab="True"
-                     TextWrapping="Wrap"
-                     VerticalScrollBarVisibility="Auto"
-                     IsHitTestVisible="{Binding IsLocked, Converter={StaticResource InverseBool}}"
-                     Background="Transparent"
-                     BorderThickness="0"
-                     Padding="14,12"
-                     FontSize="13.5"
-                     Foreground="{DynamicResource Brush.Ink}"
-                     CaretBrush="{DynamicResource Brush.Ink}"
-                     SpellCheck.IsEnabled="False"
-                     TextChanged="Editor_TextChanged" />
+            <!-- 编辑 / 预览 分段切换（切换只换显示方式，正文不动） -->
+            <Border Grid.Row="1"
+                    Padding="12,0,12,6"
+                    Background="{Binding PaperDeepBrush}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
 
-            <Border Grid.Row="2"
+                    <Border Grid.Column="0"
+                            CornerRadius="9"
+                            Background="{DynamicResource Brush.ChipIdle}"
+                            BorderBrush="{DynamicResource Brush.Line}"
+                            BorderThickness="1"
+                            Padding="2"
+                            HorizontalAlignment="Left">
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="EditTab" Style="{StaticResource SegmentTab.Active}" Click="EditTab_Click">
+                                <TextBlock Text="{Binding EditTabText}" />
+                            </Button>
+                            <Button x:Name="PreviewTab" Style="{StaticResource SegmentTab}" Click="PreviewTab_Click">
+                                <TextBlock Text="{Binding PreviewTabText}" />
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock Grid.Column="1"
+                               Text="{Binding MarkdownHint}"
+                               Style="{StaticResource Text.Caption}"
+                               Margin="8,0,0,0"
+                               FontSize="10"
+                               Opacity="0.6"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding MarkdownHint}"
+                               Visibility="{Binding IsPreview, Converter={StaticResource InverseBoolToVis}}" />
+                </Grid>
+            </Border>
+
+            <!-- 整块就是一张纸：编辑是原来的 TextBox，预览是同一份文本渲染出来的只读文档 -->
+            <Grid Grid.Row="2">
+                <TextBox x:Name="Editor"
+                         Text="{Binding Content, UpdateSourceTrigger=PropertyChanged}"
+                         AcceptsReturn="True"
+                         AcceptsTab="True"
+                         TextWrapping="Wrap"
+                         VerticalScrollBarVisibility="Auto"
+                         IsHitTestVisible="{Binding IsLocked, Converter={StaticResource InverseBool}}"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         Padding="14,12"
+                         FontSize="13.5"
+                         Foreground="{DynamicResource Brush.Ink}"
+                         CaretBrush="{DynamicResource Brush.Ink}"
+                         SpellCheck.IsEnabled="False"
+                         Visibility="{Binding IsPreview, Converter={StaticResource InverseBoolToVis}}"
+                         TextChanged="Editor_TextChanged" />
+
+                <FlowDocumentScrollViewer x:Name="Previewer"
+                                          Style="{StaticResource Preview.Surface}"
+                                          Visibility="{Binding IsPreview, Converter={StaticResource BoolToVis}}" />
+            </Grid>
+
+            <Border Grid.Row="3"
                     BorderBrush="{DynamicResource Brush.Line}"
                     BorderThickness="0,1,0,0"
                     Padding="12,6">
@@ -150,12 +238,26 @@
                     <TextBlock Text="{Binding Converter={StaticResource Loc}, ConverterParameter=memo.placeholder}"
                                Style="{StaticResource Text.Caption}"
                                Opacity="0.75"
+                               Margin="0,0,10,0"
                                VerticalAlignment="Center" />
-                    <TextBlock Text="{Binding ErrorText}"
-                               HorizontalAlignment="Right"
-                               FontSize="11"
-                               Foreground="#FFC0392B"
-                               TextTrimming="CharacterEllipsis" />
+
+                    <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding NoticeText}"
+                                   HorizontalAlignment="Right"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource Brush.Accent}"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding NoticeText}"
+                                   Visibility="{Binding NoticeText, Converter={StaticResource NullToCollapsed}}" />
+
+                        <TextBlock Text="{Binding ErrorText}"
+                                   HorizontalAlignment="Right"
+                                   FontSize="11"
+                                   Foreground="#FFC0392B"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding ErrorText}"
+                                   Visibility="{Binding ErrorText, Converter={StaticResource NullToCollapsed}}" />
+                    </StackPanel>
                 </Grid>
             </Border>
         </Grid>

@@ -210,6 +210,23 @@
                                 ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=board.searchTip}"
                                 Click="Search_Click" />
 
+                        <!-- 导出当前看板的待办：Markdown / CSV / JSON -->
+                        <Button x:Name="ExportButton"
+                                Style="{StaticResource Button.Chrome}"
+                                Content="⤓"
+                                FontSize="12"
+                                ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=memo.export}"
+                                Click="ExportTodos_Click">
+                            <Button.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="{Binding Converter={StaticResource Loc}, ConverterParameter=memo.exportMarkdown}"
+                                              Click="ExportTodosMarkdown_Click" />
+                                    <MenuItem Header="导出为 CSV" Click="ExportTodosCsv_Click" />
+                                    <MenuItem Header="导出为 JSON" Click="ExportTodosJson_Click" />
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                        </Button>
+
                         <Button Style="{StaticResource Button.Chrome}"
                                 Content="⋯"
                                 FontSize="13"
@@ -967,6 +984,14 @@
                                         Margin="6,0,0,0"
                                         Click="UndoDelete_Click" />
                             </StackPanel>
+
+                            <!-- 导出成功这类一次性提示 -->
+                            <TextBlock Text="{Binding NoticeText}"
+                                       FontSize="10"
+                                       Foreground="{DynamicResource Brush.Accent}"
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTip="{Binding NoticeText}"
+                                       Visibility="{Binding NoticeText, Converter={StaticResource NullToCollapsed}}" />
 
                             <TextBlock Text="{Binding ErrorText}"
                                        FontSize="10"
