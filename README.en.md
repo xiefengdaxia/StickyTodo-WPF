@@ -96,6 +96,8 @@ Screenshot and pin (F1 to capture, then pen / line / rectangle / text; a pin can
 |---|---|
 | ![Capture](artifacts/snip-overlay.png) | ![Pin](artifacts/pin-board.png) |
 
+GIF recording (F2) is a **separate flow** and does not reuse the screenshot tools: a setup card first asks for region / full screen, shows the region size (pick it again with a plain drag-only picker), and offers “wait 3 seconds” plus a quality preset. While recording, a red frame marks exactly what is being captured; F4 or the floating bar stops it and the GIF lands on the clipboard.
+
 Every window has its own opacity (the board below is at 55%, the desktop shows through):
 
 ![Window opacity](artifacts/board-opacity.png)

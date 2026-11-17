@@ -7,13 +7,17 @@ using StickyTodo.Core.Services;
 namespace StickyTodo.App.Services;
 
 /// <summary>
-/// GIF 录屏的总入口：选区域、开悬浮条、录完放剪贴板、弹提示条。
+/// GIF 录屏的总入口：先弹录制设置（区域/全屏、尺寸、3 秒倒计时），
+/// 再开录制红框 + 悬浮条，录完放剪贴板、弹提示条。
 /// 具体的抓帧与编码在 <see cref="GifRecorder"/>，这里只管「流程和窗口」。
 ///
-/// 三个入口：
-///   * 托盘「录 GIF → 区域 / 全屏」（默认项是区域）；
-///   * 截图遮罩工具条上的「录 GIF」（用当前框选）；
-///   * 全局热键 F2（开始/停止，一律先出框选遮罩，上次区域只能「回车沿用」）/ F4（立即停止）。
+/// 入口：
+///   * 全局热键 F2：开始 / 停止（开始时先出设置卡片）；
+///   * 托盘「录 GIF → 区域 / 全屏」（同样先出设置卡片，只是预选不同范围）；
+///   * F4 或悬浮条「停止」：立即收尾。
+///
+/// 和截图（F1）**完全分开**：这里不再借用截图遮罩，框选用的是
+/// <see cref="GifRegionPickerWindow"/>（只拖框，没有画笔那套工具）。
 /// </summary>
 public sealed class GifRecordingService : IDisposable
 {
@@ -21,17 +25,11 @@ public sealed class GifRecordingService : IDisposable
 
     private GifRecorder? _recorder;
     private GifRecordingBar? _bar;
+    private GifFrameWindow? _frame;
     private GifToast? _toast;
 
     /// <summary>最近一次录制的区域（物理像素）：提示条要贴到这块屏上。</summary>
     private Rectangle? _recordedRegion;
-
-    /// <summary>
-    /// 需要用户框选一块区域（F2 每次都走这里）。
-    /// 框选 UI 在 <see cref="PinManager"/> 那边，这里只发个信号，由 App 接起来，
-    /// 免得两个服务互相持有（PinManager 已经依赖本服务）。
-    /// </summary>
-    public event Action? RegionSelectionRequested;
 
     public GifRecordingService(AppSettingsService settings)
     {
@@ -41,10 +39,14 @@ public sealed class GifRecordingService : IDisposable
     /// <summary>正在抓帧。</summary>
     public bool IsRecording => _recorder is { IsRecording: true };
 
+    /// <summary>上次录过的区域（物理像素）；没录过就退回主屏，给托盘「区域」做预填。</summary>
+    public Rectangle LastRegion =>
+        ResolveLastRegion() ?? ScreenCaptureService.GetScreens().FirstOrDefault().Bounds;
+
     /// <summary>已经在倒计时 / 正在录 / 正在生成。</summary>
     private bool IsBusy => _bar is not null || _recorder is { IsBusy: true };
 
-    /// <summary>F2：正在录（或在倒计时/生成）就停，否则一律先出框选遮罩让用户确认区域。</summary>
+    /// <summary>F2：正在录（或在倒计时/生成）就停，否则先弹录制设置。</summary>
     public void ToggleRecording()
     {
         if (IsBusy)
@@ -53,7 +55,7 @@ public sealed class GifRecordingService : IDisposable
             return;
         }
 
-        StartLastMode();
+        StartFromSetup(null, fullScreen: null);
     }
 
     /// <summary>F4 / 悬浮条「停止」：收尾并生成 GIF（还在倒计时就直接取消）。</summary>
@@ -69,15 +71,56 @@ public sealed class GifRecordingService : IDisposable
         _bar?.CancelAndClose();
     }
 
+    /// <summary>托盘「全屏」：设置卡片预选全屏。</summary>
+    public void StartFullScreen() => StartFromSetup(null, fullScreen: true);
+
+    /// <summary>托盘「区域」：设置卡片预选区域，并带上上次的尺寸。</summary>
+    public void StartRegion(Rectangle regionPx) => StartFromSetup(regionPx, fullScreen: false);
+
     /// <summary>
-    /// 整屏录制。单屏直接录那块屏；多屏先弹选屏浮层，
-    /// 选完只录那一块 —— 整个虚拟桌面拼起来的 GIF 又长又没人看得懂。
+    /// 先出录制设置卡片（区域 / 全屏、区域尺寸、是否等 3 秒、清晰度），
+    /// 用户确认后才真正开始；取消就什么都不做。
     /// </summary>
-    public void StartFullScreen()
+    private void StartFromSetup(Rectangle? region, bool? fullScreen)
     {
         if (IsBusy)
         {
             Log.Information("[gif] 已经在倒计时/录制/生成中，忽略这次的开始请求");
+            return;
+        }
+
+        var setup = new GifSetupWindow(
+            region ?? ResolveLastRegion() ?? ScreenCaptureService.GetScreens().FirstOrDefault().Bounds,
+            fullScreen ?? _settings.GifLastMode == AppSettingsService.GifModeFullScreen,
+            _settings.GifCountdown,
+            _settings.GifQuality);
+
+        if (setup.ShowDialog() != true)
+        {
+            Log.Information("[gif] 设置卡片里取消了录制");
+            return;
+        }
+
+        _settings.GifCountdown = setup.WaitThreeSeconds;
+        _settings.GifQuality = setup.Quality;
+
+        if (setup.ResultFullScreen)
+        {
+            BeginFullScreen();
+            return;
+        }
+
+        if (setup.ResultRegion is { } chosen)
+        {
+            Begin(chosen);
+        }
+    }
+
+    /// <summary>多屏时先让用户选一块屏，然后按那块屏的边界录。</summary>
+    private void BeginFullScreen()
+    {
+        if (IsBusy)
+        {
             return;
         }
 
@@ -105,56 +148,11 @@ public sealed class GifRecordingService : IDisposable
         Begin(null);
     }
 
-    /// <summary>用一块屏幕区域（物理像素）录制，区域来自截图遮罩的框选。</summary>
-    public void StartRegion(Rectangle regionPx) => Begin(regionPx);
-
-    /// <summary>
-    /// 上次记下的区域（已夹进当前虚拟屏、尺寸有效）：只给遮罩当「参考底纹 / 回车沿用」
-    /// 的建议用，不会自己开录。没记过、或记下的区域已经跑出屏幕外，就是 null。
-    /// </summary>
-    public Rectangle? LastRegionSuggestion
-    {
-        get
-        {
-            if (ResolveLastRegion() is not { } remembered)
-            {
-                return null;
-            }
-
-            var region = ClampRegion(remembered, ScreenCaptureService.GetVirtualScreenBounds());
-            return region.Width >= 4 && region.Height >= 4 ? region : null;
-        }
-    }
-
-    /// <summary>
-    /// F2 的开始动作：**一律**先出框选遮罩（gifMode），等用户拖框、点「全屏」或
-    /// 按回车（沿用上次区域）才真正开录。上次记过的区域只当遮罩上的参考建议，
-    /// 不再直接开始录制。
-    /// </summary>
-    public void StartLastMode()
-    {
-        if (RegionSelectionRequested is null)
-        {
-            Log.Warning("[gif] 没有接框选的入口，这次 F2 只能放弃");
-            return;
-        }
-
-        RegionSelectionRequested.Invoke();
-    }
-
     private void Begin(Rectangle? desiredRegion)
     {
         if (IsBusy)
         {
             Log.Information("[gif] 已经在倒计时/录制/生成中，忽略这次的开始请求");
-            return;
-        }
-
-        // 截图遮罩还开着（F1/F2 都在全局热键里，随时可能按下）：这时候开录，
-        // 录进去的会是压暗后的遮罩，先让用户把手上的框选处理完
-        if (IsOverlayOpen())
-        {
-            Log.Information("[gif] 截图遮罩还开着，先不开始录制");
             return;
         }
 
@@ -170,7 +168,7 @@ public sealed class GifRecordingService : IDisposable
         var quality = _settings.GifQuality;
         var countdown = _settings.GifCountdown;
 
-        // 到这里区域已经是物理像素（框选换算见 ScreenCaptureService.SelectionToPixels，
+        // 到这里区域已经是物理像素（框选换算见 GifRegionPickerWindow.ToPixelRect，
         // 全屏/选屏用的是 Screen.Bounds），再记一条 DPI 方便用户核对录出来的分辨率
         Log.Information(
             "[gif] 录制区域 {Width}x{Height} @ {X},{Y} 物理像素 · 屏缩放 {Scale:P0}",
@@ -179,6 +177,7 @@ public sealed class GifRecordingService : IDisposable
         RememberMode(region);
         _recordedRegion = region;
         CloseBar();
+        ShowFrame(region);
 
         var recorder = new GifRecorder { Quality = quality };
         recorder.Finished += bytes => OnFinished(recorder, bytes);
@@ -205,10 +204,51 @@ public sealed class GifRecordingService : IDisposable
             {
                 recorder.Cancel();
             }
+
+            CloseFrame();
         };
 
         _bar = bar;
         bar.Show();
+    }
+
+    // ---------------- 录制红框 ----------------
+
+    private void ShowFrame(Rectangle region)
+    {
+        CloseFrame();
+
+        try
+        {
+            var frame = new GifFrameWindow(region);
+            frame.Show();
+            _frame = frame;
+        }
+        catch (Exception ex)
+        {
+            // 红框只是提示，画不出来不影响录制
+            Log.Debug(ex, "[gif] 录制红框打开失败");
+        }
+    }
+
+    private void CloseFrame()
+    {
+        var frame = _frame;
+        _frame = null;
+
+        if (frame is null)
+        {
+            return;
+        }
+
+        try
+        {
+            frame.Close();
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "[gif] 关闭录制红框失败");
+        }
     }
 
     // ---------------- 完成 / 失败 ----------------
@@ -219,6 +259,7 @@ public sealed class GifRecordingService : IDisposable
         Dispatch(() =>
         {
             CloseBar();
+            CloseFrame();
 
             if (gif.Length == 0)
             {
@@ -241,6 +282,7 @@ public sealed class GifRecordingService : IDisposable
     private void OnFailed(string message) => Dispatch(() =>
     {
         CloseBar();
+        CloseFrame();
         ConfirmWindow.Notify(null, "GIF", message);
     });
 
@@ -272,26 +314,6 @@ public sealed class GifRecordingService : IDisposable
         }
 
         app.Dispatcher.BeginInvoke(action);
-    }
-
-    /// <summary>截图遮罩是不是还开着（全局热键不受模态窗口限制，得自己看一眼）。</summary>
-    private static bool IsOverlayOpen()
-    {
-        var app = Application.Current;
-        if (app is null)
-        {
-            return false;
-        }
-
-        foreach (Window window in app.Windows)
-        {
-            if (window is SnipOverlayWindow { IsLoaded: true })
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     // ---------------- 设置记忆 ----------------
@@ -371,6 +393,7 @@ public sealed class GifRecordingService : IDisposable
     public void Dispose()
     {
         CloseBar();
+        CloseFrame();
 
         try
         {

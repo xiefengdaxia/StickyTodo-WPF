@@ -15,7 +15,7 @@ public sealed class PinManager
 {
     private readonly List<PinWindow> _pins = new();
 
-    /// <summary>GIF 录屏（遮罩上的「录 GIF」按钮和托盘「区域录制」都从这里进）。</summary>
+    /// <summary>GIF 录屏：F1 正在录 GIF 时不要再弹截图遮罩（会把压暗层录进去）。</summary>
     private readonly GifRecordingService? _gifs;
 
     private BitmapSource? _lastImage;
@@ -37,7 +37,7 @@ public sealed class PinManager
 
     /// <summary>
     /// F1：截取整个屏幕 → 让用户框选/标注 → 贴到桌面。
-    /// 返回贴出来的窗口；用户取消（或改选了「录 GIF」）则返回 null。
+    /// 返回贴出来的窗口；用户取消则返回 null。
     /// </summary>
     public async Task<PinWindow?> CaptureAndPinAsync()
     {
@@ -52,54 +52,14 @@ public sealed class PinManager
             return null;
         }
 
-        // 遮罩上的「录 GIF」：不走贴图，直接把选区交给录制流程
-        if (overlay.GifRegion is { } gifRegion)
-        {
-            StartGif(gifRegion);
-            return null;
-        }
-
         return ShowOverlayAndPin(overlay);
-    }
-
-    /// <summary>
-    /// 托盘「录 GIF → 区域」和 F2 都走这里：先出遮罩框选，用户点「录 GIF」才开始录。
-    /// <paramref name="withLastRegionSuggestion"/> 为 true（F2）时，把上次录过的区域
-    /// 当参考底纹 / 「回车沿用」的建议画在遮罩上；托盘里显式点「区域」则要求重新框选。
-    /// </summary>
-    public async Task CaptureGifRegionAsync(bool withLastRegionSuggestion = false)
-    {
-        var suggested = withLastRegionSuggestion ? _gifs?.LastRegionSuggestion : null;
-        var overlay = await ShowOverlayAsync(gifMode: true, suggestedRegion: suggested);
-        if (overlay is null)
-        {
-            return;
-        }
-
-        // 遮罩上点了右下角「全屏」：跳过框选，走和托盘「全屏」完全同一条路径
-        if (overlay.GifFullScreenRequested)
-        {
-            Log.Information("[gif] 遮罩上选了全屏录制");
-            _gifs?.StartFullScreen();
-            return;
-        }
-
-        if (overlay.GifRegion is { } gifRegion)
-        {
-            StartGif(gifRegion);
-            return;
-        }
-
-        Log.Information("[gif] 框选结束后没有点「录 GIF」，放弃这次区域录制");
     }
 
     /// <summary>
     /// 抓屏 → 弹遮罩 → 等用户确认。返回遮罩窗口（已确认），取消/在抓屏返回 null。
     /// 整屏 BitBlt 在这台机器上约 100ms：放后台线程抓，UI 不会先冻一下才出遮罩。
     /// </summary>
-    private async Task<SnipOverlayWindow?> ShowOverlayAsync(
-        bool gifMode = false,
-        System.Drawing.Rectangle? suggestedRegion = null)
+    private async Task<SnipOverlayWindow?> ShowOverlayAsync()
     {
         if (_capturing)
         {
@@ -116,7 +76,7 @@ public sealed class PinManager
                 return null;
             }
 
-            var overlay = new SnipOverlayWindow(screenshot, gifMode, suggestedRegion)
+            var overlay = new SnipOverlayWindow(screenshot)
             {
                 WindowStartupLocation = WindowStartupLocation.Manual,
             };
@@ -141,13 +101,6 @@ public sealed class PinManager
         return true;
     }
 
-    private void StartGif(System.Drawing.Rectangle region)
-    {
-        Log.Information("[gif] 遮罩框选区域 {Width}x{Height} @ {X},{Y}",
-            region.Width, region.Height, region.X, region.Y);
-
-        _gifs?.StartRegion(region);
-    }
 
     private PinWindow? ShowOverlayAndPin(SnipOverlayWindow overlay)
     {

@@ -446,7 +446,7 @@ public sealed class TrayService : IDisposable
         gifRegion.Click += (_, _) => System.Windows.Application.Current?.Dispatcher.Invoke(() =>
         {
             _menu?.Close();
-            _ = pins.CaptureGifRegionAsync();
+            gifs.StartRegion(gifs.LastRegion);
         });
         recordGif.DropDownItems.Add(gifRegion);
 

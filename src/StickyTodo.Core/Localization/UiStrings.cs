@@ -508,6 +508,15 @@ public static class UiStrings
     ["gif.regionHint"] = ["拖动鼠标框选区域 · 或点右下角「全屏」直接录整块屏幕 · Esc 取消", "Drag to select a region — or click Full screen at bottom right to record the whole screen · Esc to cancel", "ドラッグで範囲選択 · 右下の「全画面」で画面全体を録画 · Esc でキャンセル", "드래그로 영역 선택 · 오른쪽 아래 '전체 화면'으로 화면 전체 녹화 · Esc 취소"],
     // 录 GIF 的遮罩上：上次区域只是建议（参考底纹），回车才沿用开录
     ["gif.lastRegionHint"] = ["上次区域 {0}×{1}，回车沿用", "Last region {0}×{1} — press Enter to reuse", "前回の範囲 {0}×{1} — Enter で再利用", "이전 영역 {0}×{1} — Enter 키로 재사용"],
+    ["gif.setupTitle"] = ["录制 GIF", "Record GIF", "GIF 録画", "GIF 녹화"],
+    ["gif.setupHint"] = ["F1 截图 · F2 录制 · F4 停止", "F1 snip · F2 record · F4 stop", "F1 スクショ · F2 録画 · F4 停止", "F1 캡처 · F2 녹화 · F4 중지"],
+    ["gif.scope"] = ["录制范围", "Capture area", "録画範囲", "녹화 범위"],
+    ["gif.regionSize"] = ["区域尺寸", "Region size", "範囲サイズ", "영역 크기"],
+    ["gif.reselect"] = ["重新框选", "Select again", "選び直す", "다시 선택"],
+    ["gif.wait3s"] = ["开始前等待 3 秒（方便摆好窗口再录）", "Wait 3 seconds before recording", "録画前に 3 秒待つ", "녹화 전 3초 대기"],
+    ["gif.fullScreenSizeMulti"] = ["共 {0} 块屏幕，开始后选择要录的那块", "{0} screens — you will pick one when recording starts", "画面 {0} 枚 — 開始時に録画する画面を選びます", "화면 {0}개 — 시작할 때 녹화할 화면을 선택합니다"],
+    ["gif.pickerHint"] = ["拖动鼠标选择录制区域 · 双击直接开始 · Esc 取消", "Drag to select the recording area · double-click to start · Esc to cancel", "ドラッグで録画範囲を選択 · ダブルクリックで開始 · Esc でキャンセル", "드래그로 녹화 영역 선택 · 더블클릭하면 시작 · Esc 취소"],
+    ["gif.pickerScope"] = ["红框内为录制范围", "The red frame is what gets recorded", "赤枠の中が録画範囲です", "빨간 테두리 안이 녹화 범위입니다"],
     // ===== 便签 Markdown / 导出 =====
     ["memo.edit"] = ["编辑", "Edit", "編集", "편집"],
     ["memo.preview"] = ["预览", "Preview", "プレビュー", "미리보기"],

@@ -617,10 +617,7 @@ public partial class App : System.Windows.Application
         var pins = _host.Services.GetRequiredService<PinManager>();
         var gifs = _host.Services.GetRequiredService<GifRecordingService>();
 
-        // F2 一律先出框选遮罩：上次录过的区域只当遮罩上的参考底纹 /「回车沿用」的建议，
-        // 不再直接开始录制。拖框、点遮罩上的「全屏」或按回车才真正开录。
-        gifs.RegionSelectionRequested += () => _ = pins.CaptureGifRegionAsync(withLastRegionSuggestion: true);
-
+        // F2 直接弹录制设置卡片（区域 / 全屏、尺寸、3 秒倒计时），和截图遮罩完全分开。
         var registered = hotKeys.Attach(
             host,
             onNewTodo: windows.OpenDefaultBoardForNewTodo,

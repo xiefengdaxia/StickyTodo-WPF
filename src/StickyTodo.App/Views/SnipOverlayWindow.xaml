@@ -138,9 +138,6 @@
 
                 <Button Click="Undo_Click" Content="撤销" Style="{StaticResource SnipTool}" ToolTip="撤销上一笔" />
                 <Button Click="Cancel_Click" Content="取消" Style="{StaticResource SnipTool}" ToolTip="取消截图（Esc）" />
-                <!-- 内容由代码设成 gif.record（要跟随语言切换） -->
-                <Button x:Name="RecordGifButton" Click="RecordGif_Click" Style="{StaticResource SnipTool}"
-                        ToolTip="录 GIF：用当前框选开始录屏（F2 停止 / F4 立即停止）" />
                 <Button Click="Pin_Click" Content="贴图" Style="{StaticResource SnipPrimary}" ToolTip="贴到桌面并复制（Enter / F3）" />
                 <Button Click="Copy_Click" Content="截图" Style="{StaticResource SnipTool}" ToolTip="截图到剪贴板（Ctrl+C / 双击选区），可直接粘到聊天框" />
                 </StackPanel>
@@ -154,28 +151,5 @@
                    HorizontalAlignment="Center" VerticalAlignment="Center"
                    IsHitTestVisible="False" />
 
-        <!-- 录 GIF 专用：上次录过的区域只当建议（参考底纹 + 这行提示），回车才沿用开录 -->
-        <TextBlock x:Name="LastRegionHint"
-                   Text=""
-                   Foreground="#E0FFFFFF" FontSize="12"
-                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                   Margin="0,28,0,0"
-                   Visibility="Collapsed"
-                   IsHitTestVisible="False" />
-
-        <!-- 录 GIF 专用：右下角常驻的「全屏录制」入口。框选仍是默认，这里不用拖也能直接开录 -->
-        <Border x:Name="FullScreenPanel"
-                HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,18,18"
-                Background="#E6202124" CornerRadius="8" Padding="6,4"
-                BorderBrush="#40FFFFFF" BorderThickness="1"
-                Visibility="Collapsed">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <Button x:Name="FullScreenButton" Click="FullScreen_Click" Content="▣ 全屏"
-                        Style="{StaticResource SnipTool}" />
-                <TextBlock x:Name="FullScreenHint" Text="不用框选，直接录整块屏幕"
-                           Foreground="#B0FFFFFF" FontSize="11" VerticalAlignment="Center"
-                           Margin="4,0,4,0" IsHitTestVisible="False" />
-            </StackPanel>
-        </Border>
-    </Grid>
+        </Grid>
 </Window>
