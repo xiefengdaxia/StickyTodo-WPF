@@ -190,6 +190,11 @@
             <Grid Width="{Binding ActualWidth, ElementName=QuickLayer}"
                   Height="{Binding ActualHeight, ElementName=QuickLayer}">
 
+                <!-- 只在时钟左侧这 44px 里显示：滑出/滑入都贴着时钟边缘，
+                     看起来像是从时钟里长出来的（而不是从屏幕左边推进来） -->
+                <Grid Width="44" Margin="8,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Stretch"
+                      ClipToBounds="True">
+
                 <!-- 高度撑满整块时钟（上下留 8），内容再多也只在列里滚动 -->
                 <Border x:Name="QuickBar"
                         Width="40"
@@ -202,7 +207,8 @@
                         BorderThickness="1"
                         ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=clock.quick}">
                     <Border.RenderTransform>
-                        <TranslateTransform X="-44" />
+                        <!-- 收起时向右缩进时钟底下（被上面的 Grid 裁掉），展开时向左滑出来 -->
+                        <TranslateTransform X="40" />
                     </Border.RenderTransform>
                     <Border.Style>
                         <Style TargetType="Border">
@@ -230,7 +236,7 @@
                                                                  To="0" Duration="{StaticResource Motion.Base}"
                                                                  EasingFunction="{StaticResource Motion.Ease}" />
                                                 <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
-                                                                 To="-44" Duration="{StaticResource Motion.Base}"
+                                                                 To="40" Duration="{StaticResource Motion.Base}"
                                                                  EasingFunction="{StaticResource Motion.Ease}" />
                                             </Storyboard>
                                         </BeginStoryboard>
@@ -308,6 +314,7 @@
                                 Click="QuickSettings_Click" />
                     </Grid>
                 </Border>
+                </Grid>
             </Grid>
         </Canvas>
     </Grid>
