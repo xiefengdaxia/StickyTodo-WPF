@@ -1,4 +1,6 @@
+using System.ComponentModel;
 using Avalonia.Controls;
+using Avalonia.Controls.Templates;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -16,6 +18,7 @@ public partial class ManagerWindow : Window
     private readonly ManagerViewModel _viewModel;
     private readonly GitHubUpdateChecker _updates;
     private bool _checkingUpdate;
+    private bool _viewModeHooked;
 
     public ManagerWindow(ManagerViewModel viewModel, GitHubUpdateChecker updates)
     {
@@ -29,6 +32,8 @@ public partial class ManagerWindow : Window
         TitleBar2.PointerPressed += OnTitleBarPressed;
 
         Opened += async (_, _) => await RefreshAsync();
+        Loaded += OnLoaded;
+        Closed += OnClosed;
         Chrome.Apply(this, Shell, 14, 12);
     }
 
@@ -53,6 +58,71 @@ public partial class ManagerWindow : Window
         }
 
         Activate();
+    }
+
+    // ---------------- 显示形式（列表 / 图标网格） ----------------
+
+    private void ViewToggle_Click(object? sender, RoutedEventArgs e) => _viewModel.ToggleViewMode();
+
+    /// <summary>
+    /// 把 <see cref="ManagerViewModel.GridMode"/> 套到看板列表上：行和网格各有一套
+    /// ItemsPanel + ItemTemplate，一次换完。ListBox 本身不动，所以选中、双击打开、
+    /// 右键菜单在两种形式下走的是同一套逻辑。
+    /// </summary>
+    private void ApplyViewMode()
+    {
+        var grid = _viewModel.GridMode;
+
+        // ItemsPanel 是 ITemplate<Panel?>（Avalonia 11），换掉后 ItemsPresenter 会重建容器
+        BoardList.ItemsPanel = (ITemplate<Panel?>)this.FindResource(grid ? "BoardGridPanel" : "BoardRowsPanel")!;
+        BoardList.ItemTemplate = (IDataTemplate)this.FindResource(grid ? "BoardTileTemplate" : "BoardRowTemplate")!;
+
+        // 网格模式靠 class 收紧卡片尺寸与间距（样式在本窗口的 Window.Styles 里）
+        if (grid)
+        {
+            if (!BoardList.Classes.Contains("grid"))
+            {
+                BoardList.Classes.Add("grid");
+            }
+        }
+        else
+        {
+            BoardList.Classes.Remove("grid");
+        }
+    }
+
+    /// <summary>窗口第一次显示时套用记住的显示形式，之后跟着 GridMode 变。</summary>
+    private void OnLoaded(object? sender, RoutedEventArgs e)
+    {
+        ApplyViewMode();
+
+        // 窗口是复用同一个实例的（✕ 收进托盘）——重复 Loaded 不能再挂一次
+        if (_viewModeHooked)
+        {
+            return;
+        }
+
+        _viewModeHooked = true;
+        _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ManagerViewModel.GridMode))
+        {
+            ApplyViewMode();
+        }
+    }
+
+    private void OnClosed(object? sender, EventArgs e)
+    {
+        if (!_viewModeHooked)
+        {
+            return;
+        }
+
+        _viewModeHooked = false;
+        _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
     }
 
     private void OnTitleBarPressed(object? sender, PointerPressedEventArgs e)

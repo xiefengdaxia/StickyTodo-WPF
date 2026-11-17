@@ -23,6 +23,25 @@ public partial class ManagerWindow : Window
     private bool _allowClose;
     private bool _checkingUpdate;
 
+    private void ViewToggle_Click(object sender, RoutedEventArgs e) => _viewModel.ToggleViewMode();
+
+    private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ManagerViewModel.GridMode))
+        {
+            ApplyViewMode();
+        }
+    }
+
+    /// <summary>按当前模式上模板：行是 StackPanel + 横向条目，图标是 WrapPanel + 方形卡片。</summary>
+    private void ApplyViewMode()
+    {
+        var grid = _viewModel.GridMode;
+        BoardList.ItemsPanel = (ItemsPanelTemplate)FindResource(grid ? "BoardTilePanel" : "BoardRowPanel");
+        BoardList.ItemTemplate = (DataTemplate)FindResource(grid ? "BoardTileTemplate" : "BoardRowTemplate");
+        BoardList.ItemContainerStyle = (Style)FindResource(grid ? "BoardTileItemStyle" : "BoardRowItemStyle");
+    }
+
     public ManagerWindow(ManagerViewModel viewModel, WindowManager windows, GitHubUpdateChecker updates)
     {
         InitializeComponent();
@@ -30,6 +49,11 @@ public partial class ManagerWindow : Window
         _windows = windows;
         _updates = updates;
         DataContext = viewModel;
+
+        // 看板列表的展示形式（行 / 图标网格）：跟着 VM 走，切换时重上模板与面板
+        _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        Loaded += (_, _) => ApplyViewMode();
+        Closed += (_, _) => _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
 
         Loaded += async (_, _) =>
         {

@@ -13,6 +13,180 @@
         FontFamily="Microsoft YaHei UI"
         UseLayoutRounding="True"
         TextOptions.TextFormattingMode="Display">
+    <Window.Resources>
+        <ItemsPanelTemplate x:Key="BoardRowPanel">
+            <StackPanel />
+        </ItemsPanelTemplate>
+        <ItemsPanelTemplate x:Key="BoardTilePanel">
+            <WrapPanel />
+        </ItemsPanelTemplate>
+
+        <!-- 行视图（默认） -->
+<Style x:Key="BoardRowItemStyle" TargetType="ListBoxItem">
+                            <Setter Property="Padding" Value="0" />
+                            <Setter Property="Margin" Value="0,0,0,8" />
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <Border x:Name="Row"
+                                                CornerRadius="10"
+                                                Background="{DynamicResource Brush.Surface}"
+                                                BorderBrush="{DynamicResource Brush.Line}"
+                                                BorderThickness="1"
+                                                Padding="14,11"
+                                                RenderTransformOrigin="0.5,0.5">
+                                            <Border.RenderTransform>
+                                                <ScaleTransform ScaleX="1" ScaleY="1" />
+                                            </Border.RenderTransform>
+                                            <ContentPresenter />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <!-- 悬停轻微放大：卡片"浮起来"一点点，比只换底色明显 -->
+                                                <Trigger.EnterActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetName="Row"
+                                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                                             To="1.012" Duration="{StaticResource Motion.Fast}"
+                                                                             EasingFunction="{StaticResource Motion.Ease}" />
+                                                            <DoubleAnimation Storyboard.TargetName="Row"
+                                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                                                             To="1.012" Duration="{StaticResource Motion.Fast}"
+                                                                             EasingFunction="{StaticResource Motion.Ease}" />
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </Trigger.EnterActions>
+                                                <Trigger.ExitActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetName="Row"
+                                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                                                             To="1" Duration="{StaticResource Motion.Base}"
+                                                                             EasingFunction="{StaticResource Motion.Ease}" />
+                                                            <DoubleAnimation Storyboard.TargetName="Row"
+                                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                                                                             To="1" Duration="{StaticResource Motion.Base}"
+                                                                             EasingFunction="{StaticResource Motion.Ease}" />
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </Trigger.ExitActions>
+                                                <Setter TargetName="Row" Property="Background" Value="{DynamicResource Brush.SurfaceHover}" />
+                                            </Trigger>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
+                                                <Setter TargetName="Row" Property="Background" Value="#33B27F0A" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+
+<DataTemplate x:Key="BoardRowTemplate">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- 类型图标方块 -->
+                                <Border Grid.Column="0"
+                                        Width="34" Height="34"
+                                        CornerRadius="9"
+                                        Background="{DynamicResource Brush.AccentSoft}"
+                                        VerticalAlignment="Center"
+                                        Margin="0,0,11,0">
+                                    <TextBlock Text="{Binding KindGlyph}"
+                                               FontSize="15"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource Brush.Accent}" />
+                                </Border>
+
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding Name}"
+                                                   FontSize="14"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource Brush.Ink}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <Border Margin="7,0,0,0"
+                                                Padding="6,1"
+                                                CornerRadius="5"
+                                                VerticalAlignment="Center"
+                                                Background="{DynamicResource Brush.ChipIdle}">
+                                            <TextBlock Text="{Binding KindText}" FontSize="9.5"
+                                                       Foreground="{DynamicResource Brush.InkSoft}" />
+                                        </Border>
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding Summary}"
+                                               Style="{StaticResource Text.Caption}"
+                                               Margin="0,3,0,0" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding WindowHint}"
+                                               FontSize="10"
+                                               Foreground="{DynamicResource Brush.Accent}"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,7,0" />
+                                    <Button Content="✕"
+                                            FontSize="11"
+                                            Style="{StaticResource Button.Link}"
+                                            ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=manager.deleteBoard}"
+                                            Click="DeleteRow_Click" />
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+
+        <!-- 图标网格视图 -->
+<Style x:Key="BoardTileItemStyle" TargetType="ListBoxItem">
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Margin" Value="0" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="Template">
+        <Setter.Value>
+            <ControlTemplate TargetType="ListBoxItem">
+                <Border x:Name="Row"
+                        Width="104" MinHeight="104"
+                        Margin="0,0,10,10"
+                        Padding="10,12"
+                        CornerRadius="10"
+                        Background="{DynamicResource Brush.Surface}"
+                        BorderBrush="{DynamicResource Brush.Line}"
+                        BorderThickness="1">
+                    <ContentPresenter VerticalAlignment="Center" />
+                </Border>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter TargetName="Row" Property="Background" Value="{DynamicResource Brush.SurfaceHover}" />
+                    </Trigger>
+                    <Trigger Property="IsSelected" Value="True">
+                        <Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
+                        <Setter TargetName="Row" Property="Background" Value="#33B27F0A" />
+                    </Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate>
+        </Setter.Value>
+    </Setter>
+</Style>
+<DataTemplate x:Key="BoardTileTemplate">
+    <StackPanel VerticalAlignment="Center">
+        <TextBlock Text="{Binding KindGlyph}" FontSize="24"
+                   HorizontalAlignment="Center" Foreground="{DynamicResource Brush.Accent}" />
+        <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" Margin="0,8,0,0"
+                   HorizontalAlignment="Center" TextAlignment="Center"
+                   TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Brush.Ink}" />
+        <TextBlock Text="{Binding Summary}" FontSize="9.5" Margin="0,4,0,0"
+                   HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
+                   MaxHeight="26" TextTrimming="CharacterEllipsis"
+                   Foreground="{DynamicResource Brush.InkSoft}" />
+    </StackPanel>
+</DataTemplate>
+    </Window.Resources>
 
     <Border x:Name="Shell"
             Margin="12"
@@ -157,6 +331,10 @@
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                        <!-- 列表 / 图标网格切换：图标显示"切过去之后"的样子 -->
+                        <Button Style="{StaticResource Button.Chrome}" Content="{Binding ViewToggleGlyph}" FontSize="13"
+                                Margin="0,0,4,0"
+                                ToolTip="{Binding ViewToggleHint}" Click="ViewToggle_Click" />
                         <Button Style="{StaticResource Button.Chrome}" Content="－" FontSize="13"
                                 ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=manager.minimize}" Click="Minimize_Click" />
                         <Button Style="{StaticResource Button.Chrome}" Content="□" FontSize="11"
@@ -168,6 +346,9 @@
 
                 <!-- 看板卡片列表 -->
                 <ListBox x:Name="BoardList"
+                         ItemsPanel="{StaticResource BoardRowPanel}"
+                         ItemTemplate="{StaticResource BoardRowTemplate}"
+                         ItemContainerStyle="{StaticResource BoardRowItemStyle}"
                          Grid.Row="1"
                          Margin="18,8,18,0"
                          ItemsSource="{Binding Boards}"
@@ -187,129 +368,9 @@
                             <MenuItem Header="{Binding Converter={StaticResource Loc}, ConverterParameter=common.delete}" Click="RowMenuDelete_Click" />
                         </ContextMenu>
                     </ListBox.ContextMenu>
-                    <ListBox.ItemContainerStyle>
-                        <Style TargetType="ListBoxItem">
-                            <Setter Property="Padding" Value="0" />
-                            <Setter Property="Margin" Value="0,0,0,8" />
-                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="ListBoxItem">
-                                        <Border x:Name="Row"
-                                                CornerRadius="10"
-                                                Background="{DynamicResource Brush.Surface}"
-                                                BorderBrush="{DynamicResource Brush.Line}"
-                                                BorderThickness="1"
-                                                Padding="14,11"
-                                                RenderTransformOrigin="0.5,0.5">
-                                            <Border.RenderTransform>
-                                                <ScaleTransform ScaleX="1" ScaleY="1" />
-                                            </Border.RenderTransform>
-                                            <ContentPresenter />
-                                        </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <!-- 悬停轻微放大：卡片"浮起来"一点点，比只换底色明显 -->
-                                                <Trigger.EnterActions>
-                                                    <BeginStoryboard>
-                                                        <Storyboard>
-                                                            <DoubleAnimation Storyboard.TargetName="Row"
-                                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                                                                             To="1.012" Duration="{StaticResource Motion.Fast}"
-                                                                             EasingFunction="{StaticResource Motion.Ease}" />
-                                                            <DoubleAnimation Storyboard.TargetName="Row"
-                                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                                                                             To="1.012" Duration="{StaticResource Motion.Fast}"
-                                                                             EasingFunction="{StaticResource Motion.Ease}" />
-                                                        </Storyboard>
-                                                    </BeginStoryboard>
-                                                </Trigger.EnterActions>
-                                                <Trigger.ExitActions>
-                                                    <BeginStoryboard>
-                                                        <Storyboard>
-                                                            <DoubleAnimation Storyboard.TargetName="Row"
-                                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
-                                                                             To="1" Duration="{StaticResource Motion.Base}"
-                                                                             EasingFunction="{StaticResource Motion.Ease}" />
-                                                            <DoubleAnimation Storyboard.TargetName="Row"
-                                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
-                                                                             To="1" Duration="{StaticResource Motion.Base}"
-                                                                             EasingFunction="{StaticResource Motion.Ease}" />
-                                                        </Storyboard>
-                                                    </BeginStoryboard>
-                                                </Trigger.ExitActions>
-                                                <Setter TargetName="Row" Property="Background" Value="{DynamicResource Brush.SurfaceHover}" />
-                                            </Trigger>
-                                            <Trigger Property="IsSelected" Value="True">
-                                                <Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
-                                                <Setter TargetName="Row" Property="Background" Value="#33B27F0A" />
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                    </ListBox.ItemContainerStyle>
+                    
 
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-
-                                <!-- 类型图标方块 -->
-                                <Border Grid.Column="0"
-                                        Width="34" Height="34"
-                                        CornerRadius="9"
-                                        Background="{DynamicResource Brush.AccentSoft}"
-                                        VerticalAlignment="Center"
-                                        Margin="0,0,11,0">
-                                    <TextBlock Text="{Binding KindGlyph}"
-                                               FontSize="15"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               Foreground="{DynamicResource Brush.Accent}" />
-                                </Border>
-
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding Name}"
-                                                   FontSize="14"
-                                                   FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource Brush.Ink}"
-                                                   TextTrimming="CharacterEllipsis" />
-                                        <Border Margin="7,0,0,0"
-                                                Padding="6,1"
-                                                CornerRadius="5"
-                                                VerticalAlignment="Center"
-                                                Background="{DynamicResource Brush.ChipIdle}">
-                                            <TextBlock Text="{Binding KindText}" FontSize="9.5"
-                                                       Foreground="{DynamicResource Brush.InkSoft}" />
-                                        </Border>
-                                    </StackPanel>
-                                    <TextBlock Text="{Binding Summary}"
-                                               Style="{StaticResource Text.Caption}"
-                                               Margin="0,3,0,0" />
-                                </StackPanel>
-
-                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding WindowHint}"
-                                               FontSize="10"
-                                               Foreground="{DynamicResource Brush.Accent}"
-                                               VerticalAlignment="Center"
-                                               Margin="0,0,7,0" />
-                                    <Button Content="✕"
-                                            FontSize="11"
-                                            Style="{StaticResource Button.Link}"
-                                            ToolTip="{Binding Converter={StaticResource Loc}, ConverterParameter=manager.deleteBoard}"
-                                            Click="DeleteRow_Click" />
-                                </StackPanel>
-                            </Grid>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
+                    
                 </ListBox>
 
                 <!-- 空状态 -->

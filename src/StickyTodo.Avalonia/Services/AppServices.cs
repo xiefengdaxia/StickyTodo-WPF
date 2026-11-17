@@ -64,7 +64,7 @@ public sealed class AppServices : IDisposable
         Mcp.StartCollector();
         Mcp.ApplyFromSettings();
 
-        ManagerViewModel = new ManagerViewModel(Todos, Entitlement);
+        ManagerViewModel = new ManagerViewModel(Todos, Settings, Entitlement);
         SettingsViewModel = new SettingsViewModel(Skin, Settings, Todos, Entitlement, Windows, AutoStart, Localization, EyeCare, EyeGamma, Mcp);
         PomodoroViewModel = new PomodoroViewModel(Settings, PomodoroEngine);
 

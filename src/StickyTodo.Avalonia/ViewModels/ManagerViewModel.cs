@@ -89,12 +89,17 @@ public sealed class BoardRowViewModel : ObservableObject
 public partial class ManagerViewModel : ObservableObject
 {
     private readonly TodoService _service;
+    private readonly AppSettingsService _settings;
     private readonly IEntitlementService _entitlement;
 
-    public ManagerViewModel(TodoService service, IEntitlementService entitlement)
+    public ManagerViewModel(TodoService service, AppSettingsService settings, IEntitlementService entitlement)
     {
         _service = service;
+        _settings = settings;
         _entitlement = entitlement;
+
+        // 直接写字段而不是属性：构造期间还没有绑定，不需要通知
+        _gridMode = settings.ManagerGridMode;
     }
 
     public ObservableCollection<BoardRowViewModel> Boards { get; } = new();
@@ -119,6 +124,7 @@ public partial class ManagerViewModel : ObservableObject
         OnPropertyChanged(nameof(EntitlementBadge));
         OnPropertyChanged(nameof(StorageHint));
         OnPropertyChanged(nameof(FooterHint));
+        OnPropertyChanged(nameof(ViewToggleHint));
     }
 
     /// <summary>会员档位显示名（按当前语言）。</summary>
@@ -127,6 +133,30 @@ public partial class ManagerViewModel : ObservableObject
 
     public string FooterHint =>
         Loc.F("manager.footerHint", HotKeyService.NewTodoHotKey);
+
+    /// <summary>看板区的显示形式：false=列表行，true=图标网格（构造时从设置恢复，切换后写回）。</summary>
+    [ObservableProperty]
+    private bool _gridMode;
+
+    /// <summary>切换按钮上的图标：现在是列表就显示网格图标，反之显示列表图标。</summary>
+    public string ViewToggleGlyph => GridMode ? "☰" : "▦";
+
+    /// <summary>切换按钮的提示文案（说清楚点一下会变成哪种形式）。</summary>
+    public string ViewToggleHint => Loc.T(GridMode ? "manager.viewList" : "manager.viewGrid");
+
+    /// <summary>列表 / 图标网格切换：取反后写回设置，下次打开管理面板还是这个形式。</summary>
+    public void ToggleViewMode()
+    {
+        GridMode = !GridMode;
+        _settings.ManagerGridMode = GridMode;
+    }
+
+    /// <summary>模式一变，按钮的图标和提示文案跟着换。</summary>
+    partial void OnGridModeChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ViewToggleGlyph));
+        OnPropertyChanged(nameof(ViewToggleHint));
+    }
 
     [ObservableProperty]
     private string? _errorText;

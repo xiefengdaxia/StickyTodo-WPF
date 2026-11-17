@@ -227,6 +227,8 @@ public static class UiStrings
         ["manager.selected"] = ["选中的看板", "Selected board", "選択中のボード", "선택한 보드"],
         ["manager.boards"] = ["我的看板", "My boards", "マイボード", "내 보드"],
         ["manager.listHint"] = ["双击打开 · 右键可重命名或删除", "Double-click to open · right-click to rename or delete", "ダブルクリックで開く・右クリックで改名/削除", "두 번 클릭해 열기 · 오른쪽 클릭으로 이름 변경/삭제"],
+        ["manager.viewList"] = ["切换为列表视图", "Switch to list view", "リスト表示に切り替え", "목록 보기로 전환"],
+        ["manager.viewGrid"] = ["切换为图标视图", "Switch to icon view", "アイコン表示に切り替え", "아이콘 보기로 전환"],
         ["manager.empty"] = ["还没有看板，先从左边新建一个吧", "No boards yet — create one on the left", "ボードがありません。左から作成してください", "보드가 없습니다. 왼쪽에서 만들어 보세요"],
         ["manager.minimize"] = ["最小化", "Minimize", "最小化", "최소화"],
         ["manager.maximize"] = ["最大化 / 还原", "Maximize / Restore", "最大化／元に戻す", "최대화/복원"],

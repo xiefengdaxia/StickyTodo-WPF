@@ -17,7 +17,95 @@
 
   <Window.Resources>
     <conv:NullToCollapsedConverter x:Key="NullToCollapsed" />
+
+    <!--
+      看板区的两种显示形式由 ApplyViewMode() 在同一个 ListBox 上换 ItemsPanel + ItemTemplate 实现：
+      选中、双击打开、右键菜单都挂在 ListBox 自己身上，换形式不用重接一遍。
+    -->
+    <ItemsPanelTemplate x:Key="BoardRowsPanel">
+      <StackPanel />
+    </ItemsPanelTemplate>
+
+    <ItemsPanelTemplate x:Key="BoardGridPanel">
+      <WrapPanel Orientation="Horizontal" />
+    </ItemsPanelTemplate>
+
+    <!-- 列表形式：一行一个看板 -->
+    <DataTemplate x:Key="BoardRowTemplate" x:DataType="vm:BoardRowViewModel">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <Border Grid.Column="0" Width="34" Height="34" CornerRadius="9"
+                Background="{DynamicResource Brush.AccentSoft}" VerticalAlignment="Center" Margin="0,0,11,0">
+          <TextBlock Text="{Binding KindGlyph}" FontSize="15" HorizontalAlignment="Center"
+                     VerticalAlignment="Center" Foreground="{DynamicResource Brush.Accent}" />
+        </Border>
+
+        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
+                       Foreground="{DynamicResource Brush.Ink}" TextTrimming="CharacterEllipsis" />
+            <Border Margin="7,0,0,0" Padding="6,1" CornerRadius="5" VerticalAlignment="Center"
+                    Background="{DynamicResource Brush.ChipIdle}">
+              <TextBlock Text="{Binding KindText}" FontSize="9.5"
+                         Foreground="{DynamicResource Brush.InkSoft}" />
+            </Border>
+          </StackPanel>
+          <TextBlock Text="{Binding Summary}" Classes="caption" Margin="0,3,0,0" />
+        </StackPanel>
+
+        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+          <TextBlock Text="{Binding WindowHint}" FontSize="10"
+                     Foreground="{DynamicResource Brush.Accent}" VerticalAlignment="Center" Margin="0,0,7,0" />
+          <Button Content="✕" FontSize="11" Classes="link"
+                  ToolTip.Tip="{loc:Loc manager.deleteBoard}"
+                  Tag="{Binding}" Click="DeleteRow_Click" />
+        </StackPanel>
+      </Grid>
+    </DataTemplate>
+
+    <!-- 图标网格形式：96×96 卡片，内容垂直居中（大图标 + 单行看板名 + 一行统计） -->
+    <DataTemplate x:Key="BoardTileTemplate" x:DataType="vm:BoardRowViewModel">
+      <Grid RowDefinitions="Auto,Auto,Auto" VerticalAlignment="Center">
+        <TextBlock Grid.Row="0" Text="{Binding KindGlyph}" FontSize="26"
+                   HorizontalAlignment="Center" Foreground="{DynamicResource Brush.Accent}" />
+        <TextBlock Grid.Row="1" Text="{Binding Name}" Margin="0,6,0,0" FontSize="11.5" FontWeight="SemiBold"
+                   Foreground="{DynamicResource Brush.Ink}" HorizontalAlignment="Stretch"
+                   TextAlignment="Center" TextTrimming="CharacterEllipsis" MaxLines="1" />
+        <TextBlock Grid.Row="2" Text="{Binding Summary}" Margin="0,2,0,0" FontSize="9.5"
+                   Foreground="{DynamicResource Brush.InkSoft}" HorizontalAlignment="Stretch"
+                   TextAlignment="Center" TextTrimming="CharacterEllipsis" MaxLines="1" />
+      </Grid>
+    </DataTemplate>
   </Window.Resources>
+
+  <Window.Styles>
+    <!--
+      图标网格：卡片固定 96×96、四周 5px 外边距（相邻间距 10px），内边距收紧给大图标腾地方。
+      模板里的 Border 仍叫 Row，App.axaml 中 boardCards 的悬停/选中样式（按 Border#Row 命中）照旧生效。
+    -->
+    <Style Selector="ListBox.boardCards.grid ListBoxItem">
+      <Setter Property="Width" Value="96" />
+      <Setter Property="Height" Value="96" />
+      <Setter Property="Margin" Value="5" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="Row"
+                  CornerRadius="10"
+                  Background="{DynamicResource Brush.Surface}"
+                  BorderBrush="{DynamicResource Brush.Line}"
+                  BorderThickness="1"
+                  Padding="7,6"
+                  RenderTransformOrigin="50%,50%">
+            <ContentPresenter Name="PART_ContentPresenter"
+                              Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+  </Window.Styles>
 
   <Border Name="Shell" Classes="shell">
     <Grid ColumnDefinitions="210,*">
@@ -109,7 +197,15 @@
         <Border Grid.Row="0" Name="TitleBar2" Background="Transparent" Padding="18,16,16,6">
           <Grid ColumnDefinitions="*,Auto">
             <StackPanel>
-              <TextBlock Text="{loc:Loc manager.boards}" Classes="display" FontSize="17" />
+              <!-- 标题 + 列表/图标网格切换按钮 -->
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="{loc:Loc manager.boards}" Classes="display" FontSize="17"
+                           VerticalAlignment="Center" />
+                <Button Classes="chrome"
+                        Content="{Binding ViewToggleGlyph}" FontSize="13"
+                        VerticalAlignment="Center"
+                        ToolTip.Tip="{Binding ViewToggleHint}" Click="ViewToggle_Click" />
+              </StackPanel>
               <TextBlock Text="{loc:Loc manager.listHint}" Classes="caption" Margin="0,2,0,0" />
             </StackPanel>
 
@@ -128,6 +224,8 @@
                  ItemsSource="{Binding Boards}"
                  SelectedItem="{Binding SelectedBoard, Mode=TwoWay}"
                  Background="Transparent"
+                 ItemsPanel="{StaticResource BoardRowsPanel}"
+                 ItemTemplate="{StaticResource BoardRowTemplate}"
                  PointerPressed="BoardList_PointerPressed"
                  DoubleTapped="BoardList_DoubleTapped">
           <ListBox.ContextMenu>
@@ -138,39 +236,6 @@
               <MenuItem Header="{loc:Loc common.delete}" Click="RowMenuDelete_Click" />
             </ContextMenu>
           </ListBox.ContextMenu>
-
-          <ListBox.ItemTemplate>
-            <DataTemplate x:DataType="vm:BoardRowViewModel">
-              <Grid ColumnDefinitions="Auto,*,Auto">
-                <Border Grid.Column="0" Width="34" Height="34" CornerRadius="9"
-                        Background="{DynamicResource Brush.AccentSoft}" VerticalAlignment="Center" Margin="0,0,11,0">
-                  <TextBlock Text="{Binding KindGlyph}" FontSize="15" HorizontalAlignment="Center"
-                             VerticalAlignment="Center" Foreground="{DynamicResource Brush.Accent}" />
-                </Border>
-
-                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                  <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
-                               Foreground="{DynamicResource Brush.Ink}" TextTrimming="CharacterEllipsis" />
-                    <Border Margin="7,0,0,0" Padding="6,1" CornerRadius="5" VerticalAlignment="Center"
-                            Background="{DynamicResource Brush.ChipIdle}">
-                      <TextBlock Text="{Binding KindText}" FontSize="9.5"
-                                 Foreground="{DynamicResource Brush.InkSoft}" />
-                    </Border>
-                  </StackPanel>
-                  <TextBlock Text="{Binding Summary}" Classes="caption" Margin="0,3,0,0" />
-                </StackPanel>
-
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                  <TextBlock Text="{Binding WindowHint}" FontSize="10"
-                             Foreground="{DynamicResource Brush.Accent}" VerticalAlignment="Center" Margin="0,0,7,0" />
-                  <Button Content="✕" FontSize="11" Classes="link"
-                          ToolTip.Tip="{loc:Loc manager.deleteBoard}"
-                          Tag="{Binding}" Click="DeleteRow_Click" />
-                </StackPanel>
-              </Grid>
-            </DataTemplate>
-          </ListBox.ItemTemplate>
         </ListBox>
 
         <TextBlock Grid.Row="1" Text="{loc:Loc manager.empty}" HorizontalAlignment="Center"

@@ -92,12 +92,15 @@ public sealed class BoardRowViewModel : ObservableObject
 public partial class ManagerViewModel : ObservableObject
 {
     private readonly TodoService _service;
+    private readonly AppSettingsService _settings;
     private readonly IEntitlementService _entitlement;
 
-    public ManagerViewModel(TodoService service, IEntitlementService entitlement)
+    public ManagerViewModel(TodoService service, AppSettingsService settings, IEntitlementService entitlement)
     {
         _service = service;
+        _settings = settings;
         _entitlement = entitlement;
+        _gridMode = settings.ManagerGridMode;
     }
 
     public ObservableCollection<BoardRowViewModel> Boards { get; } = new();
@@ -120,6 +123,7 @@ public partial class ManagerViewModel : ObservableObject
         OnPropertyChanged(nameof(EntitlementBadge));
         OnPropertyChanged(nameof(StorageHint));
         OnPropertyChanged(nameof(FooterHint));
+        OnPropertyChanged(nameof(ViewToggleHint));
     }
 
     /// <summary>会员档位显示名（按当前语言）。</summary>
@@ -134,6 +138,36 @@ public partial class ManagerViewModel : ObservableObject
 
     [ObservableProperty]
     private BoardRowViewModel? _selectedBoard;
+
+    /// <summary>看板列表的展示形式：false = 行列表，true = 图标网格（存设置里，下次打开沿用）。</summary>
+    [ObservableProperty]
+    private bool _gridMode;
+
+    /// <summary>切换按钮上的图标：列表模式显示"切到网格"，网格模式显示"切到列表"。</summary>
+    public string ViewToggleGlyph => GridMode ? "☰" : "▦";
+
+    /// <summary>切换按钮的提示文案（跟着当前模式变）。</summary>
+    public string ViewToggleHint => Loc.T(GridMode ? "manager.viewList" : "manager.viewGrid");
+
+    partial void OnGridModeChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ViewToggleGlyph));
+        OnPropertyChanged(nameof(ViewToggleHint));
+    }
+
+    /// <summary>列表 ⇄ 图标网格。</summary>
+    public void ToggleViewMode()
+    {
+        GridMode = !GridMode;
+        try
+        {
+            _settings.ManagerGridMode = GridMode;
+        }
+        catch (Exception)
+        {
+            // 记不住也不影响这次切换
+        }
+    }
 
     public async Task LoadAsync()
     {

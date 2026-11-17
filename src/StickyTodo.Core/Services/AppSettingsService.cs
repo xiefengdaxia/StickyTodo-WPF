@@ -59,6 +59,9 @@ public sealed class AppSettingsService
     public const string StartupDesktopLevelKey = "startup.desktopLevel";
 
 
+    /// <summary>管理面板看板列表的展示形式：list（行，默认）/ grid（图标网格）。</summary>
+    public const string ManagerViewModeKey = "manager.viewMode";
+
     /// <summary>Token 数据源（opencode 数据库）的自定义路径，空=默认位置。</summary>
     public const string TokenDatabasePathKey = "token.databasePath";
 
@@ -246,6 +249,13 @@ public sealed class AppSettingsService
     {
         get => GetBool(StartupDesktopLevelKey, true);
         set => SetSetting(StartupDesktopLevelKey, value ? "1" : "0");
+    }
+
+    /// <summary>管理面板用图标网格显示看板（默认 false = 行列表）。</summary>
+    public bool ManagerGridMode
+    {
+        get => string.Equals(GetString(ManagerViewModeKey, null), "grid", StringComparison.OrdinalIgnoreCase);
+        set => SetSetting(ManagerViewModeKey, value ? "grid" : "list");
     }
 
     /// <summary>
