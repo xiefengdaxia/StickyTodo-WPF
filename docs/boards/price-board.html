@@ -37,9 +37,11 @@
     .seg button.on { background: var(--chipOn); color: #fff; }
     .link { border: 0; background: transparent; color: var(--accent); font: inherit; font-size: 11px; cursor: pointer; padding: 1px 3px; }
     .link:hover { text-decoration: underline; }
-    .stats { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 7px; }
-    .stat { background: var(--chip); border-radius: 7px; padding: 4px 8px; min-width: 74px; }
-    .stat b { display: block; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+    /* 汇总卡片固定 4 列 × 2 行：token 四个方向一行，钱和次数一行 */
+    .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-bottom: 7px; }
+    .stat { background: var(--chip); border-radius: 7px; padding: 4px 8px; min-width: 0; }
+    .stat b { display: block; font-size: 13.5px; font-variant-numeric: tabular-nums;
+              white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .stat span { font-size: 10px; color: var(--dim); }
     .picker { border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; margin-bottom: 6px; }
     .picker > summary { cursor: pointer; font-size: 11.5px; color: var(--accent); outline: none; display: flex; align-items: center; gap: 6px; }
@@ -107,6 +109,7 @@
 <div class="note">
     价格：a6api 模型广场「价格从低到高」前 10 家渠道，输入/输出/缓存读/缓存写四项分别取均价（USD/1M），按 <b id="fxNote">7.3</b> 折人民币。
     用量：本机 StickyTodo 统计的每日 token（含 5 个客户端），缓存 = 总量 − 输入 − 输出。区间与勾选会自动记住。
+    月估按 <b>22 个工作日</b>折算；单价 = 勾选模型的合计 ÷ tokens × 100 万（¥/1M tokens）。
 </div>
 
 <script>
@@ -120,6 +123,7 @@ var RANGES = [
 var STORE_KEY = 'stickytodo.priceBoard.v1';
 var CACHE_KEY = '{{SECRET_8v0cm9hd}}';
 var FX = 7.3;
+var MONTH_DAYS = 22;   // 月估按 22 个工作日折算（不是自然月 30 天）
 var data = null;
 var state = { range: 'today', sel: {}, open: {}, showPrice: false };
 var canPersist = true;
@@ -312,7 +316,7 @@ function renderAll() {
         var c = 0;
         rows.forEach(function (r) { var v = costOf(r, m); if (v !== null) c += v; });
         return {
-            m: m, sum: c, day: c / n, month: c / n * 30,
+            m: m, sum: c, day: c / n, month: c / n * MONTH_DAYS,
             pIn: m.in / 1e6 * FX, pOut: m.out / 1e6 * FX, pCr: m.cr / 1e6 * FX
         };
     }).sort(function (a, b) { return a.day - b.day; });
@@ -320,6 +324,9 @@ function renderAll() {
     var sumCost = per.reduce(function (a, x) { return a + x.sum; }, 0);
     var sumIn = 0, sumOut = 0, sumTotal = 0, sumSteps = 0;
     rows.forEach(function (r) { sumIn += r.input || 0; sumOut += r.output || 0; sumTotal += r.total || 0; sumSteps += r.steps || 0; });
+    var sumCache = Math.max(0, sumTotal - sumIn - sumOut);
+    // 加权单价：勾选模型的合计 ÷ tokens × 100 万（¥/1M tokens）
+    var unitPrice = sumTotal > 0 ? sumCost / sumTotal * 1e6 : null;
     var rangeLabel = (RANGES.filter(function (r) { return r.k === state.range; })[0] || RANGES[0]).label;
 
     document.getElementById('meta').textContent =
@@ -327,12 +334,17 @@ function renderAll() {
         ' · 汇率 ' + FX + ' · ' + (data.usageSource || '本机用量');
     updateMemNote();
 
+    // 汇总：第一行 token 四项，第二行次数 / 单价 / 合计 / 月估
     document.getElementById('stats').innerHTML =
         '<div class="stat"><b>' + fmtTok(sumTotal) + '</b><span>' + rangeLabel + ' tokens</span></div>' +
         '<div class="stat"><b>' + fmtTok(sumIn) + '</b><span>输入</span></div>' +
-        '<div class="stat"><b>' + fmtTok(sumTotal - sumIn - sumOut) + '</b><span>缓存读</span></div>' +
+        '<div class="stat"><b>' + fmtTok(sumOut) + '</b><span>输出</span></div>' +
+        '<div class="stat"><b>' + fmtTok(sumCache) + '</b><span>缓存读</span></div>' +
+        '<div class="stat"><b>' + sumSteps.toLocaleString() + '</b><span>调用次数</span></div>' +
+        '<div class="stat" title="勾选模型的加权均价：合计 ÷ tokens × 100 万"><b>' +
+            (unitPrice === null ? '—' : '¥' + fmtMoney(unitPrice)) + '</b><span>' + rangeLabel + '单价 · 每百万</span></div>' +
         '<div class="stat"><b>¥' + fmtMoney(sumCost) + '</b><span>' + rangeLabel + '合计</span></div>' +
-        '<div class="stat"><b>¥' + fmtMoney(sumCost / n * 30) + '</b><span>月估</span></div>';
+        '<div class="stat"><b>¥' + fmtMoney(sumCost / n * MONTH_DAYS) + '</b><span>月估 · ' + MONTH_DAYS + '天</span></div>';
 
     var maxDay = 0;
     per.forEach(function (x) { if (x.day > maxDay) maxDay = x.day; });
@@ -359,7 +371,7 @@ function renderAll() {
         html += '<tr class="sum"><td>合计 ' + per.length + ' 个</td><td class="p"></td><td class="p"></td><td class="p"></td>' +
             '<td class="num">' + fmtMoney(sumCost) + '</td>' +
             '<td class="num">' + fmtMoney(sumCost / n) + '</td>' +
-            '<td class="num">' + fmtMoney(sumCost / n * 30) + '</td></tr>';
+            '<td class="num">' + fmtMoney(sumCost / n * MONTH_DAYS) + '</td></tr>';
     }
     html += '</tbody></table></div>';
     var root = document.getElementById('root');
