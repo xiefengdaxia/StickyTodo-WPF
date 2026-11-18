@@ -83,6 +83,7 @@
 
 <div class="row">
     <div class="seg" id="rangeSeg"></div>
+    <div class="seg" id="unitSeg" title="数字单位"></div>
     <label class="switch"><input type="checkbox" id="showPrice"> 显示单价</label>
     <span class="dim" id="memNote" style="font-size:10.5px;opacity:.6"></span>
 </div>
@@ -120,12 +121,16 @@ var RANGES = [
     { k: 'd7', label: '近7天', n: 7 },
     { k: 'd14', label: '近14天', n: 14 }
 ];
+var UNITS = [
+    { k: 'en', label: 'K/M/B' },
+    { k: 'cn', label: '万/亿' }
+];
 var STORE_KEY = 'stickytodo.priceBoard.v1';
 var CACHE_KEY = '{{SECRET_8v0cm9hd}}';
 var FX = 7.3;
 var MONTH_DAYS = 22;   // 月估按 22 个工作日折算（不是自然月 30 天）
 var data = null;
-var state = { range: 'today', sel: {}, open: {}, showPrice: false };
+var state = { range: 'today', sel: {}, open: {}, showPrice: false, unit: 'en' };
 var canPersist = true;
 var hasBridge = !!(window.chrome && window.chrome.webview);
 var priceCache = {};
@@ -141,6 +146,7 @@ function loadState() {
             if (o.sel && typeof o.sel === 'object') state.sel = o.sel;
             if (o.open && typeof o.open === 'object') state.open = o.open;
             if (typeof o.showPrice === 'boolean') state.showPrice = o.showPrice;
+            if (o.unit === 'cn' || o.unit === 'en') state.unit = o.unit;
         }
     } catch (e) {
         canPersist = false;
@@ -187,10 +193,20 @@ function fmtPrice(v) {
 }
 function fmtTok(n) {
     if (!n) return '0';
+    if (state.unit === 'cn') {
+        // 中文习惯：万 / 亿（1 亿 = 1e8）
+        if (n >= 1e8) return trimZero((n / 1e8).toFixed(2)) + '亿';
+        if (n >= 1e4) return trimZero((n / 1e4).toFixed(1)) + '万';
+        return String(Math.round(n));
+    }
     if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
     if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
     if (n >= 1e3) return (n / 1e3).toFixed(0) + 'K';
     return String(Math.round(n));
+}
+// 1160.0万 这种去掉没意义的 ".0"（1.20亿 保留成 1.2亿）
+function trimZero(s) {
+    return s.indexOf('.') >= 0 ? s.replace(/\.?0+$/, '') : s;
 }
 function cacheOf(r) {
     var c = (r.total || 0) - (r.input || 0) - (r.output || 0);
@@ -225,6 +241,20 @@ document.getElementById('rangeSeg').addEventListener('click', function (e) {
     state.range = b.getAttribute('data-range');
     saveState(); renderRanges(); renderAll();
 });
+
+// ---------- 数字单位（K/M/B ↔ 万/亿） ----------
+function renderUnits() {
+    document.getElementById('unitSeg').innerHTML = UNITS.map(function (u) {
+        return '<button type="button" data-unit="' + u.k + '"' + (u.k === state.unit ? ' class="on"' : '') + '>' + u.label + '</button>';
+    }).join('');
+}
+document.getElementById('unitSeg').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-unit]');
+    if (!b) return;
+    state.unit = b.getAttribute('data-unit');
+    saveState(); renderUnits(); renderAll();
+});
+
 document.getElementById('showPrice').addEventListener('change', function (e) {
     state.showPrice = e.target.checked;
     saveState();
@@ -432,6 +462,7 @@ function render(newData, fetchedAt) {
 loadState();
 loadCache();
 renderRanges();
+renderUnits();
 updateMemNote();
 document.getElementById('showPrice').checked = state.showPrice;
 
@@ -441,7 +472,9 @@ function applyState(o) {
     if (o.sel && typeof o.sel === 'object') state.sel = o.sel;
     if (o.open && typeof o.open === 'object') state.open = o.open;
     if (typeof o.showPrice === 'boolean') state.showPrice = o.showPrice;
+    if (o.unit === 'cn' || o.unit === 'en') state.unit = o.unit;
     renderRanges();
+    renderUnits();
     document.getElementById('showPrice').checked = state.showPrice;
     if (data) { renderPicker(); renderAll(); }
 }
