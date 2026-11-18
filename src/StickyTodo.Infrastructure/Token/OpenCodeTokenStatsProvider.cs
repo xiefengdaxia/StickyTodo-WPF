@@ -42,6 +42,12 @@ public sealed class OpenCodeTokenStatsProvider : ITokenStatsProvider
     /// <summary>缓存对应的数据库最后修改时间，库被换掉/重建时整体失效。</summary>
     private DateTime _cachedForWriteTime;
 
+    /// <summary>
+    /// 缓存锁：UI 的定时刷新和采集脚本可能同时进来。这里是 async 方法，
+    /// 不能用 lock，用信号量把整段读缓存/写缓存串起来。
+    /// </summary>
+    private readonly SemaphoreSlim _cacheGate = new(1, 1);
+
     public OpenCodeTokenStatsProvider(string? databasePath = null)
     {
         _databasePath = databasePath ?? Path.Combine(
@@ -62,6 +68,19 @@ public sealed class OpenCodeTokenStatsProvider : ITokenStatsProvider
             return TokenStats.Empty;
         }
 
+        await _cacheGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await FetchCoreAsync(days, granularity, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _cacheGate.Release();
+        }
+    }
+
+    private async Task<TokenStats> FetchCoreAsync(int days, string granularity, CancellationToken cancellationToken)
+    {
         var now = DateTimeOffset.Now;
         var today = DateOnly.FromDateTime(now.LocalDateTime);
         var fromDay = days <= 0 ? today : today.AddDays(-(days - 1));

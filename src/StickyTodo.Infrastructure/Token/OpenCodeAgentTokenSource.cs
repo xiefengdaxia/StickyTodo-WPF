@@ -20,6 +20,9 @@ public sealed class OpenCodeAgentTokenSource : IAgentTokenSource
     /// <summary>按天缓存：日期 → 格子。历史日期不变，只重算今天（与 OpenCodeTokenStatsProvider 一致）。</summary>
     private readonly Dictionary<DateOnly, List<AgentUsageEntry>> _dayCache = new();
 
+    /// <summary>缓存锁：看板刷新和采集脚本可能同时读同一个源，Dictionary 并发写会把状态搞坏。</summary>
+    private readonly object _cacheGate = new();
+
     public OpenCodeAgentTokenSource(string? databasePath = null)
     {
         _databasePath = databasePath ?? Path.Combine(
@@ -33,6 +36,14 @@ public sealed class OpenCodeAgentTokenSource : IAgentTokenSource
     public bool IsAvailable => File.Exists(_databasePath);
 
     public IEnumerable<AgentUsageEntry> ReadEntries(DateOnly fromDay)
+    {
+        lock (_cacheGate)
+        {
+            return ReadEntriesCore(fromDay);
+        }
+    }
+
+    private List<AgentUsageEntry> ReadEntriesCore(DateOnly fromDay)
     {
         var today = DateOnly.FromDateTime(DateTime.Now);
         if (fromDay > today)

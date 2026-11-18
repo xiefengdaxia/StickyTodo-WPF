@@ -50,7 +50,24 @@ internal abstract class FileAgentTokenSource : IAgentTokenSource
     /// <summary>按天缓存的聚合：日期 → 记录。历史日期不变，只重算今天。</summary>
     private readonly Dictionary<DateOnly, List<AgentUsageEntry>> _dayCache = new();
 
+    /// <summary>
+    /// 缓存锁：同一个源会被多路同时读（看板定时刷新 + 采集脚本里的 get_token_stats，
+    /// 还可能是两轮叠加），Dictionary 并发写会抛
+    /// "Operations that change non-concurrent collections must have exclusive access"，
+    /// 而且那一抛就把整个 get_token_stats 打断。锁只护内存缓存，读文件也在锁里，
+    /// 因为缓存命中判断和写入必须原子。
+    /// </summary>
+    private readonly object _cacheGate = new();
+
     public IEnumerable<AgentUsageEntry> ReadEntries(DateOnly fromDay)
+    {
+        lock (_cacheGate)
+        {
+            return ReadEntriesCore(fromDay);
+        }
+    }
+
+    private List<AgentUsageEntry> ReadEntriesCore(DateOnly fromDay)
     {
         var today = DateOnly.FromDateTime(DateTime.Now);
         if (fromDay > today)

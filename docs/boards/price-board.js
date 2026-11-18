@@ -41,8 +41,15 @@ var BUDGET_MS = 25000;
 
 // 本机用量：近 14 天逐日 input/output/total/steps
 // 沙盒内置 mcp(tool, args)：进程内直调本机 MCP 工具，返回已解析的对象，脚本不需要令牌。
+// 工具报错时 mcp() 会抛异常（文本形如「错误：…」）——必须在这里接住：
+// 漏出去会让整个 collect() 挂掉，看板只剩一行 JSON 解析错误，价格也一起没了。
 function fetchUsage() {
-    var payload = mcp('get_token_stats', { days: DAYS });
+    var payload;
+    try {
+        payload = mcp('get_token_stats', { days: DAYS });
+    } catch (e) {
+        return { error: '本机用量读取失败：' + String((e && e.message) || e), rows: [] };
+    }
     if (!payload) {
         return { error: '本机用量读取失败（MCP 无返回）', rows: [] };
     }
