@@ -137,24 +137,61 @@ function buildCatalog() {
         if (!error) { error = '热门模型为空，已用内置清单'; }
     }
 
-    // 品牌序号 + 默认勾选（渠道数前 N 个品牌各来一个，第一次打开就有东西可看）
+    // 品牌序号（picker 的分组顺序）
     var brandRank = {};
     for (var b = 0; b < brands.length; b++) {
         brandRank[brands[b]] = b;
     }
 
-    var seenBrand = {};
+    // 品牌内按版本号从大到小：6.2 → 6.1 → 6 → 5.6 …
+    // 版本相同（比如 opus-5-5 / sonnet-5-5）按渠道数，再按名字
     for (var n = 0; n < models.length; n++) {
-        var item = models[n];
-        item.bi = brandRank[item.brand] === undefined ? 99 : brandRank[item.brand];
+        models[n].bi = brandRank[models[n].brand] === undefined ? 99 : brandRank[models[n].brand];
+        models[n].ver = versionOf(models[n].m);
+    }
+    models.sort(function (a, b) {
+        if (a.bi !== b.bi) { return a.bi - b.bi; }
+        var byVer = compareVersion(a.ver, b.ver);
+        if (byVer !== 0) { return byVer; }
+        if (a.listings !== b.listings) { return b.listings - a.listings; }
+        return a.m < b.m ? -1 : (a.m > b.m ? 1 : 0);
+    });
+
+    // 默认勾选：渠道数前 N 个品牌各来一个（排序后的第一个 = 该品牌最新版本）
+    var seenBrand = {};
+    for (var q = 0; q < models.length; q++) {
+        var item = models[q];
         if (item.on === undefined) {
-            var rank = item.bi;
-            item.on = rank < DEFAULT_BRANDS && !seenBrand[item.brand];
+            item.on = item.bi < DEFAULT_BRANDS && !seenBrand[item.brand];
         }
         seenBrand[item.brand] = true;
     }
 
     return { models: models, error: error };
+}
+
+// 版本号：取名字里前两段 1~3 位数字（6.2 → [6,2]；4o → [4]）。
+// 4 位以上或带前导零的数字当成日期/编号（20251001、0813）跳过。
+function versionOf(name) {
+    var runs = String(name).match(/\d+/g) || [];
+    var out = [];
+    for (var i = 0; i < runs.length && out.length < 2; i++) {
+        var raw = runs[i];
+        if (raw.length >= 4 || (raw.length > 1 && raw.charAt(0) === '0')) { continue; }
+        out.push(parseInt(raw, 10));
+    }
+    return out;
+}
+
+// 版本从大到小（6.2 > 6.1 > 6；缺的那段按 0 算）
+function compareVersion(a, b) {
+    var n = Math.max(a.length, b.length);
+    for (var i = 0; i < n; i++) {
+        var x = i < a.length ? a[i] : 0;
+        var y = i < b.length ? b[i] : 0;
+        if (x !== y) { return y - x; }
+    }
+    return 0;
 }
 
 // 渠道块里取第一个出现的字段（块内 official_price / confirmed_price_snapshot 也有同名字段，
