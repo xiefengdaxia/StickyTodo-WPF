@@ -23,6 +23,10 @@ public partial class CustomBoardWindow : Window
     private readonly WindowGeometryMemory _geometry;
     private CollectorHost? _collector;
 
+    /// <summary>上一次见到的勾选集合（判断要不要立刻补采）与上次自动采集时间（防抖）。</summary>
+    private string? _lastSelJson;
+    private DateTime _lastAutoRun;
+
     public CustomBoardWindow(CustomBoardViewModel viewModel, Board board, WindowManager windows)
     {
         _viewModel = viewModel;
@@ -229,11 +233,52 @@ public partial class CustomBoardWindow : Window
             }
 
             BoardUiStateStore.Save(_viewModel.BoardId, state.GetRawText());
+
+            // 勾选变了就立刻补采一轮（10 秒防抖）：新勾上的模型不用等下一个采集周期
+            if (state.TryGetProperty("sel", out var sel) && sel.ValueKind == JsonValueKind.Object)
+            {
+                var selJson = sel.GetRawText();
+                if (selJson != _lastSelJson)
+                {
+                    _lastSelJson = selJson;
+                    TriggerCollectorRun();
+                }
+            }
         }
         catch (Exception ex)
         {
             Log.Debug("[custom] 保存看板界面状态失败：" + ex.Message);
         }
+    }
+
+    /// <summary>勾选变化后立刻采一轮；10 秒内重复触发会被吞掉，连点不会打一堆请求。</summary>
+    private void TriggerCollectorRun()
+    {
+        var collector = _collector;
+        if (collector is null)
+        {
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        if ((now - _lastAutoRun).TotalSeconds < 10)
+        {
+            return;
+        }
+
+        _lastAutoRun = now;
+        var boardId = _viewModel.BoardId;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await collector.RunNowAsync(boardId).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Log.Debug("[custom] 勾选变化后立即采集失败：" + ex.Message);
+            }
+        });
     }
 
     /// <summary>整窗不透明度 / 背景透明度变了：同步给网页（HwndHost 里的内容不参与窗口 Opacity）。</summary>

@@ -118,6 +118,27 @@ public sealed class CollectorHostTests : DatabaseTestBase
     }
 
     [Fact]
+    public async Task UiState_IsInjectedForScripts()
+    {
+        var todos = new TodoService(Repository, new PermanentFreeEntitlement());
+        var board = CreateScriptedBoard(todos, """
+            function collect() {
+                var n = uiState && uiState.sel ? Object.keys(uiState.sel).length : -1;
+                return { picked: n };
+            }
+            """);
+        var collector = new CollectorHost(todos);
+        collector.AttachUiStateProvider(_ => """{"sel":{"a":true,"b":false}}""");
+        collector.NotifyBoardsChanged();
+
+        await collector.RunNowAsync(board.Id);
+        var snapshot = collector.GetSnapshot(board.Id)!;
+        Assert.Null(snapshot.Error);
+        // 脚本能读到看板界面状态里的勾选集合（价格看板据此只给勾上的模型取价）
+        Assert.Contains("\"picked\":2", snapshot.DataJson);
+    }
+
+    [Fact]
     public async Task RunNow_MissingCollectFunction_ReportsError()
     {
         var todos = new TodoService(Repository, new PermanentFreeEntitlement());

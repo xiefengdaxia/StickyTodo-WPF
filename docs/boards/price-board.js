@@ -6,8 +6,8 @@
 // 注意（实测约束）：
 //   - 渠道响应每家 4KB+（success_buckets / reviews / official_price），整段 JSON.parse 会顶穿
 //     沙盒内存，所以对原文做定点正则抽取，一个模型只留 4 个数字；
-//   - 单轮 20s 预算：上轮还没取到价的最优先，其次默认勾选，其余按分钟轮转，
-//     页面用上一轮缓存的价格补齐（宿主把上一轮数据注入成 prior）。
+//   - 只给看板上「勾上」的模型取价（勾选状态由宿主注入成 uiState），
+//     勾了还没价的优先取，其余按分钟轮转；单轮 20s 预算，页面用上一轮缓存补齐（prior）。
 var HOT_URL = 'https://a6api.vip/api/marketplace/hot-models';
 var API = 'https://a6api.vip/api/marketplace/public/channels/search';
 
@@ -282,21 +282,18 @@ function collect() {
         }
     }
 
-    // 顺序：还没价格的最优先（新上架 / 上轮预算没轮到）→ 默认勾选 → 其余按分钟轮转
-    var fresh = [], prio = [], rest = [];
+    // 只给「勾上」的模型取价：勾选存在看板界面状态里（宿主把 board-ui 的状态注入成 uiState）。
+    // 没勾的模型不浪费请求；勾了但还没价的排最前面，勾了已有价的按分钟轮转刷新。
+    var sel = (uiState && uiState.sel && typeof uiState.sel === 'object') ? uiState.sel : null;
+    var fresh = [], prio = [];
     for (var i = 0; i < MODELS.length; i++) {
         var item = MODELS[i];
-        if (!priced[item.m]) {
-            fresh.push(i);
-        } else if (item.on) {
-            prio.push(i);
-        } else {
-            rest.push(i);
-        }
+        item.active = sel && sel[item.m] !== undefined ? !!sel[item.m] : !!item.on;
+        if (!item.active) { continue; }
+        if (!priced[item.m]) { fresh.push(i); } else { prio.push(i); }
     }
-    var advance = Math.max(1, MAX_FETCH - fresh.length - prio.length);
-    var shift = rest.length ? ((Math.floor(Date.now() / 60000) * advance) % rest.length) : 0;
-    var order = fresh.concat(prio).concat(rest.slice(shift)).concat(rest.slice(0, shift));
+    var shift = prio.length ? (Math.floor(Date.now() / 60000) % prio.length) : 0;
+    var order = fresh.concat(prio.slice(shift)).concat(prio.slice(0, shift));
 
     var got = {}, failed = 0, skipped = 0, done = 0;
     for (var k = 0; k < order.length; k++) {
@@ -315,7 +312,7 @@ function collect() {
         }
         p.m = def.m;
         p.brand = def.brand;
-        p.on = !!def.on;
+        p.on = !!def.active;
         p.bi = def.bi;
         p.listings = def.listings || 0;
         got[def.m] = p;
@@ -326,7 +323,7 @@ function collect() {
     for (var j = 0; j < MODELS.length; j++) {
         var d = MODELS[j];
         var item = got[d.m] || {
-            ok: false, err: '待刷新', m: d.m, brand: d.brand, on: !!d.on, bi: d.bi, listings: d.listings || 0
+            ok: false, err: '待刷新', m: d.m, brand: d.brand, on: !!d.active, bi: d.bi, listings: d.listings || 0
         };
         models.push(item);
     }
@@ -351,6 +348,7 @@ function collect() {
         generatedAt: new Date().toISOString()
     };
 }
+
 
 
 

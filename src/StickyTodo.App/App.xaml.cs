@@ -442,16 +442,23 @@ public partial class App : System.Windows.Application
                     sp.GetRequiredService<EyeCareFilter>(),
                     sp.GetRequiredService<EyeGammaService>(),
                     () => sp.GetRequiredService<TrayService>()));
-                services.AddSingleton(sp => new StickyTodo.Mcp.McpService(
-                    sp.GetRequiredService<StickyTodo.Mcp.IMcpUiHost>(),
-                    sp.GetRequiredService<TodoService>(),
-                    sp.GetRequiredService<AppSettingsService>(),
-                    sp.GetRequiredService<Core.Pomodoro.PomodoroEngine>(),
-                    sp.GetRequiredService<Weather.WeatherService>(),
-                    sp.GetRequiredService<Core.Abstractions.ITokenStatsProvider>(),
-                    AppPaths.McpTokenPath,
-                    AppPaths.McpEndpointPath,
-                    message => Log.Information("[mcp] {Message}", message)));
+                services.AddSingleton(sp =>
+                {
+                    var mcp = new StickyTodo.Mcp.McpService(
+                        sp.GetRequiredService<StickyTodo.Mcp.IMcpUiHost>(),
+                        sp.GetRequiredService<TodoService>(),
+                        sp.GetRequiredService<AppSettingsService>(),
+                        sp.GetRequiredService<Core.Pomodoro.PomodoroEngine>(),
+                        sp.GetRequiredService<Weather.WeatherService>(),
+                        sp.GetRequiredService<Core.Abstractions.ITokenStatsProvider>(),
+                        AppPaths.McpTokenPath,
+                        AppPaths.McpEndpointPath,
+                        message => Log.Information("[mcp] {Message}", message));
+
+                    // 采集脚本能读到看板的界面状态（勾了哪些模型），只给勾上的取价
+                    mcp.Collector.AttachUiStateProvider(StickyTodo.Infrastructure.BoardUiStateStore.Load);
+                    return mcp;
+                });
             })
             .Build();
     }

@@ -59,6 +59,7 @@ public sealed class AppServices : IDisposable
             Infrastructure.AppPaths.McpTokenPath,
             Infrastructure.AppPaths.McpEndpointPath,
             message => Log.Info("[mcp] " + message));
+        Mcp.Collector.AttachUiStateProvider(Infrastructure.BoardUiStateStore.Load);
         Windows.CollectorProvider = () => Mcp.Collector;
         Mcp.StartCollector();
         Mcp.ApplyFromSettings();

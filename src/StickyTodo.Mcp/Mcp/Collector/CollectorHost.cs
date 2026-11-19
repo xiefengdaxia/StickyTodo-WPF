@@ -60,6 +60,12 @@ public sealed class CollectorHost : IDisposable
     /// </summary>
     private Func<string, string?, string?>? _mcpBridge;
 
+    /// <summary>
+    /// 看板界面的状态（区间、勾选…）读取器。App 端接 BoardUiStateStore，
+    /// 脚本里通过 uiState 拿到用户勾了哪些模型，只给勾上的取价。
+    /// </summary>
+    private Func<string, string?>? _uiStateProvider;
+
     /// <summary>某看板采集结果变化（成功或失败都会触发）。事件在后台线程抛出。</summary>
     public event EventHandler<string>? DataChanged;
 
@@ -87,6 +93,9 @@ public sealed class CollectorHost : IDisposable
 
     /// <summary>注入 mcp() 桥（McpService 构造尾部调用；不注入时脚本调 mcp() 会报错）。</summary>
     public void AttachMcpBridge(Func<string, string?, string?> bridge) => _mcpBridge = bridge;
+
+    /// <summary>注入看板界面状态读取器（boardId → JSON），脚本里通过 uiState 用。</summary>
+    public void AttachUiStateProvider(Func<string, string?> provider) => _uiStateProvider = provider;
 
     public void Start()
     {
@@ -433,6 +442,10 @@ public sealed class CollectorHost : IDisposable
         if (__priorJson) {
             try { prior = JSON.parse(__priorJson); } catch (e) { prior = null; }
         }
+        var uiState = null;
+        if (__uiStateJson) {
+            try { uiState = JSON.parse(__uiStateJson); } catch (e) { uiState = null; }
+        }
         """;
 
     private string ExecuteScript(Board board, string? priorDataJson, List<string> log)
@@ -445,6 +458,7 @@ public sealed class CollectorHost : IDisposable
         });
 
         engine.SetValue("__priorJson", priorDataJson);
+        engine.SetValue("__uiStateJson", _uiStateProvider?.Invoke(board.Id));
         engine.SetValue("console", new ConsoleShim(log));
         engine.SetValue("__httpReq", new Func<string, string, string?, long, string, HttpResult>(
             (method, url, body, timeoutMs, headersJson) => HttpCall(method, url, body, timeoutMs, headersJson, log)));
