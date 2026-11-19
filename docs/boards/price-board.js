@@ -6,8 +6,8 @@
 // 注意（实测约束）：
 //   - 渠道响应每家 4KB+（success_buckets / reviews / official_price），整段 JSON.parse 会顶穿
 //     沙盒内存，所以对原文做定点正则抽取，一个模型只留 4 个数字；
-//   - 只给看板上「勾上」的模型取价（勾选状态由宿主注入成 uiState），
-//     勾了还没价的优先取，其余按分钟轮转；单轮 20s 预算，页面用上一轮缓存补齐（prior）。
+//   - 只给看板上「勾上」的模型取价（勾选由宿主注入成 uiState），勾了还没价的优先；
+//     取价走 http_get_many：C# 侧并发 6 个、整批 12 秒上限，页面用上一轮缓存补齐（prior）。
 var HOT_URL = 'https://a6api.vip/api/marketplace/hot-models';
 var API = 'https://a6api.vip/api/marketplace/public/channels/search';
 
@@ -21,9 +21,10 @@ var DAYS = 14;
 var MAX_MODELS = 140;       // 安全阀：热门接口正常返回 110 个左右，全收
 var MIN_LISTINGS = 2;       // 至少 2 家渠道在卖：单渠道的极端价不算行情
 var DEFAULT_BRANDS = 6;     // 默认勾选：渠道数前 6 个品牌各挑一个最热门的
-var MAX_FETCH = 60;         // 单轮最多查这么多个模型的价格（实测每个约 0.4s）
-var BUDGET_MS = 20000;      // 取价预算（Jint 30s 硬超时，留余量）
+var MAX_FETCH = 80;         // 单轮最多取多少个模型（勾选一般远小于这个）
+var CONCURRENCY = 4;        // 批量取价的并发数（并发 6 会被接口 429，4 刚好）
 var REQ_TIMEOUT_MS = 4000;  // 单个模型请求上限
+var BATCH_DEADLINE_MS = 12000; // 整批墙钟上限（Jint 硬超时 30s，留足余量）
 
 // 热门接口挂了时的兜底清单：看板不能变成空白
 var FALLBACK_BRANDS = ['OpenAI', 'Anthropic', 'DeepSeek', 'Zhipu', 'Moonshot', 'xAI', 'Alibaba', 'XIAOMI', 'MiniMax', 'Google'];
@@ -235,11 +236,13 @@ function firstNum(chunk, field) {
     return m ? parseInt(m[1], 10) : 0;
 }
 
-// 某模型前 10 家渠道的四项均价（micros/1M tokens，USD）
-function fetchPrice(model) {
-    var url = API + '?page=1&page_size=10&sort=price_asc&model=' + encodeURIComponent(model);
-    // 网络错误不会抛异常（宿主侧折成 status=0 的结果），单个模型失败只标成「待刷新」
-    var res = http_get(url, REQ_TIMEOUT_MS);
+// 某模型的取价 URL（前 10 家渠道）
+function priceUrl(model) {
+    return API + '?page=1&page_size=10&sort=price_asc&model=' + encodeURIComponent(model);
+}
+
+// 解析一个取价响应 → { ok, n, in, out, cr, cw } 或 { ok:false, err }
+function parsePrice(res) {
     var body = res && res.body ? String(res.body) : '';
     if (body.charAt(0) !== '{') {
         var why = res && res.statusText ? ' · ' + res.statusText : '';
@@ -266,7 +269,6 @@ function fetchPrice(model) {
 }
 
 function collect() {
-    var started = Date.now();
     var usage = fetchUsage();
     var fx = fetchFx();
     var catalog = buildCatalog();
@@ -295,20 +297,29 @@ function collect() {
     var shift = prio.length ? (Math.floor(Date.now() / 60000) % prio.length) : 0;
     var order = fresh.concat(prio.slice(shift)).concat(prio.slice(0, shift));
 
-    var got = {}, failed = 0, skipped = 0, done = 0;
-    for (var k = 0; k < order.length; k++) {
-        var def = MODELS[order[k]];
-        var p;
-        if (done >= MAX_FETCH || Date.now() - started > BUDGET_MS) {
-            p = { ok: false, err: '待刷新' };
-            skipped++;
-        } else {
-            p = fetchPrice(def.m);
-            done++;
-            if (!p.ok) {
-                failed++;
-                console.log('取价失败: ' + def.m + ' | ' + p.err);
-            }
+    var got = {}, failed = 0, skipped = 0;
+
+    // 一次批量取价：C# 侧限流并发（默认 6），比串行一个个等快 4~5 倍
+    var targets = order.slice(0, MAX_FETCH);
+    skipped = order.length - targets.length;
+    var urls = [];
+    for (var t0 = 0; t0 < targets.length; t0++) {
+        urls.push(priceUrl(MODELS[targets[t0]].m));
+    }
+    var results = targets.length
+        ? http_get_many(urls, {
+            timeout_ms: REQ_TIMEOUT_MS,
+            concurrency: CONCURRENCY,
+            deadline_ms: BATCH_DEADLINE_MS
+        })
+        : [];
+
+    for (var t = 0; t < targets.length; t++) {
+        var def = MODELS[targets[t]];
+        var p = parsePrice(results[t]);
+        if (!p.ok) {
+            failed++;
+            console.log('取价失败: ' + def.m + ' | ' + p.err);
         }
         p.m = def.m;
         p.brand = def.brand;
@@ -348,6 +359,9 @@ function collect() {
         generatedAt: new Date().toISOString()
     };
 }
+
+
+
 
 
 

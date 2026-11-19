@@ -506,7 +506,7 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 
 **M12(완료)**
 - [x] **MCP 연결**: 로컬 서버(127.0.0.1 전용 + Bearer 토큰, TcpListener로 최소 HTTP 직접 구현) + Streamable HTTP와 stdio 브리지 이중 전송(브리지는 앱이 꺼져 있으면 자동 실행); 보드 / 할 일 / 메모 / 태그 / 뽀모도로 / 날씨 / Token / 스크린샷 / 알림 / 설정 변경 / 보드 마켓(`list_market` 으로 목록, `install_market_board` 로 설치) 등 32개 도구. MCP가 데이터를 바꾸면 열려 있는 보드가 자동 새로고침
-- [x] **AI 보드**: 새 보드 유형 — UI는 AI가 작성한 완전한 HTML(WebView2 렌더링, 런타임 부재 시 텍스트 표시), 데이터는 AI가 작성한 JS 수집 스크립트가 주기적으로 가져옴. 스크립트는 Jint 샌드박스(http_get/http_post/http만 허용, 메모리/문장/시간 제한); `push_custom_data`로 바로Push
+- [x] **AI 보드**: 새 보드 유형 — UI는 AI가 작성한 완전한 HTML(WebView2 렌더링, 런타임 부재 시 텍스트 표시), 데이터는 AI가 작성한 JS 수집 스크립트가 주기적으로 가져옴. 스크립트는 Jint 샌드박스(http_get/http_get_many(동시 배치)/http_post/http만 허용, 메모리/문장/시간 제한); `push_custom_data`로 바로Push
 - [x] **보드 마켓**: `market/` 디렉터리가 곧 마켓입니다. 폴더 하나 = 보드 패키지 하나(board.json + html + 수집 스크립트 + 미리보기 이미지)이며, 관리 패널에서 클릭 한 번으로 설치/제거할 수 있습니다. AI도 MCP의 `install_market_board` 로 직접 설치할 수 있습니다. 수집 스크립트에는 `mcp(tool, args)` 가 추가되어 프로세스 내에서 로컬 MCP 도구를 직접 호출할 수 있습니다(스크립트는 토큰을 받지 않음)
 - [x] **배경 투명도 보드별 독립**: 🎨 메뉴의 배경·창 투명도는 현재 보드에만 적용(각각 "전역 따르기" 제공); AI 보드 창도 같은 메뉴 사용
 - [x] DB 스키마 v8(board.custom_html / custom_script / custom_interval)
@@ -567,3 +567,4 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 
 코드, UI, 문구, 색상은 모두 이 프로젝트의 독자 구현입니다. 다른 프로그램의 디컴파일 산출물, 리소스 파일, 비공개 API는 복제하지 않았습니다.
 렌더링에 사용하는 시스템 글꼴(「Microsoft YaHei UI」/「Yu Gothic UI」/「Malgun Gothic」 등)은 각자의 라이선스를 따르며 이 프로젝트의 배포물에 포함되지 않습니다.
+

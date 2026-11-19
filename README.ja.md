@@ -530,7 +530,7 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 
 **M12（完了）**
 - [x] **MCP 接続**：ローカルサーバー（127.0.0.1 のみ + Bearer トークン、TcpListener で最小 HTTP を自前実装）＋ Streamable HTTP と stdio ブリッジの両伝送（ブリッジはアプリ未起動なら自動起動）；ボード / タスク / メモ / タグ / ポモドーロ / 天気 / Token / スクリーンショット / 通知 / 設定変更 / ボードマーケット（`list_market` で一覧、`install_market_board` でインストール）の 32 ツール。MCP がデータを変えると開いているボードは自動で再読込
-- [x] **AI ボード**：新しいボード種別 — UI は AI が書いた完全な HTML（WebView2 で描画、ランタイム欠如時はテキスト表示）、データは AI が書いた JS 収集スクリプトが定时取得。スクリプトは Jint サンドボックス（http_get / http_post / http のみ許可、メモリ / 文 / 時間制限）；`push_custom_data` で直接Push
+- [x] **AI ボード**：新しいボード種別 — UI は AI が書いた完全な HTML（WebView2 で描画、ランタイム欠如時はテキスト表示）、データは AI が書いた JS 収集スクリプトが定时取得。スクリプトは Jint サンドボックス（http_get / http_get_many（並列バッチ） / http_post / http のみ許可、メモリ / 文 / 時間制限）；`push_custom_data` で直接Push
 - [x] **ボードマーケット**：`market/` ディレクトリがそのままマーケット。1 フォルダ = 1 ボードパッケージ（board.json + html + 収集スクリプト + プレビュー画像）で、管理パネルからワンクリックでインストール／削除できます。AI も MCP の `install_market_board` で自分で入れられます。収集スクリプトには `mcp(tool, args)` を追加し、プロセス内でローカル MCP ツールを直接呼べるように（スクリプトはトークンを受け取りません）
 - [x] **背景透明度をボードごとに**：🎨 メニューの背景・ウィンドウ透明度は現在のボードだけに効く（各「グローバルに従う」付き）；AI ボードも同じメニューに対応
 - [x] DB スキーマ v8（board.custom_html / custom_script / custom_interval）
@@ -567,3 +567,4 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 
 コード、UI、文言、配色はすべて本プロジェクトのオリジナル実装です。他社プログラムの逆コンパイル成果物、リソースファイル、非公開 API はコピーしていません。
 描画に使用するシステムフォント（「Microsoft YaHei UI」／「Yu Gothic UI」／「Malgun Gothic」など）はそれぞれのライセンスに従うものであり、本プロジェクトの配布物には含まれません。
+

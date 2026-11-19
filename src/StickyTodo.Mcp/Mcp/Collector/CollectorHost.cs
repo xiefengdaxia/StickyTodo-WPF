@@ -41,6 +41,28 @@ public sealed class CollectorHost : IDisposable
     private const int DefaultTimeoutMs = 10000;
     private const int MaxTimeoutMs = 30000;
 
+    /// <summary>批量取数的默认并发与上限（对公开接口别太凶）。</summary>
+    private const int DefaultConcurrency = 4;
+    private const int MaxConcurrency = 12;
+
+    /// <summary>批量接口返回给脚本的单项（camelCase 序列化，脚本 JSON.parse 后直接点属性）。</summary>
+    private sealed record HttpBatchItem(bool Ok, int Status, string StatusText, string Body);
+
+    private static readonly JsonSerializerOptions BatchJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
+    /// <summary>日志可能被批量取数的多个线程同时写，统一加锁。</summary>
+    private static void LogLine(List<string> log, string text)
+    {
+        lock (log)
+        {
+            log.Add(text);
+        }
+    }
+
     /// <summary>单次脚本运行的沙盒限额：内存 64MB、墙钟 30 秒（语句数另见 MaxStatements）。</summary>
     private const int ScriptMemoryBytes = 64 * 1024 * 1024;
 
@@ -432,6 +454,15 @@ public sealed class CollectorHost : IDisposable
         function http_post(url, body, timeout_ms) {
             return __http_req("POST", String(url), body == null ? null : String(body), timeout_ms || 10000, "{}");
         }
+        // 批量 GET：内部 C# 限流并发，返回结果数组（顺序与入参一致），单项失败是 status=0 而不是抛异常
+        function http_get_many(urls, options) {
+            options = options || {};
+            var list = [];
+            for (var i = 0; i < (urls || []).length; i++) { list.push(String(urls[i])); }
+            var raw = __httpGetMany(JSON.stringify(list), options.timeout_ms || 10000,
+                options.concurrency || 4, options.deadline_ms || 15000);
+            try { return JSON.parse(raw); } catch (e) { return []; }
+        }
         function mcp(name, args) {
             var text = __mcpCall(String(name), args == null ? null : JSON.stringify(args));
             if (text == null || text === "") { return null; }
@@ -462,6 +493,9 @@ public sealed class CollectorHost : IDisposable
         engine.SetValue("console", new ConsoleShim(log));
         engine.SetValue("__httpReq", new Func<string, string, string?, long, string, HttpResult>(
             (method, url, body, timeoutMs, headersJson) => HttpCall(method, url, body, timeoutMs, headersJson, log)));
+        engine.SetValue("__httpGetMany", new Func<string, long, int, long, string>(
+            (urlsJson, timeoutMs, concurrency, deadlineMs) =>
+                HttpGetMany(urlsJson, timeoutMs, concurrency, deadlineMs, log)));
         engine.SetValue("__mcpCall", new Func<string, string?, string?>((name, argsJson) =>
         {
             var bridge = _mcpBridge;
@@ -485,7 +519,8 @@ public sealed class CollectorHost : IDisposable
         return result.AsString();
     }
 
-    private static HttpResult HttpCall(string method, string url, string? body, long timeoutMs, string headersJson, List<string> log)
+    private static HttpResult HttpCall(string method, string url, string? body, long timeoutMs, string headersJson,
+        List<string> log, CancellationToken outerToken = default)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
             (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
@@ -514,7 +549,7 @@ public sealed class CollectorHost : IDisposable
                 }
                 catch (Exception)
                 {
-                    log.Add("headers 不是合法 JSON，已忽略");
+                    LogLine(log, "headers 不是合法 JSON，已忽略");
                 }
             }
 
@@ -527,12 +562,13 @@ public sealed class CollectorHost : IDisposable
         }
 
         var timeout = TimeSpan.FromMilliseconds(Math.Clamp(timeoutMs, 500, MaxTimeoutMs));
-        using var cts = new CancellationTokenSource(timeout);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(outerToken);
+        cts.CancelAfter(timeout);
 
         // 网络层失败一律折成 status=0 的结果，不往脚本里抛异常：
         // Jint 的 JS try/catch 接不住 .NET 异常，一抛就整段脚本中止，
         // 看板只剩一行错误、其它模型的数据也一起没了。
-        for (var attempt = 1; attempt <= 2; attempt++)
+        for (var attempt = 1; attempt <= 3; attempt++)
         {
             var attemptStartedAt = Environment.TickCount64;
             try
@@ -543,7 +579,16 @@ public sealed class CollectorHost : IDisposable
                 if (text.Length > MaxResponseBytes)
                 {
                     text = text[..MaxResponseBytes];
-                    log.Add("响应超过 2MB，已截断");
+                    LogLine(log, "响应超过 2MB，已截断");
+                }
+
+                // 批量并发时对方可能限流：退让一下再来，别把 429 当成失败
+                if ((int)response.StatusCode == 429 && attempt < 3)
+                {
+                    var wait = 400 * attempt;
+                    LogLine(log, "接口限流（429），" + wait + "ms 后重试：" + Truncate(url, 120));
+                    Thread.Sleep(wait);
+                    continue;
                 }
 
                 return new HttpResult(
@@ -554,8 +599,11 @@ public sealed class CollectorHost : IDisposable
             }
             catch (OperationCanceledException) when (cts.IsCancellationRequested)
             {
-                log.Add("请求超时：" + Truncate(url, 120));
-                return new HttpResult(false, 0, "请求超时（" + (long)timeout.TotalMilliseconds + " ms）", string.Empty);
+                var reason = outerToken.IsCancellationRequested
+                    ? "批量请求已到截止时间"
+                    : "请求超时（" + (long)timeout.TotalMilliseconds + " ms）";
+                LogLine(log, reason + "：" + Truncate(url, 120));
+                return new HttpResult(false, 0, reason, string.Empty);
             }
             catch (Exception ex) when (ex is HttpRequestException or IOException or OperationCanceledException)
             {
@@ -566,17 +614,85 @@ public sealed class CollectorHost : IDisposable
                 var fastFail = Environment.TickCount64 - attemptStartedAt < Math.Max(1000, (long)timeout.TotalMilliseconds / 2);
                 if (attempt == 1 && fastFail)
                 {
-                    log.Add("连接失败，换新连接重试：" + Truncate(detail, 200));
+                    LogLine(log, "连接失败，换新连接重试：" + Truncate(detail, 200));
                     Thread.Sleep(200);
                     continue;
                 }
 
-                log.Add("请求失败：" + Truncate(detail, 300));
+                LogLine(log, "请求失败：" + Truncate(detail, 300));
                 return new HttpResult(false, 0, Truncate(detail, 300), string.Empty);
             }
         }
 
         return new HttpResult(false, 0, "请求失败", string.Empty);
+    }
+
+    /// <summary>
+    /// 批量 GET：脚本给一组 URL，C# 侧限流并发跑，返回 JSON 数组字符串
+    /// （<c>[{ ok, status, statusText, body }]</c>，顺序与入参一致）。
+    ///
+    /// 单个请求失败不抛异常，和 http_get 一样折成 status=0；<paramref name="deadlineMs"/>
+    /// 是整批的墙钟上限（避免几十个慢请求把脚本的 30 秒硬超时撞掉）。
+    /// </summary>
+    private static string HttpGetMany(string urlsJson, long timeoutMs, int concurrency, long deadlineMs, List<string> log)
+    {
+        string[]? urls;
+        try
+        {
+            urls = JsonSerializer.Deserialize<string[]>(urlsJson);
+        }
+        catch (JsonException)
+        {
+            urls = null;
+        }
+
+        if (urls is null || urls.Length == 0)
+        {
+            return "[]";
+        }
+
+        var limit = Math.Clamp(concurrency <= 0 ? DefaultConcurrency : concurrency, 1, MaxConcurrency);
+        var timeout = Math.Clamp(timeoutMs, 500, MaxTimeoutMs);
+        var deadline = Math.Clamp(deadlineMs, 1000, ScriptTimeoutSeconds * 1000L / 2);
+        using var overall = new CancellationTokenSource(TimeSpan.FromMilliseconds(deadline));
+        using var gate = new SemaphoreSlim(limit, limit);
+
+        var tasks = urls.Select(url => Task.Run(async () =>
+        {
+            try
+            {
+                await gate.WaitAsync(overall.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                return new HttpResult(false, 0, "批量请求已到截止时间", string.Empty);
+            }
+
+            try
+            {
+                return HttpCall("GET", url, null, timeout, "{}", log, overall.Token);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        })).ToArray();
+
+        HttpResult[] results;
+        try
+        {
+            results = Task.WhenAll(tasks).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            LogLine(log, "批量取数失败：" + DescribeError(ex));
+            results = urls.Select(_ => new HttpResult(false, 0, "批量请求失败", string.Empty)).ToArray();
+        }
+
+        var payload = results
+            .Select(r => new HttpBatchItem(r.Ok, r.Status, r.StatusText, r.Body))
+            .ToArray();
+        return JsonSerializer.Serialize(payload, BatchJsonOptions);
     }
 
     /// <summary>

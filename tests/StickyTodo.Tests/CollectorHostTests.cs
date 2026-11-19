@@ -139,6 +139,89 @@ public sealed class CollectorHostTests : DatabaseTestBase
     }
 
     [Fact]
+    public async Task HttpGetMany_RunsConcurrently_AndKeepsOrder()
+    {
+        // 本机起个最小 HTTP 服务：每个请求慢 500ms，4 个并发应该在 1.5s 内回来（串行要 2s）
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (true)
+                {
+                    var client = await listener.AcceptTcpClientAsync().ConfigureAwait(false);
+                    _ = Task.Run(async () =>
+                    {
+                        using (client)
+                        {
+                            using var stream = client.GetStream();
+                            using var reader = new System.IO.StreamReader(stream, System.Text.Encoding.ASCII, false, 1024, leaveOpen: true);
+                            var requestLine = await reader.ReadLineAsync().ConfigureAwait(false);
+                            string? line;
+                            while (!string.IsNullOrEmpty(line = await reader.ReadLineAsync().ConfigureAwait(false)))
+                            {
+                            }
+
+                            await Task.Delay(500).ConfigureAwait(false);
+
+                            // /x1 -> 响应体 "b1"
+                            var path = requestLine!.Split(' ')[1].TrimStart('/');
+                            var body = System.Text.Encoding.ASCII.GetBytes("b" + path.Substring(1));
+                            var head = System.Text.Encoding.ASCII.GetBytes(
+                                "HTTP/1.1 200 OK\r\nContent-Length: " + body.Length + "\r\nConnection: close\r\n\r\n");
+                            await stream.WriteAsync(head).ConfigureAwait(false);
+                            await stream.WriteAsync(body).ConfigureAwait(false);
+                        }
+                    });
+                }
+            }
+            catch (Exception)
+            {
+                // 测试结束 listener.Stop() 会打断 Accept，正常
+            }
+        });
+
+        try
+        {
+            var todos = new TodoService(Repository, new PermanentFreeEntitlement());
+            var board = CreateScriptedBoard(todos, $$"""
+                function collect() {
+                    var urls = [0, 1, 2, 3].map(function (i) { return 'http://127.0.0.1:{{port}}/x' + i; });
+                    var t0 = Date.now();
+                    var r = http_get_many(urls, { timeout_ms: 3000, concurrency: 4, deadline_ms: 6000 });
+                    return {
+                        ms: Date.now() - t0,
+                        n: r.length,
+                        bodies: r.map(function (x) { return x.body; }).join(','),
+                        status: r[0].status
+                    };
+                }
+                """);
+            var collector = CreateCollector(todos);
+            collector.NotifyBoardsChanged();
+
+            await collector.RunNowAsync(board.Id);
+            var snapshot = collector.GetSnapshot(board.Id);
+            Assert.NotNull(snapshot);
+            Assert.Null(snapshot!.Error);
+            Assert.Contains("\"n\":4", snapshot.DataJson);
+            Assert.Contains("b0,b1,b2,b3", snapshot.DataJson);
+            Assert.Contains("\"status\":200", snapshot.DataJson);
+
+            var json = System.Text.Json.JsonDocument.Parse(snapshot.DataJson!);
+            var ms = json.RootElement.GetProperty("ms").GetInt64();
+            Assert.True(ms < 1600, $"4 个 500ms 请求应该并发完成，实际耗时 {ms}ms");
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
+    [Fact]
     public async Task RunNow_MissingCollectFunction_ReportsError()
     {
         var todos = new TodoService(Repository, new PermanentFreeEntitlement());

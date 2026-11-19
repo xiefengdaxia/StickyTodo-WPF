@@ -340,7 +340,7 @@ dotnet run --project tools/IconGen -c Release -- src/StickyTodo.App/Assets/stick
 - 设置页勾选「启用 MCP 接口」（或托盘菜单）后，本机 AI 客户端（ZCode / Claude 等）即可通过 MCP 协议操作应用；端点**只监听 127.0.0.1**，Bearer 令牌鉴权，设置页一键生成接入配置片段
 - 传输两种都支持：**Streamable HTTP**（`http://127.0.0.1:52700/mcp`，端口被占自动顺延）与 **stdio 桥**（`StickyTodo.exe --mcp`，给 Claude Desktop 这类只支持 stdio 的客户端；应用没运行时桥会把它自动拉起来）
 - **32 个工具**：看板增删开关、待办 CRUD / 截止 / 提醒 / 重复规则、便签、标签、番茄钟、天气、Token 用量、桌面截屏（PNG）、托盘通知、读取/修改设置（皮肤、透明度、护眼等即时生效），以及**看板市场**（`list_market` 列出市场看板、`install_market_board` 安装市场看板）
-- **AI 看板**：`create_custom_board(html, script)` —— UI 是 AI 写的完整 HTML（WebView2 渲染，运行时缺失时降级为文本显示），数据由 AI 写的 **JS 采集脚本**定时抓取：脚本跑在 Jint 沙盒里，只有 `http_get / http_post / http` 三个网络函数（碰不到文件和进程），带内存、语句数与超时限额；另有 `mcp(tool, args)` 可以在脚本里直调本机 MCP 工具（如 `mcp('list_todos', {})`），返回已解析对象（进程内调用，脚本拿不到令牌）；`push_custom_data` 可以不经网络直接把数据推上墙
+- **AI 看板**：`create_custom_board(html, script)` —— UI 是 AI 写的完整 HTML（WebView2 渲染，运行时缺失时降级为文本显示），数据由 AI 写的 **JS 采集脚本**定时抓取：脚本跑在 Jint 沙盒里，只有 `http_get / http_get_many（并发批量取数）/ http_post / http` 四个网络函数（碰不到文件和进程），带内存、语句数与超时限额；另有 `mcp(tool, args)` 可以在脚本里直调本机 MCP 工具（如 `mcp('list_todos', {})`），返回已解析对象（进程内调用，脚本拿不到令牌）；`push_custom_data` 可以不经网络直接把数据推上墙
 - **背景透明度 / 整窗透明度 / 皮肤都能按这块看板单独设**（🎨 菜单）
 - MCP 改了数据之后，所有打开着的看板窗口会自动重读，屏幕上的列表立刻是最新的
 - 示例看板（年度进度 / AI 用量热力图 / 站点探针 / 空气质量环 / 昼夜时钟 / 打字机诗句）源码在 `market/`：一个看板一个目录，各含 `board.json` 清单 + `board.html` 界面 + `preview.png` 预览图，AI 用量热力图 / 站点探针 / 空气质量环 / 打字机诗句 另带 `board.js` 采集脚本；管理面板 → 看板市场可一键安装与卸载
@@ -657,3 +657,4 @@ services.AddSingleton<IEntitlementService, PermanentFreeEntitlement>();
 
 代码、UI、文案、配色全部为本项目原创实现，没有复制任何第三方程序的反编译产物、资源文件或私有接口。
 渲染用的系统字体（如「Microsoft YaHei UI」/「Yu Gothic UI」/「Malgun Gothic」）需遵守其各自的授权，不属于本项目分发内容。
+

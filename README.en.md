@@ -531,7 +531,7 @@ Quota checks are only allowed in `TodoService`; the UI's only job is to surface 
 
 **M12 (done)**
 - [x] **MCP access**: local server (127.0.0.1 only + Bearer token; minimal HTTP hand-written over TcpListener) with both Streamable HTTP and a stdio bridge (the bridge auto-launches the app when it is not running); 32 tools covering boards / todos / notes / tags / pomodoro / weather / token usage / screenshot / notifications / settings / the board market (`list_market` lists the packages, `install_market_board` installs one); boards auto-refresh after MCP writes
-- [x] **AI boards**: a new board kind — UI is a full HTML document written by AI (rendered with WebView2, falls back to text when the runtime is missing), fed by AI-written JS collector scripts on a timer; scripts run in a Jint sandbox that only exposes http_get/http_post/http with memory/statement/time limits; `push_custom_data` pushes data without any network
+- [x] **AI boards**: a new board kind — UI is a full HTML document written by AI (rendered with WebView2, falls back to text when the runtime is missing), fed by AI-written JS collector scripts on a timer; scripts run in a Jint sandbox that only exposes http_get/http_get_many (concurrent batch)/http_post/http with memory/statement/time limits; `push_custom_data` pushes data without any network
 - [x] **Board market**: the `market/` folder is the market — one folder equals one board package (board.json + html + collector script + preview image); install and uninstall in one click from the manager panel, and AI can install boards itself through MCP's `install_market_board`; collector scripts gained `mcp(tool, args)` to call local MCP tools in-process (the script never sees the token)
 - [x] **Per-board background opacity**: the 🎨 menu applies background and window opacity to the current board only (each with "follow global"); AI board windows join the same menu
 - [x] Database schema v8 (`board.custom_html` / `custom_script` / `custom_interval`)
@@ -568,3 +568,5 @@ Quota checks are only allowed in `TodoService`; the UI's only job is to surface 
 
 All code, UI, copy and colors are original to this project; no decompiled artifacts, resource files or private APIs from any third-party program were copied.
 System fonts used for rendering (such as "Microsoft YaHei UI" / "Yu Gothic UI" / "Malgun Gothic") remain under their own licenses and are not distributed with this project.
+
+
