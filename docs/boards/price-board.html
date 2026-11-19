@@ -113,7 +113,7 @@
     价格：a6api 模型广场「价格从低到高」前 10 家渠道，输入/输出/缓存读/缓存写四项分别取均价（USD/1M），按实时中间价 <b id="fxNote">7.3</b> 折人民币（每天取一次 open.er-api / ECB，失败退回 7.3）。
     模型清单来自 a6api「<b>热门模型</b>」接口（文本模型、按 token 计费、至少 2 家渠道在卖），品牌内按版本号从大到小排（6.2 → 6.1 → 6），每轮只查 60 个的价格，其余轮转补齐。
     用量：本机 StickyTodo 统计的每日 token（含 5 个客户端），缓存 = 总量 − 输入 − 输出。区间与勾选会自动记住。
-    月估按 <b>22 个工作日</b>折算；单价 = 勾选模型的合计 ÷ tokens × 100 万（¥/1M tokens）。
+    月估按 <b>22 个工作日</b>折算；单价 = 勾选模型的合计 ÷ tokens × 100 万（¥/1M tokens）。表格里带 <b>·旧</b> 的模型表示本轮没轮到取价，用的是上一轮缓存的价格（悬停看是多久前）。
 </div>
 
 <script>
@@ -191,6 +191,12 @@ function fmtMoney(v) {
 function fmtFx(v) {
     if (!v || isNaN(v)) return '7.3';
     return v.toFixed(4);
+}
+// 「·旧」的悬停说明：这一行用的是上一轮缓存的价格
+function staleHint(at) {
+    if (!at) { return '本轮没取到价，用的是缓存里的上一轮价格'; }
+    var mins = Math.round((Date.now() - at) / 60000);
+    return '本轮没取到价，用的是 ' + (mins < 1 ? '1 分钟内' : mins + ' 分钟前') + '的缓存价格';
 }
 function fmtPrice(v) {
     if (v === null || v === undefined) return '—';
@@ -409,7 +415,8 @@ function renderAll() {
     }
     per.forEach(function (x, idx) {
         html += '<tr' + (idx === 0 ? ' class="top"' : '') + '>' +
-            '<td>' + x.m.m + '<span class="tag">' + x.m.brand + (x.m.stale ? '·旧' : '') + '</span></td>' +
+            '<td>' + x.m.m + '<span class="tag"' + (x.m.stale ? ' title="' + staleHint(x.m.at) + '"' : '') +
+                '>' + x.m.brand + (x.m.stale ? '·旧' : '') + '</span></td>' +
             '<td class="num p">' + fmtPrice(x.pIn) + '</td>' +
             '<td class="num p">' + fmtPrice(x.pOut) + '</td>' +
             '<td class="num p">' + fmtPrice(x.pCr) + '</td>' +
@@ -466,12 +473,12 @@ function render(newData, fetchedAt) {
         document.getElementById('root').textContent = '采集数据为空';
         return;
     }
-    (data.models || []).forEach(function (m) { if (m.ok) priceCache[m.m] = { in: m.in, out: m.out, cr: m.cr, cw: m.cw, n: m.n }; });
+    (data.models || []).forEach(function (m) { if (m.ok) priceCache[m.m] = { in: m.in, out: m.out, cr: m.cr, cw: m.cw, n: m.n, t: Date.now() }; });
     data.models = data.models.map(function (m) {
         if (m.ok) return m;
         var c = priceCache[m.m];
         if (!c) return m;
-        return { m: m.m, brand: m.brand, on: m.on, bi: m.bi, ok: true, stale: true, n: c.n, in: c.in, out: c.out, cr: c.cr, cw: c.cw };
+        return { m: m.m, brand: m.brand, on: m.on, bi: m.bi, ok: true, stale: true, at: c.t || 0, n: c.n, in: c.in, out: c.out, cr: c.cr, cw: c.cw };
     });
     saveCache();
     document.getElementById('showPrice').checked = state.showPrice;
