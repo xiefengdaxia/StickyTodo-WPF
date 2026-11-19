@@ -5,14 +5,14 @@
 // 注意（实测约束）：
 //   - 渠道响应每家 4KB+（success_buckets / reviews / official_price），整段 JSON.parse 会顶穿
 //     沙盒内存，所以对原文做定点正则抽取，一个模型只留 4 个数字；
-//   - 单轮 20s 预算：已勾选的模型优先，其余按分钟轮转，页面用上一轮缓存的价格补齐。
+//   - 单轮 20s 预算：上轮还没取到价的最优先，其次默认勾选，其余按分钟轮转，
+//     页面用上一轮缓存的价格补齐（宿主把上一轮数据注入成 prior）。
 var HOT_URL = 'https://a6api.vip/api/marketplace/hot-models';
 var API = 'https://a6api.vip/api/marketplace/public/channels/search';
 
 var FX = 7.3;               // 站内显示汇率 1 USD = 7.3 CNY
 var DAYS = 14;
-var MAX_MODELS = 96;        // 清单上限（每个品牌最多 PER_BRAND 个，全列出来没法看）
-var PER_BRAND = 8;          // 每个品牌最多进几个模型：否则前 N 名全被 OpenAI/Anthropic 占满
+var MAX_MODELS = 140;       // 安全阀：热门接口正常返回 110 个左右，全收
 var MIN_LISTINGS = 2;       // 至少 2 家渠道在卖：单渠道的极端价不算行情
 var DEFAULT_BRANDS = 6;     // 默认勾选：渠道数前 6 个品牌各挑一个最热门的
 var MAX_FETCH = 60;         // 单轮最多查这么多个模型的价格（实测每个约 0.4s）
@@ -115,15 +115,11 @@ function buildCatalog() {
         }
         usable.sort(function (a, b) { return (b.listing_count || 0) - (a.listing_count || 0); });
 
-        // 全局按热度排，但每个品牌只留 PER_BRAND 个，别让头部品牌把清单占满
-        var perBrand = {};
+        // 全收（按热度排序），不做每品牌截断：截断会把新版本模型（gpt-6.2、claude-fable-5-2）
+        // 挡在门外，而「为什么少了某个模型」正是最容易被追问的问题。
+        // MAX_MODELS 只是防接口返回异常膨胀的安全阀。
         for (var k = 0; k < usable.length && models.length < MAX_MODELS; k++) {
             var u = usable[k];
-            var used = perBrand[u.brand] || 0;
-            if (used >= PER_BRAND) {
-                continue;
-            }
-            perBrand[u.brand] = used + 1;
             if (brands.indexOf(u.brand) < 0) {
                 brands.push(u.brand);   // 兜底：接口 brands 里没有的品牌排到最后
             }
@@ -204,14 +200,31 @@ function collect() {
     var catalog = buildCatalog();
     var MODELS = catalog.models;
 
-    // 顺序：已勾选的先抓；其余的按分钟轮转，保证慢的时候也能逐步补齐
-    var prio = [], rest = [];
-    for (var i = 0; i < MODELS.length; i++) {
-        (MODELS[i].on ? prio : rest).push(i);
+    // 上一轮已经拿到价格的模型：宿主把上次的数据注入成 prior（没有就是 null）
+    var priced = {};
+    if (prior && prior.models) {
+        for (var q = 0; q < prior.models.length; q++) {
+            if (prior.models[q] && prior.models[q].ok) {
+                priced[prior.models[q].m] = true;
+            }
+        }
     }
-    var advance = Math.max(1, MAX_FETCH - prio.length);
+
+    // 顺序：还没价格的最优先（新上架 / 上轮预算没轮到）→ 默认勾选 → 其余按分钟轮转
+    var fresh = [], prio = [], rest = [];
+    for (var i = 0; i < MODELS.length; i++) {
+        var item = MODELS[i];
+        if (!priced[item.m]) {
+            fresh.push(i);
+        } else if (item.on) {
+            prio.push(i);
+        } else {
+            rest.push(i);
+        }
+    }
+    var advance = Math.max(1, MAX_FETCH - fresh.length - prio.length);
     var shift = rest.length ? ((Math.floor(Date.now() / 60000) * advance) % rest.length) : 0;
-    var order = prio.concat(rest.slice(shift)).concat(rest.slice(0, shift));
+    var order = fresh.concat(prio).concat(rest.slice(shift)).concat(rest.slice(0, shift));
 
     var got = {}, failed = 0, skipped = 0, done = 0;
     for (var k = 0; k < order.length; k++) {
@@ -262,5 +275,6 @@ function collect() {
         generatedAt: new Date().toISOString()
     };
 }
+
 
 

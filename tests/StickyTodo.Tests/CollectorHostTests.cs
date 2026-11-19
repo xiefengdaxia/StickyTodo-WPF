@@ -94,6 +94,30 @@ public sealed class CollectorHostTests : DatabaseTestBase
     }
 
     [Fact]
+    public async Task PriorData_IsInjectedAsPriorForNextRun()
+    {
+        var todos = new TodoService(Repository, new PermanentFreeEntitlement());
+        var board = CreateScriptedBoard(todos, """
+            function collect() {
+                return { seen: prior ? prior.hello : null, hello: "world" };
+            }
+            """);
+        var collector = CreateCollector(todos);
+        collector.NotifyBoardsChanged();
+
+        await collector.RunNowAsync(board.Id);
+        var first = collector.GetSnapshot(board.Id)!;
+        Assert.Null(first.Error);
+        Assert.Contains("\"seen\":null", first.DataJson);
+
+        await collector.RunNowAsync(board.Id);
+        var second = collector.GetSnapshot(board.Id)!;
+        Assert.Null(second.Error);
+        // 第二轮能读到第一轮的数据（价格看板用它把「还没取到价」的模型排到最前面）
+        Assert.Contains("\"seen\":\"world\"", second.DataJson);
+    }
+
+    [Fact]
     public async Task RunNow_MissingCollectFunction_ReportsError()
     {
         var todos = new TodoService(Repository, new PermanentFreeEntitlement());

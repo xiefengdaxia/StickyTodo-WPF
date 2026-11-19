@@ -231,6 +231,10 @@ function costOf(row, m) {
 function isOn(m) {
     return state.sel[m.m] === undefined ? !!m.on : !!state.sel[m.m];
 }
+// 可用 = 已取到价格，或只是这轮还没轮到（待刷新）
+function isUsable(m) {
+    return !!m && (m.ok || m.err === '待刷新');
+}
 
 // ---------- 区间 ----------
 function renderRanges() {
@@ -280,7 +284,8 @@ function renderPicker() {
     var html = '';
     order.forEach(function (brand) {
         var all = groups[brand];
-        var list = all.filter(function (m) { return m.ok; });
+        // 「待刷新」也算可用：价格还没轮到取，但可以勾上，等轮转到就参与计算
+        var list = all.filter(isUsable);
         var onCount = list.filter(isOn).length;
         var open = !!state.open[brand];
         html += '<div class="group' + (open ? ' open' : '') + '" data-brand="' + brand + '">' +
@@ -292,15 +297,17 @@ function renderPicker() {
             '<span>' + brand + '</span><span class="cnt">' + onCount + '/' + list.length + '</span>' +
             '</div><div class="mlist">';
         all.forEach(function (m) {
-            if (!m.ok) {
-                var pending = m.err === '待刷新';
-                html += '<label class="m off' + (pending ? ' pending' : '') + '" title="' +
-                    (pending ? '这轮还没轮到取价，下一轮补齐' : (m.err || '取价失败')) +
-                    '"><input type="checkbox" disabled>' + m.m + '</label>';
+            var pending = !m.ok && m.err === '待刷新';
+            if (!m.ok && !pending) {
+                html += '<label class="m off" title="' + (m.err || '取价失败') + '">' +
+                    '<input type="checkbox" disabled>' + m.m + '</label>';
                 return;
             }
-            html += '<label class="m' + (isOn(m) ? '' : ' off') + '"' +
-                (m.listings ? ' title="' + m.listings + ' 家渠道在卖"' : '') +
+            var tip = pending
+                ? '还没轮到取价，轮转时会补齐'
+                : (m.listings ? m.listings + ' 家渠道在卖' : '');
+            html += '<label class="m' + (isOn(m) ? '' : ' off') + (pending ? ' pending' : '') + '"' +
+                (tip ? ' title="' + tip + '"' : '') +
                 '><input type="checkbox" data-model="' + m.m + '"' +
                 (isOn(m) ? ' checked' : '') + '>' + m.m + '</label>';
         });
@@ -308,7 +315,8 @@ function renderPicker() {
     });
     document.getElementById('groups').innerHTML = html;
     document.querySelectorAll('#groups input[data-mixed]').forEach(function (el) { el.indeterminate = true; });
-    document.getElementById('selCount').textContent = '· 已选 ' + models.filter(isOn).length + '/' + models.length;
+    document.getElementById('selCount').textContent =
+        '· 已选 ' + models.filter(isOn).length + '/' + models.filter(isUsable).length;
 }
 document.getElementById('groups').addEventListener('click', function (e) {
     var fold = e.target.closest('button[data-fold]');
@@ -322,7 +330,7 @@ document.getElementById('groups').addEventListener('change', function (e) {
     var el = e.target;
     if (el.hasAttribute('data-vendor')) {
         var brand = el.getAttribute('data-vendor');
-        var models = (data.models || []).filter(function (m) { return m.brand === brand && m.ok; });
+        var models = (data.models || []).filter(function (m) { return m.brand === brand && isUsable(m); });
         var allOn = models.every(isOn);
         models.forEach(function (m) { state.sel[m.m] = !allOn; });
     } else if (el.hasAttribute('data-model')) {
@@ -334,7 +342,7 @@ document.getElementById('groups').addEventListener('change', function (e) {
 });
 document.getElementById('selAll').addEventListener('click', function (e) {
     e.preventDefault(); e.stopPropagation();
-    (data.models || []).forEach(function (m) { if (m.ok) state.sel[m.m] = true; });
+    (data.models || []).forEach(function (m) { if (isUsable(m)) state.sel[m.m] = true; });
     saveState(); renderPicker(); renderAll();
 });
 document.getElementById('selNone').addEventListener('click', function (e) {
@@ -502,5 +510,6 @@ if (window.chrome && window.chrome.webview) {
 </script>
 </body>
 </html>
+
 
 

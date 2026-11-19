@@ -364,7 +364,7 @@ public sealed class CollectorHost : IDisposable
             string dataJson;
             try
             {
-                dataJson = ExecuteScript(board, log);
+                dataJson = ExecuteScript(board, run.Snapshot?.DataJson, log);
                 if (dataJson.Length > MaxDataJsonBytes)
                 {
                     throw new InvalidOperationException("采集结果超过 2MB。");
@@ -429,9 +429,13 @@ public sealed class CollectorHost : IDisposable
             // 工具报错时不抛异常，返回 { __mcpError: "错误：…" } 让脚本自己判断
             return JSON.parse(text);
         }
+        var prior = null;
+        if (__priorJson) {
+            try { prior = JSON.parse(__priorJson); } catch (e) { prior = null; }
+        }
         """;
 
-    private string ExecuteScript(Board board, List<string> log)
+    private string ExecuteScript(Board board, string? priorDataJson, List<string> log)
     {
         using var engine = new Engine(options =>
         {
@@ -440,6 +444,7 @@ public sealed class CollectorHost : IDisposable
             options.MaxStatements(200_000);
         });
 
+        engine.SetValue("__priorJson", priorDataJson);
         engine.SetValue("console", new ConsoleShim(log));
         engine.SetValue("__httpReq", new Func<string, string, string?, long, string, HttpResult>(
             (method, url, body, timeoutMs, headersJson) => HttpCall(method, url, body, timeoutMs, headersJson, log)));
