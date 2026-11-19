@@ -75,7 +75,7 @@ public sealed class McpService : IDisposable
         }
         catch (JsonException ex)
         {
-            throw new InvalidOperationException("mcp('" + tool + "') 的参数不是合法 JSON 对象：" + ex.Message);
+            return ErrorPayload("mcp('" + tool + "') 的参数不是合法 JSON 对象：" + ex.Message);
         }
 
         var request = new JsonObject
@@ -104,7 +104,7 @@ public sealed class McpService : IDisposable
             var message = error.TryGetProperty("message", out var text) && text.ValueKind == JsonValueKind.String
                 ? text.GetString()
                 : error.ToString();
-            throw new InvalidOperationException("mcp('" + tool + "') 失败：" + message);
+            return ErrorPayload("mcp('" + tool + "') 失败：" + message);
         }
 
         if (!root.TryGetProperty("result", out var result))
@@ -115,11 +115,19 @@ public sealed class McpService : IDisposable
         var payload = FirstContentText(result);
         if (result.TryGetProperty("isError", out var isError) && isError.ValueKind == JsonValueKind.True)
         {
-            throw new InvalidOperationException("mcp('" + tool + "') 返回错误：" + (payload ?? "未知错误"));
+            return ErrorPayload(payload ?? "未知错误");
         }
 
         return payload;
     }
+
+    /// <summary>
+    /// 工具报错时给脚本一个可判断的对象，而不是抛 .NET 异常：
+    /// Jint 里的 JS try/catch 接不住 CLR 异常，一抛就整段采集脚本中止
+    /// （看板只剩一行 "错误：…"，其它数据也没了）。脚本用 payload.__mcpError 判断。
+    /// </summary>
+    private static string ErrorPayload(string message) =>
+        new JsonObject { ["__mcpError"] = message }.ToJsonString();
 
     private static string? FirstContentText(JsonElement result)
     {

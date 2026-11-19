@@ -6,8 +6,8 @@ using StickyTodo.Mcp;
 namespace StickyTodo.Tests;
 
 /// <summary>
-/// 采集器（Jint 沙盒）回归：collect() 返回值、错误捕获、推送数据。
-/// http 抓取涉及真实网络，单测里不测；脚本行为（同步返回、异常、console.log）都覆盖。
+/// 采集器（Jint 沙盒）回归：collect() 返回值、错误捕获、推送数据、网络失败不中断脚本。
+/// 脚本行为（同步返回、异常、console.log）都覆盖；网络只在本地端口上测「连不上」这种确定路径。
 /// </summary>
 public sealed class CollectorHostTests : DatabaseTestBase
 {
@@ -64,6 +64,33 @@ public sealed class CollectorHostTests : DatabaseTestBase
         var snapshot = collector.GetSnapshot(board.Id);
         Assert.NotNull(snapshot);
         Assert.Contains("目标挂了", snapshot!.Error);
+    }
+
+    [Fact]
+    public async Task HttpFailure_ReturnsFailedResult_InsteadOfAbortingScript()
+    {
+        var todos = new TodoService(Repository, new PermanentFreeEntitlement());
+        var board = CreateScriptedBoard(todos, """
+            function collect() {
+                // 127.0.0.1:1 一定连不上：宿主必须把它折成 status=0 的结果，
+                // 不能抛 .NET 异常（Jint 的 try/catch 接不住，整段脚本会中止）
+                var res = http_get('http://127.0.0.1:1/', 1500);
+                return { ok: res.ok, status: res.status, note: res.statusText };
+            }
+            """);
+        var collector = CreateCollector(todos);
+        collector.NotifyBoardsChanged();
+
+        var ran = await collector.RunNowAsync(board.Id);
+        Assert.True(ran);
+
+        var snapshot = collector.GetSnapshot(board.Id);
+        Assert.NotNull(snapshot);
+        Assert.Null(snapshot!.Error);
+        Assert.Contains("\"status\":0", snapshot.DataJson);
+        Assert.Contains("\"ok\":false", snapshot.DataJson);
+        // statusText 带着失败原因（TLS / 拒绝连接…），看板 Tooltip 用它
+        Assert.DoesNotContain("\"note\":\"\"", snapshot.DataJson);
     }
 
     [Fact]

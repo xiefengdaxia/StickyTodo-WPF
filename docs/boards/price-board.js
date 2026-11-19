@@ -41,14 +41,12 @@ var BUDGET_MS = 25000;
 
 // 本机用量：近 14 天逐日 input/output/total/steps
 // 沙盒内置 mcp(tool, args)：进程内直调本机 MCP 工具，返回已解析的对象，脚本不需要令牌。
-// 工具报错时 mcp() 会抛异常（文本形如「错误：…」）——必须在这里接住：
-// 漏出去会让整个 collect() 挂掉，看板只剩一行 JSON 解析错误，价格也一起没了。
+// 工具报错时返回 { __mcpError: "错误：…" }（宿主不抛异常：Jint 的 try/catch 接不住 CLR 异常，
+// 一抛整段脚本就中止，价格也一起没了）。所以这里只判断 __mcpError，用量失败不影响取价。
 function fetchUsage() {
-    var payload;
-    try {
-        payload = mcp('get_token_stats', { days: DAYS });
-    } catch (e) {
-        return { error: '本机用量读取失败：' + String((e && e.message) || e), rows: [] };
+    var payload = mcp('get_token_stats', { days: DAYS });
+    if (payload && payload.__mcpError) {
+        return { error: '本机用量读取失败：' + payload.__mcpError, rows: [] };
     }
     if (!payload) {
         return { error: '本机用量读取失败（MCP 无返回）', rows: [] };
@@ -77,10 +75,12 @@ function firstNum(chunk, field) {
 // 某模型前 10 家渠道的四项均价（micros/1M tokens，USD）
 function fetchPrice(model) {
     var url = API + '?page=1&page_size=10&sort=price_asc&model=' + encodeURIComponent(model);
+    // 网络错误不会抛异常（宿主侧折成 status=0 的结果），单个模型失败只标成「待刷新」
     var res = http_get(url, 6000);
     var body = res && res.body ? String(res.body) : '';
     if (body.charAt(0) !== '{') {
-        return { ok: false, err: '取价失败 HTTP ' + (res ? res.status : '?') };
+        var why = res && res.statusText ? ' · ' + res.statusText : '';
+        return { ok: false, err: '取价失败 HTTP ' + (res ? res.status : '?') + why };
     }
     var chunks = body.split('"listing_id"');
     var n = Math.min(10, chunks.length - 1);

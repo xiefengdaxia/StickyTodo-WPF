@@ -40,11 +40,11 @@ function parseKey(key) {
 }
 
 function collect() {
-    var raw;
-    try {
-        raw = mcp(MCP_TOOL, { days: DAYS });
-    } catch (e) {
-        throw new Error('读不到本机 Token 用量：' + ((e && e.message) || String(e)));
+    // 工具报错时返回 { __mcpError }，宿主不会抛异常（JS 的 try/catch 接不住 CLR 异常）
+    var raw = mcp(MCP_TOOL, { days: DAYS });
+
+    if (raw && raw.__mcpError) {
+        throw new Error('读不到本机 Token 用量：' + raw.__mcpError);
     }
 
     if (!raw || typeof raw !== 'object') {

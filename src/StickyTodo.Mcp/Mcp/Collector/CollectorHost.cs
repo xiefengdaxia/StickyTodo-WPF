@@ -68,7 +68,15 @@ public sealed class CollectorHost : IDisposable
         _todos = todos;
     }
 
-    private static HttpClient CreateClient() => new()
+    private static HttpClient CreateClient() => new(new SocketsHttpHandler
+    {
+        // 看板的取价接口在 CDN 后面（a6api → apisnode 两个边缘 IP）。机器休眠、换网络、
+        // 边缘换证书之后，连接池里那条老 TLS 连接会一直握手失败（The SSL connection could
+        // not be established），所以别让它抱太久：到点就换新连接。
+        PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+        PooledConnectionIdleTimeout = TimeSpan.FromSeconds(30),
+        ConnectTimeout = TimeSpan.FromSeconds(10),
+    })
     {
         // 单进程共享：频繁轮询别把连接池/TLS 握手打爆（同 WeatherService 的口径）。
         // 单次调用真正的时间上限由调用方传的 timeout_ms 经 CancellationToken 控制。
@@ -364,7 +372,8 @@ public sealed class CollectorHost : IDisposable
             }
             catch (Exception ex)
             {
-                var message = ex.Message.Length > LogLineLimit * 2 ? ex.Message[..(LogLineLimit * 2)] : ex.Message;
+                var detail = DescribeError(ex);
+                var message = detail.Length > LogLineLimit * 2 ? detail[..(LogLineLimit * 2)] : detail;
                 // 保留上一次的好数据，让看板继续有东西可看，错误挂在旁边
                 run.Snapshot = new CollectorSnapshot(run.Snapshot?.DataJson, message, now, null, log);
                 DataChanged?.Invoke(this, run.BoardId);
@@ -417,6 +426,7 @@ public sealed class CollectorHost : IDisposable
         function mcp(name, args) {
             var text = __mcpCall(String(name), args == null ? null : JSON.stringify(args));
             if (text == null || text === "") { return null; }
+            // 工具报错时不抛异常，返回 { __mcpError: "错误：…" } 让脚本自己判断
             return JSON.parse(text);
         }
         """;
@@ -464,46 +474,109 @@ public sealed class CollectorHost : IDisposable
             throw new InvalidOperationException("只支持 http/https 地址：" + Truncate(url, 200));
         }
 
-        using var request = new HttpRequestMessage(new HttpMethod(ValidateMethod(method)), uri);
-        if (!string.IsNullOrEmpty(headersJson))
+        var verb = new HttpMethod(ValidateMethod(method));
+
+        // 每次尝试都要一条新请求（HttpRequestMessage 不能重发）
+        HttpRequestMessage CreateRequest()
         {
-            try
+            var request = new HttpRequestMessage(verb, uri);
+            if (!string.IsNullOrEmpty(headersJson))
             {
-                using var document = JsonDocument.Parse(headersJson);
-                foreach (var header in document.RootElement.EnumerateObject())
+                try
                 {
-                    if (header.Value.ValueKind == JsonValueKind.String && !IsForbiddenHeader(header.Name))
+                    using var document = JsonDocument.Parse(headersJson);
+                    foreach (var header in document.RootElement.EnumerateObject())
                     {
-                        request.Headers.TryAddWithoutValidation(header.Name, header.Value.GetString());
+                        if (header.Value.ValueKind == JsonValueKind.String && !IsForbiddenHeader(header.Name))
+                        {
+                            request.Headers.TryAddWithoutValidation(header.Name, header.Value.GetString());
+                        }
                     }
                 }
+                catch (Exception)
+                {
+                    log.Add("headers 不是合法 JSON，已忽略");
+                }
             }
-            catch (Exception)
-            {
-                log.Add("headers 不是合法 JSON，已忽略");
-            }
-        }
 
-        if (!string.IsNullOrEmpty(body))
-        {
-            request.Content = new StringContent(body, Encoding.UTF8);
+            if (!string.IsNullOrEmpty(body))
+            {
+                request.Content = new StringContent(body, Encoding.UTF8);
+            }
+
+            return request;
         }
 
         var timeout = TimeSpan.FromMilliseconds(Math.Clamp(timeoutMs, 500, MaxTimeoutMs));
         using var cts = new CancellationTokenSource(timeout);
-        using var response = SharedHttp.SendAsync(request, cts.Token).GetAwaiter().GetResult();
-        var text = response.Content.ReadAsStringAsync(cts.Token).GetAwaiter().GetResult();
-        if (text.Length > MaxResponseBytes)
+
+        // 网络层失败一律折成 status=0 的结果，不往脚本里抛异常：
+        // Jint 的 JS try/catch 接不住 .NET 异常，一抛就整段脚本中止，
+        // 看板只剩一行错误、其它模型的数据也一起没了。
+        for (var attempt = 1; attempt <= 2; attempt++)
         {
-            text = text[..MaxResponseBytes];
-            log.Add("响应超过 2MB，已截断");
+            var attemptStartedAt = Environment.TickCount64;
+            try
+            {
+                using var request = CreateRequest();
+                using var response = SharedHttp.SendAsync(request, cts.Token).GetAwaiter().GetResult();
+                var text = response.Content.ReadAsStringAsync(cts.Token).GetAwaiter().GetResult();
+                if (text.Length > MaxResponseBytes)
+                {
+                    text = text[..MaxResponseBytes];
+                    log.Add("响应超过 2MB，已截断");
+                }
+
+                return new HttpResult(
+                    response.IsSuccessStatusCode,
+                    (int)response.StatusCode,
+                    response.ReasonPhrase ?? string.Empty,
+                    text);
+            }
+            catch (OperationCanceledException) when (cts.IsCancellationRequested)
+            {
+                log.Add("请求超时：" + Truncate(url, 120));
+                return new HttpResult(false, 0, "请求超时（" + (long)timeout.TotalMilliseconds + " ms）", string.Empty);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or IOException or OperationCanceledException)
+            {
+                var detail = DescribeError(ex);
+
+                // 只在「几毫秒就失败」时才重试：老 TLS 连接被边缘关掉属于这一类；
+                // 真超时/慢网络就不要再等一轮了。
+                var fastFail = Environment.TickCount64 - attemptStartedAt < Math.Max(1000, (long)timeout.TotalMilliseconds / 2);
+                if (attempt == 1 && fastFail)
+                {
+                    log.Add("连接失败，换新连接重试：" + Truncate(detail, 200));
+                    Thread.Sleep(200);
+                    continue;
+                }
+
+                log.Add("请求失败：" + Truncate(detail, 300));
+                return new HttpResult(false, 0, Truncate(detail, 300), string.Empty);
+            }
         }
 
-        return new HttpResult(
-            response.IsSuccessStatusCode,
-            (int)response.StatusCode,
-            response.ReasonPhrase ?? string.Empty,
-            text);
+        return new HttpResult(false, 0, "请求失败", string.Empty);
+    }
+
+    /// <summary>
+    /// 异常链压成一行：SSL 这类错误的真正原因全在 inner exception 里
+    /// （外层只有一句 "The SSL connection could not be established"）。
+    /// </summary>
+    private static string DescribeError(Exception ex)
+    {
+        var parts = new List<string>();
+        for (var e = ex; e is not null; e = e.InnerException)
+        {
+            var text = e.Message.Trim();
+            if (text.Length > 0 && !parts.Contains(text))
+            {
+                parts.Add(text);
+            }
+        }
+
+        return string.Join(" ← ", parts);
     }
 
     private static string ValidateMethod(string method)
