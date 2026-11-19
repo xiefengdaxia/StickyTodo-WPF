@@ -109,6 +109,7 @@
 
 <div class="note">
     价格：a6api 模型广场「价格从低到高」前 10 家渠道，输入/输出/缓存读/缓存写四项分别取均价（USD/1M），按 <b id="fxNote">7.3</b> 折人民币。
+    模型清单来自 a6api「<b>热门模型</b>」接口（文本模型、按 token 计费、至少 2 家渠道在卖），每轮只查 40 个的价格，其余轮转补齐。
     用量：本机 StickyTodo 统计的每日 token（含 5 个客户端），缓存 = 总量 − 输入 − 输出。区间与勾选会自动记住。
     月估按 <b>22 个工作日</b>折算；单价 = 勾选模型的合计 ÷ tokens × 100 万（¥/1M tokens）。
 </div>
@@ -293,7 +294,9 @@ function renderPicker() {
                 html += '<label class="m off" title="' + (m.err || '取价失败') + '"><input type="checkbox" disabled>' + m.m + '</label>';
                 return;
             }
-            html += '<label class="m' + (isOn(m) ? '' : ' off') + '"><input type="checkbox" data-model="' + m.m + '"' +
+            html += '<label class="m' + (isOn(m) ? '' : ' off') + '"' +
+                (m.listings ? ' title="' + m.listings + ' 家渠道在卖"' : '') +
+                '><input type="checkbox" data-model="' + m.m + '"' +
                 (isOn(m) ? ' checked' : '') + '>' + m.m + '</label>';
         });
         html += '</div></div>';
@@ -456,7 +459,10 @@ function render(newData, fetchedAt) {
     renderPicker();
     renderAll();
     var miss = (data.models || []).filter(function (m) { return !m.ok; }).length;
-    document.getElementById('hint').textContent = miss > 0 ? ('还有 ' + miss + ' 个模型价格待补齐') : '';
+    var hints = [];
+    if (data.catalogError) { hints.push('模型清单降级：' + data.catalogError); }
+    if (miss > 0) { hints.push('还有 ' + miss + ' 个模型价格待补齐'); }
+    document.getElementById('hint').textContent = hints.join(' · ');
 }
 
 loadState();
@@ -491,3 +497,4 @@ if (window.chrome && window.chrome.webview) {
 </script>
 </body>
 </html>
+
