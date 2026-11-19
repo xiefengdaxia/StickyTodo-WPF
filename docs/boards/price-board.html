@@ -54,6 +54,8 @@
     .group.open .mlist { display: flex; }
     .group label.m { display: flex; align-items: center; gap: 4px; font-size: 11px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .group label.m.off { opacity: .45; text-decoration: line-through; }
+    /* 只是「这一轮还没轮到取价」，不是失败：别划掉，淡一点就行 */
+    .group label.m.pending { text-decoration: none; }
     input[type=checkbox] { accent-color: var(--chipOn); margin: 0; flex: none; }
     table { width: 100%; border-collapse: collapse; font-size: 12px; }
     th, td { padding: 4px 5px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
@@ -109,7 +111,7 @@
 
 <div class="note">
     价格：a6api 模型广场「价格从低到高」前 10 家渠道，输入/输出/缓存读/缓存写四项分别取均价（USD/1M），按 <b id="fxNote">7.3</b> 折人民币。
-    模型清单来自 a6api「<b>热门模型</b>」接口（文本模型、按 token 计费、至少 2 家渠道在卖），每轮只查 40 个的价格，其余轮转补齐。
+    模型清单来自 a6api「<b>热门模型</b>」接口（文本模型、按 token 计费、至少 2 家渠道在卖），每轮只查 60 个的价格，其余轮转补齐。
     用量：本机 StickyTodo 统计的每日 token（含 5 个客户端），缓存 = 总量 − 输入 − 输出。区间与勾选会自动记住。
     月估按 <b>22 个工作日</b>折算；单价 = 勾选模型的合计 ÷ tokens × 100 万（¥/1M tokens）。
 </div>
@@ -291,7 +293,10 @@ function renderPicker() {
             '</div><div class="mlist">';
         all.forEach(function (m) {
             if (!m.ok) {
-                html += '<label class="m off" title="' + (m.err || '取价失败') + '"><input type="checkbox" disabled>' + m.m + '</label>';
+                var pending = m.err === '待刷新';
+                html += '<label class="m off' + (pending ? ' pending' : '') + '" title="' +
+                    (pending ? '这轮还没轮到取价，下一轮补齐' : (m.err || '取价失败')) +
+                    '"><input type="checkbox" disabled>' + m.m + '</label>';
                 return;
             }
             html += '<label class="m' + (isOn(m) ? '' : ' off') + '"' +
@@ -497,4 +502,5 @@ if (window.chrome && window.chrome.webview) {
 </script>
 </body>
 </html>
+
 

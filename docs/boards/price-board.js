@@ -11,11 +11,11 @@ var API = 'https://a6api.vip/api/marketplace/public/channels/search';
 
 var FX = 7.3;               // 站内显示汇率 1 USD = 7.3 CNY
 var DAYS = 14;
-var MAX_MODELS = 72;        // 清单上限（每个品牌最多 PER_BRAND 个，全列出来没法看）
-var PER_BRAND = 6;          // 每个品牌最多进几个模型：否则前 60 名全被 OpenAI/Anthropic 占满
+var MAX_MODELS = 96;        // 清单上限（每个品牌最多 PER_BRAND 个，全列出来没法看）
+var PER_BRAND = 8;          // 每个品牌最多进几个模型：否则前 N 名全被 OpenAI/Anthropic 占满
 var MIN_LISTINGS = 2;       // 至少 2 家渠道在卖：单渠道的极端价不算行情
 var DEFAULT_BRANDS = 6;     // 默认勾选：渠道数前 6 个品牌各挑一个最热门的
-var MAX_FETCH = 40;         // 单轮最多查这么多个模型的价格（实测每个约 0.4s）
+var MAX_FETCH = 60;         // 单轮最多查这么多个模型的价格（实测每个约 0.4s）
 var BUDGET_MS = 20000;      // 取价预算（Jint 30s 硬超时，留余量）
 var REQ_TIMEOUT_MS = 4000;  // 单个模型请求上限
 
@@ -262,4 +262,5 @@ function collect() {
         generatedAt: new Date().toISOString()
     };
 }
+
 
