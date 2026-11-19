@@ -110,7 +110,7 @@
 </details>
 
 <div class="note">
-    价格：a6api 模型广场「价格从低到高」前 10 家渠道，输入/输出/缓存读/缓存写四项分别取均价（USD/1M），按 <b id="fxNote">7.3</b> 折人民币。
+    价格：a6api 模型广场「价格从低到高」前 10 家渠道，输入/输出/缓存读/缓存写四项分别取均价（USD/1M），按实时中间价 <b id="fxNote">7.3</b> 折人民币（每天取一次 open.er-api / ECB，失败退回 7.3）。
     模型清单来自 a6api「<b>热门模型</b>」接口（文本模型、按 token 计费、至少 2 家渠道在卖），品牌内按版本号从大到小排（6.2 → 6.1 → 6），每轮只查 60 个的价格，其余轮转补齐。
     用量：本机 StickyTodo 统计的每日 token（含 5 个客户端），缓存 = 总量 − 输入 − 输出。区间与勾选会自动记住。
     月估按 <b>22 个工作日</b>折算；单价 = 勾选模型的合计 ÷ tokens × 100 万（¥/1M tokens）。
@@ -131,6 +131,7 @@ var UNITS = [
 var STORE_KEY = 'stickytodo.priceBoard.v1';
 var CACHE_KEY = '{{SECRET_8v0cm9hd}}';
 var FX = 7.3;
+var fxSource = '';
 var MONTH_DAYS = 22;   // 月估按 22 个工作日折算（不是自然月 30 天）
 var data = null;
 var state = { range: 'today', sel: {}, open: {}, showPrice: false, unit: 'en' };
@@ -185,6 +186,10 @@ function fmtMoney(v) {
     if (v >= 10) return v.toFixed(2);
     if (v >= 1) return v.toFixed(2);
     if (v >= 0.01) return v.toFixed(3);
+    return v.toFixed(4);
+}
+function fmtFx(v) {
+    if (!v || isNaN(v)) return '7.3';
     return v.toFixed(4);
 }
 function fmtPrice(v) {
@@ -377,7 +382,7 @@ function renderAll() {
 
     document.getElementById('meta').textContent =
         '区间 ' + rangeLabel + '（' + n + ' 天） · 模型 ' + selModels.length + '/' + data.models.length +
-        ' · 汇率 ' + FX + ' · ' + (data.usageSource || '本机用量');
+        ' · 汇率 ' + fmtFx(FX) + (fxSource ? '（' + fxSource + '）' : '') + ' · ' + (data.usageSource || '本机用量');
     updateMemNote();
 
     // 汇总：第一行 token 四项，第二行次数 / 单价 / 合计 / 月估
@@ -455,7 +460,8 @@ function render(newData, fetchedAt) {
     document.getElementById('error').textContent = newData && newData.usageError ? newData.usageError : '';
     data = newData;
     FX = data.fx || 7.3;
-    document.getElementById('fxNote').textContent = FX;
+    fxSource = data.fxSource || '';
+    document.getElementById('fxNote').textContent = fmtFx(FX);
     if (!data.models || !data.models.length) {
         document.getElementById('root').textContent = '采集数据为空';
         return;
@@ -510,6 +516,9 @@ if (window.chrome && window.chrome.webview) {
 </script>
 </body>
 </html>
+
+
+
 
 
 

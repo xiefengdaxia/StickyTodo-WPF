@@ -2,6 +2,7 @@
 // 1) mcp('get_token_stats') 拿近 14 天本机用量
 // 2) 热门模型接口（/api/marketplace/hot-models）拿「现在有渠道在卖」的文本模型清单
 // 3) 逐个模型查模型广场：价格从低到高前 10 家渠道，四价分别求平均
+// 4) 取一次实时汇率（USD→CNY），失败时退回兜底值
 // 注意（实测约束）：
 //   - 渠道响应每家 4KB+（success_buckets / reviews / official_price），整段 JSON.parse 会顶穿
 //     沙盒内存，所以对原文做定点正则抽取，一个模型只留 4 个数字；
@@ -10,7 +11,12 @@
 var HOT_URL = 'https://a6api.vip/api/marketplace/hot-models';
 var API = 'https://a6api.vip/api/marketplace/public/channels/search';
 
-var FX = 7.3;               // 站内显示汇率 1 USD = 7.3 CNY
+var FX_FALLBACK = 7.3;      // 汇率接口全挂时的兜底（写死会有偏差，只当保险）
+// 两个免费、无需 key 的公开中间价接口，按顺序试
+var FX_SOURCES = [
+    { url: 'https://open.er-api.com/v6/latest/USD', name: 'open.er-api' },
+    { url: 'https://api.frankfurter.app/latest?from=USD&to=CNY', name: 'ECB' }
+];
 var DAYS = 14;
 var MAX_MODELS = 140;       // 安全阀：热门接口正常返回 110 个左右，全收
 var MIN_LISTINGS = 2;       // 至少 2 家渠道在卖：单渠道的极端价不算行情
@@ -72,6 +78,34 @@ function fetchUsage() {
         });
     }
     return { rows: rows, source: payload.source || '' };
+}
+
+// 实时汇率：USD → CNY 中间价。接口都很小（几 KB），失败就换下一个。
+// 一天只取一次：prior 里记着上次的日期，同一天直接复用（含重启前那次）。
+function fetchFx() {
+    var now = new Date();
+    var dayKey = now.getFullYear() + '-' + (now.getMonth() + 1) + '-' + now.getDate();
+
+    if (prior && prior.fxDay === dayKey && prior.fx > 4 && prior.fx < 12 && prior.fxSource !== '兜底') {
+        return { rate: prior.fx, source: prior.fxSource || '缓存', error: '', day: dayKey };
+    }
+
+    for (var i = 0; i < FX_SOURCES.length; i++) {
+        var res = http_get(FX_SOURCES[i].url, 5000);
+        var body = res && res.body ? String(res.body) : '';
+        if (body.charAt(0) !== '{') { continue; }
+        var payload;
+        try {
+            payload = JSON.parse(body);
+        } catch (e) {
+            continue;
+        }
+        var rate = payload && payload.rates ? parseFloat(payload.rates.CNY) : NaN;
+        if (rate > 4 && rate < 12) {
+            return { rate: rate, source: FX_SOURCES[i].name, error: '', day: dayKey };
+        }
+    }
+    return { rate: FX_FALLBACK, source: '兜底', error: '汇率接口失败，用兜底 ' + FX_FALLBACK, day: dayKey };
 }
 
 // ---------------- 模型清单：热门模型接口 ----------------
@@ -234,6 +268,7 @@ function fetchPrice(model) {
 function collect() {
     var started = Date.now();
     var usage = fetchUsage();
+    var fx = fetchFx();
     var catalog = buildCatalog();
     var MODELS = catalog.models;
 
@@ -298,9 +333,13 @@ function collect() {
 
     if (usage.error) console.log(usage.error);
     if (catalog.error) console.log(catalog.error);
+    if (fx.error) console.log(fx.error);
 
     return {
-        fx: FX,
+        fx: fx.rate,
+        fxDay: fx.day || '',
+        fxSource: fx.source || '',
+        fxError: fx.error || '',
         days: DAYS,
         usageSource: usage.source || '',
         usageError: usage.error || '',
@@ -312,6 +351,7 @@ function collect() {
         generatedAt: new Date().toISOString()
     };
 }
+
 
 
 
