@@ -43,6 +43,8 @@ public sealed class MultiAgentTokenStatsProvider : ITokenStatsProvider
             new QoderAgentSource(),
             new KimiAgentSource(),
             new PiAgentSource(),
+            // DSH（DeepSeek Harness 桌面端）的 zstd 会话日志
+            new DshAgentSource(),
             // Alma 自己的账本（%APPDATA%\Alma\chat_threads.db 的 agent_op_traces）
             new AlmaAgentSource());
     }

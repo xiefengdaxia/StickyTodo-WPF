@@ -12,6 +12,8 @@
   <ItemGroup>
     <PackageReference Include="Dapper" Version="2.1.35" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.10" />
+    <!-- DSH 的会话日志是 zstd 压缩的 JSONL（纯托管实现，没有原生依赖） -->
+    <PackageReference Include="ZstdSharp.Port" Version="0.8.1" />
   </ItemGroup>
 
   <PropertyGroup>
